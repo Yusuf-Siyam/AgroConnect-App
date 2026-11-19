@@ -1,6 +1,8 @@
 import { View } from 'react-native';
 import { TextInput, type TextInputProps } from 'react-native';
 
+import { theme } from '@/theme';
+
 import { AppText } from './AppText';
 
 export function TextField({
@@ -16,7 +18,7 @@ export function TextField({
       <TextInput
         {...props}
         placeholder={placeholder}
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor={theme.colors.muted}
         className={`min-h-12 rounded-xl border bg-white px-4 py-3 text-base text-ink ${
           error ? 'border-danger' : 'border-line'
         }`}

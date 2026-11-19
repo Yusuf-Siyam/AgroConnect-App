@@ -1,6 +1,7 @@
 import { ActivityIndicator, View } from 'react-native';
 
 import { useTranslation } from '@/i18n';
+import { theme } from '@/theme';
 
 import { AppText } from './AppText';
 
@@ -12,7 +13,7 @@ export function SplashScreen() {
       <AppText variant="title" className="text-primary">
         {t('common.appName')}
       </AppText>
-      <ActivityIndicator color="#2E7D32" />
+      <ActivityIndicator color={theme.colors.primary} />
       <AppText variant="caption">{t('common.loading')}</AppText>
     </View>
   );

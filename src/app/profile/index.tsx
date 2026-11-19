@@ -9,6 +9,7 @@ import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { Screen } from '@/components/common/Screen';
+import { StateView } from '@/components/common/StateView';
 import { TextField } from '@/components/common/TextField';
 import { validationKey } from '@/features/authentication/errorMessages';
 import { profileSchema, type ProfileValues } from '@/features/authentication/schemas';
@@ -87,8 +88,16 @@ export default function ProfileScreen() {
               />
             )}
           />
+          {mutation.isPending ? <StateView state="loading" title={t('common.saving')} /> : null}
+          {mutation.isError ? (
+            <StateView
+              state="error"
+              onRetry={() => {
+                void onSubmit();
+              }}
+            />
+          ) : null}
           {mutation.isSuccess ? <AppText className="text-success">{t('profile.updateSuccess')}</AppText> : null}
-          {mutation.isError ? <AppText variant="error">{t('error.generic')}</AppText> : null}
           <Button
             label={formState.isSubmitting ? t('common.saving') : t('profile.updateAction')}
             onPress={onSubmit}

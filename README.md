@@ -58,7 +58,7 @@ Update this table at the end of every phase.
 | 01 | Project Foundation | Complete |
 | 02 | Firebase Integration | Complete |
 | 03 | Authentication | Complete |
-| 04 | UI Foundation | Not started |
+| 04 | UI Foundation | Complete |
 | 05 | Farmer Module | Not started |
 | 06 | Buyer Module | Not started |
 | 07 | Order and Payment | Not started |
@@ -292,6 +292,8 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 
 **Phase 03 additions:** Auth forms and profile parsing live in `src/features/authentication/`; session state is provided by `src/providers/AuthProvider.tsx`. Backend verification is in `backend/src/middleware/auth.ts`, profile endpoints in `backend/src/routes/auth.ts`, and secure admin provisioning in `backend/src/scripts/provision-admin.ts`. Rule-based role screens live under the `(farmer)`, `(buyer)`, `(transporter)`, and `(admin)` route groups.
 
+**Phase 04 additions:** Design tokens live in `src/theme/` and `tailwind.config.js`. Reusable UI lives in `src/components/common/`, shared dashboard chrome in `src/components/navigation/`, and typed Bangla/English dictionaries in `src/locales/` with the locale store in `src/store/locale.ts`.
+
 ---
 
 ## 10. UI/UX and Localization
@@ -358,12 +360,12 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** role-based authentication is implemented end to end; live sign-in and token verification require real Firebase credentials (see §14). Phone OTP is documented as unavailable on this Expo Go-compatible stack rather than simulated.
 
 ### Phase 04 - UI Foundation
-- [ ] Global theme and reusable components
-- [ ] Common navigation
-- [ ] Bangla/English localization
-- [ ] Loading and error components
+- [x] Global theme and reusable components
+- [x] Common navigation
+- [x] Bangla/English localization
+- [x] Loading and error components
 
-**Result:** consistent mobile design system.
+**Result:** consistent mobile design system with Bangla as the default language, English switching, shared role-dashboard chrome, and reusable state components.
 
 ### Phase 05 - Farmer Module
 - [ ] Dashboard
@@ -633,6 +635,15 @@ Firebase initialization is lazy: the app and backend start without credentials, 
 7. **Phone OTP:** the installed Firebase JS SDK does not support native phone authentication in Expo Go. The OTP screen states this explicitly and no mock verification is performed. Native OTP would require `@react-native-firebase/auth`, `expo-dev-client`, configuration files, and a development build.
 
 Verification performed in this repository: mobile `npm run typecheck`, `npm run lint`, `npx expo-doctor`, and web/iOS/Android exports; backend `npm run typecheck`, `npm run build`, and 12 `npm test` assertions. Live email/password sign-in, token verification, and admin claim propagation are **UNVERIFIED** without real Firebase credentials.
+
+### Phase 04 setup (UI Foundation)
+
+- Design tokens are centralized in `src/theme/index.ts`; Tailwind class tokens are declared in `tailwind.config.js`. Primary green, dark-green secondary, light canvas, rounded cards/buttons, and accessible touch targets are the baseline.
+- Reusable components: `AppText`, `Button`, `TextField`, `Card`, `Screen`, `StateView`, `RoleBadge`, `RolePicker`, `LanguageSwitcher`, `RoleGuard`, and `SplashScreen` in `src/components/common/`.
+- Common navigation is provided by `src/components/navigation/RoleNavigator.tsx` and `DashboardHeader.tsx`, giving all four role dashboards the same header, role badge, profile action, and language switcher.
+- Localization uses typed flat dictionaries in `src/locales/en.ts` and `src/locales/bn.ts`. Bangla is the default; a device locale of `en` selects English on first launch. A user's choice is persisted with Zustand and can be changed from Profile. `app.json` declares `bn` and `en` as supported locales and disables RTL (both languages are LTR). Web text receives the matching `lang` attribute.
+- Loading, error, and empty states use `StateView`; profile mutations show a real loading/error state with retry. No simulated data or mock success responses were added.
+- This phase needs no new credentials. Verification: mobile `npm run typecheck`, `npm run lint`, `npx expo-doctor` (20/20), and web/iOS/Android exports. Visual review on physical devices is **UNVERIFIED** in this environment.
 
 ---
 

@@ -1,5 +1,7 @@
 import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 
+import { theme } from '@/theme';
+
 import { AppText } from './AppText';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'danger';
@@ -47,7 +49,9 @@ export function Button({
       }`}
     >
       <View className="flex-row items-center gap-2">
-        {loading ? <ActivityIndicator color={variant === 'outline' ? '#1F2937' : '#FFFFFF'} /> : null}
+        {loading ? (
+          <ActivityIndicator color={variant === 'outline' ? theme.colors.ink : theme.colors.surface} />
+        ) : null}
         <AppText className={`font-semibold ${labelClasses[variant]}`}>{label}</AppText>
       </View>
     </TouchableOpacity>

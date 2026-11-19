@@ -1,4 +1,6 @@
-import { Text as RNText, type TextProps } from 'react-native';
+import { Platform, Text as RNText, type TextProps } from 'react-native';
+
+import { useTranslation } from '@/i18n';
 
 type Variant = 'title' | 'subtitle' | 'body' | 'label' | 'caption' | 'error';
 
@@ -17,9 +19,12 @@ export function AppText({
   style,
   ...props
 }: TextProps & { variant?: Variant }) {
+  const { locale } = useTranslation();
+
   return (
     <RNText
       {...props}
+      lang={Platform.OS === 'web' ? (locale === 'bn' ? 'bn-BD' : 'en-GB') : undefined}
       className={`${variantClasses[variant]} ${className}`}
       style={[{ textAlign: 'left' }, style]}
     />
