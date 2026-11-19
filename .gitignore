@@ -1,41 +1,68 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# AgroConnect ignore rules
+# Mobile: Expo / React Native / NativeWind. Backend: Node.js / Express / TypeScript.
 
-# dependencies
+# Dependencies (root and backend)
 node_modules/
 
-# Expo
+# Expo, Metro and React Native generated files
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
+.metro-health-check*
+/ios/
+/android/
+*.apk
+*.aab
+*.ipa
+*.app
+*.hbc
+*.bundle
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
+# Backend and test build outputs
+backend/dist/
+coverage/
+.nyc_output/
+*.lcov
+junit.xml
+
+# Environment variables, credentials and service accounts
+.env
+.env.*
+!.env.example
+*.pem
 *.p8
 *.p12
 *.key
+*.pfx
+*.jks
+*.keystore
 *.mobileprovision
+*serviceAccount*.json
+*service-account*.json
+*firebase-adminsdk*.json
 
-# Metro
-.metro-health-check*
-
-# debug
+# Logs, caches and temporary files
+*.log
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+bun-debug.log*
+*.tmp
+*.swp
+*.swo
+*~
+.cache/
+.parcel-cache/
+.turbo/
 
-# macOS
+# Editor and operating-system files
 .DS_Store
-*.pem
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
 
-# local env files
-.env*.local
-
-# typescript
+# TypeScript incremental build info
 *.tsbuildinfo
-
-# generated native folders
-/ios
-/android

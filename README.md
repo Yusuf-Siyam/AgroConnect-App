@@ -1,0 +1,638 @@
+# AgroConnect
+
+**Connecting Farmers. Empowering Agriculture.**
+
+An AI-powered agricultural marketplace connecting farmers, buyers, and transporters in Bangladesh.
+Farm-to-consumer trading with AI crop support and smart logistics, in Bangla and English.
+
+> This README is the **main project specification**. Human developers and AI agents must follow it. See [Section 13](#13-ai-agent-working-rules) for agent rules and [Section 11](#11-development-phases) for the build order.
+
+---
+
+## Table of Contents
+
+1. [Project Overview](#1-project-overview)
+2. [Progress Tracker](#2-progress-tracker)
+3. [Technology Stack](#3-technology-stack)
+4. [Architecture and Roles](#4-architecture-and-roles)
+5. [Features](#5-features)
+6. [Order Workflow](#6-order-workflow)
+7. [Database Structure](#7-database-structure)
+8. [Backend API](#8-backend-api)
+9. [Project Structure](#9-project-structure)
+10. [UI/UX and Localization](#10-uiux-and-localization)
+11. [Development Phases](#11-development-phases)
+12. [Standards, Security and Testing](#12-standards-security-and-testing)
+13. [AI Agent Working Rules](#13-ai-agent-working-rules)
+14. [Configuration and Setup](#14-configuration-and-setup)
+15. [Open Decisions](#15-open-decisions)
+16. [Initial AI Prompt](#16-initial-ai-prompt)
+
+---
+
+## 1. Project Overview
+
+### Core Concept
+Farm-to-consumer marketplace with AI crop support and smart logistics.
+
+### Main Objectives
+- Direct farmer-to-buyer trading.
+- Transparent agricultural pricing.
+- AI-based crop disease detection.
+- AI farming assistance (Bangla and English).
+- Smart delivery with GPS tracking.
+- Secure payments.
+- Full Bangla and English support.
+
+### Success Goal
+Deliver a secure, scalable, bilingual, AI-powered agricultural marketplace for Bangladesh.
+
+---
+
+## 2. Progress Tracker
+
+Update this table at the end of every phase.
+
+| Phase | Name | Status |
+|------:|------|--------|
+| 01 | Project Foundation | Complete |
+| 02 | Firebase Integration | Not started |
+| 03 | Authentication | Not started |
+| 04 | UI Foundation | Not started |
+| 05 | Farmer Module | Not started |
+| 06 | Buyer Module | Not started |
+| 07 | Order and Payment | Not started |
+| 08 | Transporter Module | Not started |
+| 09 | AI Integration | Not started |
+| 10 | Communication | Not started |
+| 11 | Advanced Features | Not started |
+| 12 | Admin and Deployment | Not started |
+
+Status values: `Not started` / `In progress` / `Complete` / `Blocked`.
+
+---
+
+## 3. Technology Stack
+
+### Mobile Application
+React Native, Expo, TypeScript, Expo Router, NativeWind, Zustand, TanStack Query, Axios, React Hook Form, Zod.
+
+### Backend
+Node.js, Express.js, TypeScript, Firebase Admin SDK, REST API.
+
+### Firebase
+Authentication, Cloud Firestore, Storage, Cloud Messaging (FCM), Firestore Security Rules.
+
+### External Services
+
+| Service | Purpose |
+|---------|---------|
+| Gemini API | AI farming assistant |
+| Verified image classification model | Plant disease detection |
+| Google Maps | Maps and GPS |
+| Open-Meteo | Weather |
+| bKash / Nagad | Payment gateway |
+
+---
+
+## 4. Architecture and Roles
+
+One mobile application with four role-based dashboards.
+
+```text
+React Native App  ->  Express REST API  ->  Firebase / External Services
+   (Expo Router)       (Zod, auth,           (Auth, Firestore, Storage,
+                        rate limiting)         FCM, Gemini, Maps, Payments)
+```
+
+- Login uses **Firebase Authentication**. Express middleware verifies Firebase ID tokens.
+- **Firestore** holds application data and powers realtime features.
+- All sensitive business operations are validated by the **backend**.
+- Authorization is enforced by backend middleware **and** Firestore Security Rules. Never rely on frontend role checks alone.
+- **Admin accounts are provisioned securely** (e.g., server-side script or claim assignment), never through public registration.
+
+### User Roles
+
+| Role | Registration | Dashboard |
+|------|--------------|-----------|
+| Farmer | Public | `(farmer)` |
+| Buyer | Public | `(buyer)` |
+| Transporter | Public (with vehicle details, subject to verification) | `(transporter)` |
+| Admin | Secure provisioning only | `(admin)` |
+
+After authentication, users are redirected to the dashboard for their role.
+
+---
+
+## 5. Features
+
+### A. Authentication
+Splash screen, onboarding, registration, login, OTP verification where supported, password recovery, role-based navigation, profile management.
+
+### B. Farmer Module
+Dashboard, product add/edit/delete, product images, harvest information, inventory management, accept/reject orders, sales analytics, earnings summary, weather forecast, market price information, harvest calendar.
+
+### C. Buyer Module
+Marketplace, categories, search and filters, product details, farmer profiles, cart, wishlist, checkout, order history, ratings and reviews, group buying, emergency listings.
+
+### D. Transporter Module
+Registration, vehicle information, available delivery jobs, accept/reject jobs, pickup confirmation, GPS tracking, delivery status, earnings and commission.
+
+### E. AI Features
+1. Plant disease detection from leaf images.
+2. Bangla and English AI farming assistant.
+3. Disease symptoms and prevention guidance.
+4. Fertilizer and irrigation guidance.
+5. Crop price prediction (**only with sufficient historical data**).
+
+> AI results are **advisory, not guaranteed diagnoses**. Low-confidence results must be shown as uncertain.
+
+### F. Logistics
+Distance-based pricing, weight-based pricing, local unit conversion, pickup and drop-off locations, live tracking during active delivery, delivery confirmation.
+
+### G. Communication
+Buyer-Farmer chat, Buyer-Transporter chat, admin support, realtime messages, push notifications, unread indicators.
+
+### H. Admin Module
+User verification, user management, product moderation, complaint management, order monitoring, payment monitoring, commission management, platform analytics.
+
+### I. Advanced Features
+Bangla voice assistant, QR product traceability, farmer reputation score, smart group buying, offline farming information, smart demand forecasting.
+
+---
+
+## 6. Order Workflow
+
+### Statuses
+
+```text
+pending -> accepted -> paid -> shipment_accepted -> collected -> shipped -> delivered
+```
+
+Also supported: `rejected`, `cancelled`.
+
+### Proposed Transition Rules (finalize in Phase 07)
+
+| From | To | Allowed actor |
+|------|----|---------------|
+| pending | accepted / rejected | Farmer (owner of the products) |
+| pending | cancelled | Buyer |
+| accepted | paid | **System only**, after server-side payment verification |
+| accepted | cancelled | Buyer, Farmer, Admin |
+| paid | shipment_accepted | Transporter (accepts the delivery job) |
+| shipment_accepted | collected | Transporter (pickup confirmation) |
+| collected | shipped | Transporter |
+| shipped | delivered | Transporter (delivery confirmation) |
+| paid or later | cancelled | Admin only (refund handling) |
+
+### Rules
+- Validate **every** status transition on the backend.
+- Users must never be able to set payment or delivery status arbitrarily.
+- Store order item price snapshots at order time.
+- Use Firestore transactions for stock updates.
+- Prevent duplicate orders and duplicate payments (idempotency keys).
+- Verify payment gateway callbacks server-side.
+
+---
+
+## 7. Database Structure
+
+Cloud Firestore collections:
+
+```text
+users/                  products/              orders/
+carts/                  wishlists/             transporters/
+deliveryJobs/           payments/              chats/
+messages/               notifications/         reviews/
+cropDiagnoses/          farmingConversations/  priceHistory/
+groupPurchases/         harvestRecords/        productBatches/
+reports/
+```
+
+### Data Rules
+- Use document IDs consistently.
+- Store timestamps; maintain `createdAt` and `updatedAt` on every document.
+- Paginate large collections.
+- Create required Firestore indexes.
+- Snapshot prices in order items.
+- Use transactions for stock updates.
+- Prevent duplicate payments and orders.
+- Restrict all access through Security Rules.
+
+---
+
+## 8. Backend API
+
+REST modules:
+
+```text
+/api/auth      /api/users     /api/products   /api/cart
+/api/orders    /api/payments  /api/delivery   /api/ai
+/api/weather   /api/market    /api/chat       /api/reviews
+/api/admin
+```
+
+Required middleware and practices:
+- Authentication middleware (Firebase ID token verification).
+- Role authorization middleware.
+- Zod request validation.
+- Central error handling with a consistent error format.
+- Rate limiting.
+- Secure environment variables.
+- Server-side verification of payment callbacks.
+
+---
+
+## 9. Project Structure
+
+```text
+AgroConnect/
+├── app/
+│   ├── (auth)/
+│   ├── (farmer)/
+│   ├── (buyer)/
+│   ├── (transporter)/
+│   ├── (admin)/
+│   ├── chat/
+│   └── profile/
+├── components/
+│   ├── common/
+│   ├── product/
+│   ├── order/
+│   └── dashboard/
+├── features/
+│   ├── authentication/   ├── farmer/        ├── buyer/
+│   ├── transporter/      ├── marketplace/   ├── orders/
+│   ├── payments/         ├── logistics/     ├── ai/
+│   ├── notifications/    └── admin/
+├── services/
+├── hooks/
+├── store/
+├── types/
+├── utils/
+├── constants/
+├── assets/
+└── backend/
+    └── src/
+        ├── config/
+        ├── middleware/
+        ├── modules/
+        ├── routes/
+        ├── services/
+        ├── validators/
+        ├── types/
+        └── server.ts
+```
+
+Adapt the structure when necessary, without creating unnecessary complexity.
+
+**Phase 01 adaptation:** Expo Router routes live in `src/app/` (the Expo SDK 58 default), with the remaining mobile code under `src/`. The backend lives in `backend/src/`. Empty folders contain `.gitkeep` files until their phases are implemented.
+
+---
+
+## 10. UI/UX and Localization
+
+### Design Guidelines
+- Primary color: green. Secondary color: dark green.
+- Clean white/light background.
+- Consistent spacing, reusable components.
+- Rounded cards and buttons.
+- Clear typography, accessible touch targets.
+- Loading, error, and empty states on every data screen.
+
+### Localization
+- Bangla (default) and English.
+- Centralized translation files. **No hardcoded UI text.**
+- Localized notifications and order statuses.
+- Supported units: kg, gram, মণ (maund), ton, with conversion.
+
+---
+
+## 11. Development Phases
+
+**Follow phases in order. Never generate the whole application in one response.**
+
+For every phase:
+1. Inspect existing project files.
+2. Understand the existing architecture.
+3. Implement only the requested phase.
+4. Write complete, working code.
+5. Install only necessary dependencies.
+6. Explain changed files briefly.
+7. Run TypeScript checks and relevant tests.
+8. Fix errors before finishing.
+9. Update the Progress Tracker above.
+10. Wait for approval before starting the next phase.
+
+Do not use fake APIs, hardcoded production data, or mock success responses. If credentials are unavailable, create safe configuration placeholders and document the setup.
+
+### Phase 01 - Project Foundation
+- [x] Create Expo TypeScript project
+- [x] Configure Expo Router
+- [x] Configure NativeWind
+- [x] Install essential dependencies
+- [x] Create folder structure
+- [x] Configure environment variables
+- [x] Set up Git
+- [x] Prepare Node.js Express TypeScript backend
+
+**Result:** clean, runnable mobile and backend projects.
+
+### Phase 02 - Firebase Integration
+- [ ] Configure Firebase, Authentication, Firestore, Storage, FCM
+- [ ] Set up Firebase Admin SDK
+- [ ] Create Security Rules
+
+**Result:** working Firebase connection.
+
+### Phase 03 - Authentication
+- [ ] Login, registration, OTP (where available), password recovery
+- [ ] User profile and role selection
+- [ ] Backend token verification
+- [ ] Protected routes
+
+**Result:** fully working role-based authentication.
+
+### Phase 04 - UI Foundation
+- [ ] Global theme and reusable components
+- [ ] Common navigation
+- [ ] Bangla/English localization
+- [ ] Loading and error components
+
+**Result:** consistent mobile design system.
+
+### Phase 05 - Farmer Module
+- [ ] Dashboard
+- [ ] Product CRUD and image uploads
+- [ ] Inventory
+- [ ] Order management
+- [ ] Sales analytics
+- [ ] Weather and market prices
+
+**Result:** working Farmer Dashboard.
+
+### Phase 06 - Buyer Module
+- [ ] Marketplace, categories, search and filters
+- [ ] Product details
+- [ ] Cart and wishlist
+- [ ] Checkout
+- [ ] Reviews
+
+**Result:** working Buyer shopping experience.
+
+### Phase 07 - Order and Payment
+- [ ] Order creation and stock validation
+- [ ] Order status management
+- [ ] Payment initiation and verification
+- [ ] Transaction history
+
+**Result:** secure order and payment workflow.
+
+### Phase 08 - Transporter Module
+- [ ] Transporter profile and vehicle information
+- [ ] Delivery jobs and job acceptance
+- [ ] Delivery status and GPS tracking
+- [ ] Delivery pricing
+- [ ] Earnings
+
+**Result:** working Transporter Dashboard.
+
+### Phase 09 - AI Integration
+- [ ] Crop image upload
+- [ ] Disease classification
+- [ ] Gemini farming assistant with Bangla responses
+- [ ] Diagnosis history
+- [ ] Confidence handling
+
+**Result:** working AI farming features.
+
+### Phase 10 - Communication
+- [ ] Realtime chat and message history
+- [ ] Unread indicators
+- [ ] Push notifications
+- [ ] Admin support
+
+**Result:** working communication system.
+
+### Phase 11 - Advanced Features
+Implement individually:
+- [ ] Voice assistant
+- [ ] Crop price prediction
+- [ ] Group buying
+- [ ] QR traceability
+- [ ] Harvest calendar
+- [ ] Offline mode
+- [ ] Farmer reputation
+
+**Result:** advanced AgroConnect features.
+
+### Phase 12 - Admin and Deployment
+- [ ] Admin dashboard
+- [ ] User verification
+- [ ] Product moderation
+- [ ] Complaint management
+- [ ] Order monitoring
+- [ ] Analytics
+- [ ] Security audit
+- [ ] Testing
+- [ ] Production deployment
+
+**Result:** production-ready application.
+
+### Cross-Phase Dependencies
+
+- **Phases 05 and 06 depend on Phase 07 for order data.** Build the order screens and checkout UI in their phases, but keep order submission disabled (clearly labeled, not mocked) until Phase 07 delivers the real order API.
+- **Phase 07 payments need gateway credentials** (bKash/Nagad merchant or sandbox access).
+- **Phase 08 delivery jobs** require orders from Phase 07 to reach `paid`.
+- **Phase 10 push notifications** require the FCM setup from Phase 02.
+
+---
+
+## 12. Standards, Security and Testing
+
+### Coding Standards
+- TypeScript throughout; avoid unnecessary `any`.
+- Modular architecture; reusable components.
+- Separate UI, business logic, and API calls.
+- Zustand for client state; TanStack Query for server state.
+- Zod for validation; React Hook Form for forms.
+- Consistent API error handling.
+- Transactions for critical operations.
+- Tests for important business logic.
+
+### Security Baseline
+- Never expose API secrets. Gemini, payment, and Firebase Admin credentials live **only** on the backend.
+- Verify ID tokens on every protected route.
+- Enforce roles on the backend and in Firestore Rules.
+- Validate all input with Zod.
+- Rate limit public and AI endpoints.
+- Verify payment callbacks server-side.
+- Provision admins through a secure channel only.
+
+### Testing Requirements
+
+| Area | Must cover |
+|------|-----------|
+| Authentication | Valid and invalid login, role permissions, unauthorized access, session persistence |
+| Marketplace | Product creation and updates, search and filters, image uploads |
+| Orders | Stock validation, duplicate order prevention, status transitions, payment verification |
+| Logistics | Job acceptance, location permissions, tracking, delivery confirmation |
+| AI | Image upload, prediction handling, Bangla responses, invalid and uncertain results |
+| Security | Unauthorized API access, role escalation, data validation, Firestore Rules, secret protection |
+
+---
+
+## 13. AI Agent Working Rules
+
+You are the senior full-stack developer for AgroConnect.
+
+1. Follow this README as the main specification.
+2. Inspect existing code before changing anything.
+3. Work on one phase at a time; do not start future phases.
+4. Keep existing working features intact.
+5. Generate complete, runnable code.
+6. Never skip necessary configuration.
+7. Never invent API credentials. Never expose secrets.
+8. Test each completed phase and never fabricate test results.
+9. Maintain project documentation.
+10. If blocked, report the exact blocker instead of claiming completion.
+11. If a requirement conflicts with an earlier instruction, state the conflict before proceeding.
+
+### Token Optimization
+- Do not repeat project explanations.
+- Do not regenerate unchanged files.
+- Show only relevant code and file changes.
+- Keep progress summaries short.
+- Reuse existing components; avoid unnecessary dependencies.
+
+### Completion Report (after each phase)
+
+```text
+STATUS: COMPLETE / BLOCKED
+Phase:
+Completed:
+Files Created:
+Files Updated:
+Dependencies:
+Tests:            (label each: TESTED / REVIEWED / UNVERIFIED)
+Errors:
+Assumptions:
+Remaining Tasks:
+Next Phase:
+```
+
+**STOP after each phase and wait for user approval.**
+
+---
+
+## 14. Configuration and Setup
+
+> Commands and scripts are added here as each phase is completed. Do not document commands that do not exist yet.
+
+### Prerequisites
+- Node.js (current LTS) and npm
+- Git
+- Firebase project (Authentication, Firestore, Storage, Cloud Messaging enabled)
+- Android Studio and/or Xcode for device builds
+
+### Environment Variables (placeholders only, never commit real values)
+
+**Mobile (`.env`)**: only non-secret, public configuration.
+
+```text
+EXPO_PUBLIC_API_BASE_URL=
+EXPO_PUBLIC_FIREBASE_API_KEY=
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+EXPO_PUBLIC_FIREBASE_APP_ID=
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=       # restrict by app and API in Google Cloud
+```
+
+**Backend (`backend/.env`)**: secrets, server only.
+
+```text
+PORT=
+NODE_ENV=
+CORS_ORIGINS=
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
+GEMINI_API_KEY=
+DISEASE_MODEL_ENDPOINT=
+DISEASE_MODEL_API_KEY=
+BKASH_APP_KEY=
+BKASH_APP_SECRET=
+BKASH_USERNAME=
+BKASH_PASSWORD=
+BKASH_BASE_URL=
+NAGAD_MERCHANT_ID=
+NAGAD_PUBLIC_KEY=
+NAGAD_PRIVATE_KEY=
+NAGAD_BASE_URL=
+```
+
+Add `.env` and service-account files to `.gitignore`. Provide `.env.example` files with empty values.
+
+### Phase 01 setup and scripts
+
+Copy `.env.example` to `.env` (mobile) and `backend/.env.example` to `backend/.env` (backend), then fill in only the values needed for the environment. Real credentials and service-account files are never committed.
+
+Mobile (project root):
+
+```bash
+npm install
+npm start              # Expo dev server
+npm run web            # Metro web dev server
+npm run android        # Android
+npm run ios            # iOS
+npm run typecheck      # tsc --noEmit
+npm run lint           # expo lint
+npx expo-doctor        # dependency/config diagnostics
+```
+
+Backend (`backend/`):
+
+```bash
+npm install
+npm run dev            # tsx watch src/server.ts
+npm run build          # TypeScript -> dist/
+npm start              # node dist/server.js
+npm run typecheck      # tsc --noEmit
+npm test               # built-in node:test suite
+```
+
+The backend exposes `GET /api/health` and a consistent JSON 404/error format. After installing native dependencies, use a development build if Expo Go reports a missing native module; later phases will add more native modules.
+
+---
+
+## 15. Open Decisions
+
+Resolve these early; record the outcome here.
+
+| # | Decision | Needed by | Outcome |
+|--:|----------|-----------|---------|
+| 1 | Firebase client library: Firebase JS SDK vs React Native Firebase (affects Expo Go vs development builds, FCM, phone OTP) | Phase 02 | Pending |
+| 2 | Disease classification model: which verified model or hosted service, supported crops, and licensing | Phase 09 | Pending |
+| 3 | Payment gateway access: bKash/Nagad merchant or sandbox credentials and callback URL hosting | Phase 07 | Pending |
+| 4 | Admin provisioning method (script vs custom claims) | Phase 03 | Pending |
+| 5 | Backend hosting and deployment target | Phase 12 | Pending |
+| 6 | Source of market price and price history data (price prediction requires sufficient history) | Phase 05 / 11 | Pending |
+| 7 | Commission rates and delivery pricing formula | Phase 07 / 08 | Pending |
+
+---
+
+## 16. Initial AI Prompt
+
+Start the build with this instruction:
+
+> Read README.md completely. Inspect the existing repository. Understand the architecture and requirements. Start Phase 01 only. Build the Expo TypeScript mobile foundation and Node.js Express TypeScript backend. Do not implement future phases. Test everything, update documentation, report changed files and wait for approval.
+
+---
+
+## License
+
+To be decided by the project owner.
+
+**AgroConnect - Connecting Farmers. Empowering Agriculture.**
