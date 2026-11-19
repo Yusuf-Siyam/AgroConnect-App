@@ -1,14 +1,62 @@
 import '../../global.css';
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { SplashScreen } from '@/components/common/SplashScreen';
+import { AppLocaleProvider } from '@/providers/AppLocaleProvider';
+import { AuthProvider, useAuth } from '@/providers/AuthProvider';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 1, staleTime: 30_000 },
+    mutations: { retry: 0 },
+  },
+});
+
+function AppNavigator() {
+  const { status } = useAuth();
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={status === 'unauthenticated'} redirectTo="/login">
+        <Stack.Screen name="(auth)" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={status === 'authenticated'} redirectTo="/login">
+        <Stack.Screen name="(farmer)" />
+        <Stack.Screen name="(buyer)" />
+        <Stack.Screen name="(transporter)" />
+        <Stack.Screen name="(admin)" />
+        <Stack.Screen name="profile" />
+      </Stack.Protected>
+
+      <Stack.Screen name="index" />
+    </Stack>
+  );
+}
+
+function RootContent() {
+  const { status } = useAuth();
+
+  if (status === 'loading') return <SplashScreen />;
+
+  return <AppNavigator />;
+}
+
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }} />
-    </SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <AppLocaleProvider>
+        <AuthProvider>
+          <SafeAreaProvider>
+            <StatusBar style="dark" />
+            <RootContent />
+          </SafeAreaProvider>
+        </AuthProvider>
+      </AppLocaleProvider>
+    </QueryClientProvider>
   );
 }

@@ -1,12 +1,12 @@
-import { Text, View } from 'react-native';
+import { Redirect } from 'expo-router';
 
-import { APP_NAME, TAGLINE } from '@/constants/strings';
+import { useAuth } from '@/providers/AuthProvider';
+import { homePathForRole } from '@/types/user';
 
 export default function Index() {
-  return (
-    <View className="flex-1 items-center justify-center bg-white px-6">
-      <Text className="text-3xl font-bold text-primary">{APP_NAME}</Text>
-      <Text className="mt-3 text-center text-base text-slate-600">{TAGLINE}</Text>
-    </View>
-  );
+  const { status, role } = useAuth();
+
+  if (status === 'authenticated') return <Redirect href={homePathForRole(role)} />;
+  if (status === 'unauthenticated') return <Redirect href="/login" />;
+  return null;
 }

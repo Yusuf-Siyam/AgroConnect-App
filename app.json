@@ -30,6 +30,13 @@
         {
           "defaultChannel": "default"
         }
+      ],
+      [
+        "expo-localization",
+        {
+          "supportedLocales": ["bn", "en"],
+          "supportsRTL": false
+        }
       ]
     ],
     "experiments": {

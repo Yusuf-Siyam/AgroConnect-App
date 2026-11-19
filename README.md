@@ -57,7 +57,7 @@ Update this table at the end of every phase.
 |------:|------|--------|
 | 01 | Project Foundation | Complete |
 | 02 | Firebase Integration | Complete |
-| 03 | Authentication | Not started |
+| 03 | Authentication | Complete |
 | 04 | UI Foundation | Not started |
 | 05 | Farmer Module | Not started |
 | 06 | Buyer Module | Not started |
@@ -290,6 +290,8 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 
 **Phase 02 additions:** Firebase client initialization and push-token helpers live in `src/services/`. The Admin SDK initializer lives in `backend/src/config/firebase.ts`. Security Rules and their Firebase CLI configuration live in `firebase/firestore.rules`, `firebase/storage.rules`, and `firebase.json`.
 
+**Phase 03 additions:** Auth forms and profile parsing live in `src/features/authentication/`; session state is provided by `src/providers/AuthProvider.tsx`. Backend verification is in `backend/src/middleware/auth.ts`, profile endpoints in `backend/src/routes/auth.ts`, and secure admin provisioning in `backend/src/scripts/provision-admin.ts`. Rule-based role screens live under the `(farmer)`, `(buyer)`, `(transporter)`, and `(admin)` route groups.
+
 ---
 
 ## 10. UI/UX and Localization
@@ -348,12 +350,12 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** working Firebase connection (code and configuration complete; live verification requires project credentials — see §14).
 
 ### Phase 03 - Authentication
-- [ ] Login, registration, OTP (where available), password recovery
-- [ ] User profile and role selection
-- [ ] Backend token verification
-- [ ] Protected routes
+- [x] Login, registration, OTP (where available), password recovery
+- [x] User profile and role selection
+- [x] Backend token verification
+- [x] Protected routes
 
-**Result:** fully working role-based authentication.
+**Result:** role-based authentication is implemented end to end; live sign-in and token verification require real Firebase credentials (see §14). Phone OTP is documented as unavailable on this Expo Go-compatible stack rather than simulated.
 
 ### Phase 04 - UI Foundation
 - [ ] Global theme and reusable components
@@ -620,6 +622,18 @@ The backend exposes `GET /api/health` and a consistent JSON 404/error format. Af
 
 Firebase initialization is lazy: the app and backend start without credentials, and `getFirebase()` / `getFirebaseAdmin()` fail with explicit configuration errors only when a Firebase service is actually requested. Backend configuration is covered by `npm test` in `backend/`. A live Firebase connection and push delivery can only be verified after real credentials and a device build are available.
 
+### Phase 03 setup (Authentication)
+
+1. In Firebase **Authentication → Sign-in method**, enable **Email/Password**. Add your web/mobile auth domains to **Authorized domains** when deploying.
+2. Fill the root `.env` Firebase public values and `backend/.env` Admin SDK values described above. The mobile app works without `EXPO_PUBLIC_API_BASE_URL`, but backend token-verification/profile calls require it.
+3. Public registration accepts `farmer`, `buyer`, and `transporter`. Transporter registration also stores vehicle type and registration number; all new accounts start with `isVerified: false`. Admin is never offered in public registration.
+4. To create an admin, first register the user normally and copy its Firebase UID. Then run from `backend/`: `npm run admin:provision -- <firebase-uid>`. This sets the trusted `admin` and `role: admin` custom claims and updates the user's Firestore profile. The user must sign in again (or refresh the token) to receive the claim.
+5. Protected backend endpoints are `GET /api/auth/me` and `PATCH /api/auth/profile`; both require `Authorization: Bearer <Firebase ID token>`. The mobile Axios client injects the token automatically. These routes are rate limited (60 requests/minute per client) and validated with Zod; role escalation through `PATCH /api/auth/profile` is rejected because roles are never accepted in the request body.
+6. Protected screens use Expo Router guards and role checks. Frontend guards improve UX only; the backend and Firestore Rules remain the real authorization boundary.
+7. **Phone OTP:** the installed Firebase JS SDK does not support native phone authentication in Expo Go. The OTP screen states this explicitly and no mock verification is performed. Native OTP would require `@react-native-firebase/auth`, `expo-dev-client`, configuration files, and a development build.
+
+Verification performed in this repository: mobile `npm run typecheck`, `npm run lint`, `npx expo-doctor`, and web/iOS/Android exports; backend `npm run typecheck`, `npm run build`, and 12 `npm test` assertions. Live email/password sign-in, token verification, and admin claim propagation are **UNVERIFIED** without real Firebase credentials.
+
 ---
 
 ## 15. Open Decisions
@@ -628,10 +642,10 @@ Resolve these early; record the outcome here.
 
 | # | Decision | Needed by | Outcome |
 |--:|----------|-----------|---------|
-| 1 | Firebase client library: Firebase JS SDK vs React Native Firebase (affects Expo Go vs development builds, FCM, phone OTP) | Phase 02 | **Firebase JS SDK v13** for Auth/Firestore/Storage (Expo Go compatible) + `expo-notifications` for FCM/APNs tokens. React Native Firebase is not used; revisit if phone OTP/Crashlytics become mandatory. |
+| 1 | Firebase client library: Firebase JS SDK vs React Native Firebase (affects Expo Go vs development builds, FCM, phone OTP) | Phase 02 | **Firebase JS SDK v13** for Auth/Firestore/Storage (Expo Go compatible) + `expo-notifications` for FCM/APNs tokens. React Native Firebase is not used. Native phone OTP is not supported by this JS-SDK path on mobile, so Phase 03 ships email/password + recovery and provides an explicit informational OTP screen; revisit if phone OTP/Crashlytics become mandatory. |
 | 2 | Disease classification model: which verified model or hosted service, supported crops, and licensing | Phase 09 | Pending |
 | 3 | Payment gateway access: bKash/Nagad merchant or sandbox credentials and callback URL hosting | Phase 07 | Pending |
-| 4 | Admin provisioning method (script vs custom claims) | Phase 03 | Pending |
+| 4 | Admin provisioning method (script vs custom claims) | Phase 03 | **Server-side CLI script** that sets the trusted `admin` / `role: admin` custom claim on an existing Firebase Auth user and updates its Firestore profile. There is no public admin registration route. |
 | 5 | Backend hosting and deployment target | Phase 12 | Pending |
 | 6 | Source of market price and price history data (price prediction requires sufficient history) | Phase 05 / 11 | Pending |
 | 7 | Commission rates and delivery pricing formula | Phase 07 / 08 | Pending |

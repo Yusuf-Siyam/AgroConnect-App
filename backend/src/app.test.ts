@@ -36,4 +36,12 @@ describe('foundation API', () => {
     const body = (await response.json()) as { error: { code: string; message: string } };
     assert.equal(body.error.code, 'NOT_FOUND');
   });
+
+  it('rejects protected auth requests without an ID token', async () => {
+    const response = await fetch(`${baseUrl}/api/auth/me`);
+
+    assert.equal(response.status, 401);
+    const body = (await response.json()) as { error: { code: string; message: string } };
+    assert.equal(body.error.code, 'UNAUTHORIZED');
+  });
 });
