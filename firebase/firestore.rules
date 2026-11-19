@@ -1,0 +1,227 @@
+rules_version = '2';
+
+// AgroConnect Firestore Security Rules.
+// The Admin SDK bypasses these rules; all privileged business operations belong
+// in the Express backend. Client writes are limited to the user's own data.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ---------- Helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Admins are provisioned with a trusted custom claim (never public registration).
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isAdmin() || (signedIn() && userDoc().role == role);
+    }
+
+    function hasTimestamps() {
+      return request.resource.data.keys().hasAll(['createdAt', 'updatedAt']);
+    }
+
+    function unchanged(key) {
+      return !(key in request.resource.data) || request.resource.data[key] == resource.data[key];
+    }
+
+    function ownsField(field) {
+      return signedIn() && resource.data.get(field, null) == request.auth.uid;
+    }
+
+    // ---------- Users ----------
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create: if isSelf(uid)
+                    && hasTimestamps()
+                    && request.resource.data.role in ['farmer', 'buyer', 'transporter']
+                    && (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false);
+      allow update: if isAdmin() || (isSelf(uid)
+                    && unchanged('role')
+                    && unchanged('isVerified')
+                    && unchanged('createdAt'));
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Products (farmer inventory / marketplace) ----------
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if hasRole('farmer')
+                    && hasTimestamps()
+                    && request.resource.data.sellerId == request.auth.uid;
+      allow update: if isAdmin() || (hasRole('farmer')
+                    && ownsField('sellerId')
+                    && unchanged('sellerId')
+                    && unchanged('createdAt'));
+      allow delete: if isAdmin() || (hasRole('farmer') && ownsField('sellerId'));
+    }
+
+    // ---------- Orders (state changes only through the backend) ----------
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (signedIn() && (
+                    request.auth.uid == resource.data.get('buyerId', null) ||
+                    request.auth.uid == resource.data.get('sellerId', null) ||
+                    request.auth.uid == resource.data.get('transporterId', null)
+                  ));
+      allow create: if hasRole('buyer')
+                    && hasTimestamps()
+                    && request.resource.data.buyerId == request.auth.uid
+                    && request.resource.data.status == 'pending';
+      allow update, delete: if false;
+    }
+
+    // ---------- Buyer state ----------
+    match /carts/{cartId} {
+      allow read: if isSelf(cartId) || ownsField('ownerId');
+      allow create: if isSelf(cartId)
+                    && hasTimestamps()
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSelf(cartId) && unchanged('ownerId') && unchanged('createdAt');
+      allow delete: if isSelf(cartId);
+    }
+
+    match /wishlists/{wishlistId} {
+      allow read: if isSelf(wishlistId) || ownsField('ownerId');
+      allow create: if isSelf(wishlistId)
+                    && hasTimestamps()
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSelf(wishlistId) && unchanged('ownerId') && unchanged('createdAt');
+      allow delete: if isSelf(wishlistId);
+    }
+
+    // ---------- Transporters ----------
+    match /transporters/{transporterId} {
+      allow read: if true;
+      allow create: if isSelf(transporterId)
+                    && hasRole('transporter')
+                    && hasTimestamps()
+                    && (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false);
+      allow update: if isAdmin() || (isSelf(transporterId)
+                    && unchanged('isVerified')
+                    && unchanged('createdAt'));
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Logistics, payments and notifications (backend-owned) ----------
+    match /deliveryJobs/{jobId} {
+      allow read: if isAdmin() || (signedIn() && (
+                    request.auth.uid == resource.data.get('transporterId', null) ||
+                    request.auth.uid == resource.data.get('farmerId', null) ||
+                    request.auth.uid == resource.data.get('buyerId', null)
+                  ));
+      allow write: if false;
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAdmin() || (signedIn() && (
+                    request.auth.uid == resource.data.get('buyerId', null) ||
+                    request.auth.uid == resource.data.get('sellerId', null)
+                  ));
+      allow write: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAdmin() || ownsField('userId');
+      allow write: if false;
+    }
+
+    // ---------- Chat ----------
+    match /chats/{chatId} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid in resource.data.participants);
+      allow create: if signedIn()
+                    && hasTimestamps()
+                    && request.auth.uid in request.resource.data.participants;
+      allow update, delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAdmin() || (signedIn() &&
+                      request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
+        allow create: if signedIn()
+                      && hasTimestamps()
+                      && request.resource.data.senderId == request.auth.uid
+                      && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow update, delete: if false;
+      }
+    }
+
+    // ---------- Reviews ----------
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if hasRole('buyer')
+                    && hasTimestamps()
+                    && request.resource.data.buyerId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- AI history ----------
+    match /cropDiagnoses/{diagnosisId} {
+      allow read: if isAdmin() || ownsField('userId');
+      allow create: if signedIn()
+                    && hasTimestamps()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /farmingConversations/{conversationId} {
+      allow read: if isAdmin() || ownsField('userId');
+      allow create: if signedIn()
+                    && hasTimestamps()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- Farmer data and market information ----------
+    match /harvestRecords/{recordId} {
+      allow read: if isAdmin() || ownsField('farmerId');
+      allow create: if hasRole('farmer')
+                    && hasTimestamps()
+                    && request.resource.data.farmerId == request.auth.uid;
+      allow update: if isAdmin() || (hasRole('farmer') && ownsField('farmerId') && unchanged('createdAt'));
+      allow delete: if isAdmin() || (hasRole('farmer') && ownsField('farmerId'));
+    }
+
+    match /productBatches/{batchId} {
+      allow read: if isAdmin() || ownsField('farmerId');
+      allow create: if hasRole('farmer')
+                    && hasTimestamps()
+                    && request.resource.data.farmerId == request.auth.uid;
+      allow update: if isAdmin() || (hasRole('farmer') && ownsField('farmerId') && unchanged('createdAt'));
+      allow delete: if isAdmin() || (hasRole('farmer') && ownsField('farmerId'));
+    }
+
+    match /priceHistory/{priceId} {
+      allow read: if signedIn() || isAdmin();
+      allow write: if false;
+    }
+
+    match /groupPurchases/{groupPurchaseId} {
+      allow read: if signedIn() || isAdmin();
+      allow create: if hasRole('buyer') && hasTimestamps();
+      allow update, delete: if false;
+    }
+
+    // ---------- Reports ----------
+    match /reports/{reportId} {
+      allow read: if isAdmin() || ownsField('reporterId');
+      allow create: if signedIn()
+                    && hasTimestamps()
+                    && request.resource.data.reporterId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Everything else is denied by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

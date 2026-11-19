@@ -9,6 +9,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().max(65535).default(4000),
   CORS_ORIGINS: z.string().default(''),
+  FIREBASE_STORAGE_BUCKET: z.string().default(''),
 });
 
 // Empty values in a copied .env.example should fall back to the schema defaults.
@@ -29,4 +30,5 @@ export const env = {
   corsOrigins: parsed.data.CORS_ORIGINS.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
+  firebaseStorageBucket: parsed.data.FIREBASE_STORAGE_BUCKET,
 } as const;

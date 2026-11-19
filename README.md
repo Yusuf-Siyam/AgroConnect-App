@@ -56,7 +56,7 @@ Update this table at the end of every phase.
 | Phase | Name | Status |
 |------:|------|--------|
 | 01 | Project Foundation | Complete |
-| 02 | Firebase Integration | Not started |
+| 02 | Firebase Integration | Complete |
 | 03 | Authentication | Not started |
 | 04 | UI Foundation | Not started |
 | 05 | Farmer Module | Not started |
@@ -288,6 +288,8 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 
 **Phase 01 adaptation:** Expo Router routes live in `src/app/` (the Expo SDK 58 default), with the remaining mobile code under `src/`. The backend lives in `backend/src/`. Empty folders contain `.gitkeep` files until their phases are implemented.
 
+**Phase 02 additions:** Firebase client initialization and push-token helpers live in `src/services/`. The Admin SDK initializer lives in `backend/src/config/firebase.ts`. Security Rules and their Firebase CLI configuration live in `firebase/firestore.rules`, `firebase/storage.rules`, and `firebase.json`.
+
 ---
 
 ## 10. UI/UX and Localization
@@ -339,11 +341,11 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** clean, runnable mobile and backend projects.
 
 ### Phase 02 - Firebase Integration
-- [ ] Configure Firebase, Authentication, Firestore, Storage, FCM
-- [ ] Set up Firebase Admin SDK
-- [ ] Create Security Rules
+- [x] Configure Firebase, Authentication, Firestore, Storage, FCM
+- [x] Set up Firebase Admin SDK
+- [x] Create Security Rules
 
-**Result:** working Firebase connection.
+**Result:** working Firebase connection (code and configuration complete; live verification requires project credentials — see §14).
 
 ### Phase 03 - Authentication
 - [ ] Login, registration, OTP (where available), password recovery
@@ -559,6 +561,8 @@ CORS_ORIGINS=
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
+# Optional: defaults to <FIREBASE_PROJECT_ID>.appspot.com
+FIREBASE_STORAGE_BUCKET=
 GEMINI_API_KEY=
 DISEASE_MODEL_ENDPOINT=
 DISEASE_MODEL_API_KEY=
@@ -605,6 +609,17 @@ npm test               # built-in node:test suite
 
 The backend exposes `GET /api/health` and a consistent JSON 404/error format. After installing native dependencies, use a development build if Expo Go reports a missing native module; later phases will add more native modules.
 
+### Phase 02 setup (Firebase)
+
+1. Create a Firebase project and enable **Authentication**, **Cloud Firestore**, **Cloud Storage**, and **Cloud Messaging**.
+2. Register a **web app** in that project; copy its config values into the root `.env` as `EXPO_PUBLIC_FIREBASE_*` (the Firebase JS SDK uses this web-style config on native too).
+3. Create a least-privilege service account in Firebase **Settings → Service accounts**. Store the downloaded JSON outside the repository and copy its `project_id`, `client_email`, and `private_key` into `backend/.env` (the supported method in this phase). Keep `FIREBASE_STORAGE_BUCKET` empty unless a non-default bucket is used.
+4. Deploy the rules with the Firebase CLI (external tool, not a project script): `firebase use --add <project-id>`, then `firebase deploy --only firestore:rules,storage`. The source of truth is `firebase/firestore.rules` and `firebase/storage.rules`, wired through `firebase.json`.
+5. Admin access is a server-assigned custom claim (`admin: true`). Never add admins through public registration or client-side code.
+6. FCM: `expo-notifications` is installed and configured via the app config plugin with a `default` Android channel. Remote push requires a development/production build (not Expo Go on Android, SDK 53+). Configure Android FCM V1 credentials per <https://docs.expo.dev/push-notifications/fcm-credentials.md> and iOS APNs credentials via Expo EAS. Set `extra.eas.projectId` in the app config when the EAS project exists so Expo push tokens can be issued; no placeholder ID is committed.
+
+Firebase initialization is lazy: the app and backend start without credentials, and `getFirebase()` / `getFirebaseAdmin()` fail with explicit configuration errors only when a Firebase service is actually requested. Backend configuration is covered by `npm test` in `backend/`. A live Firebase connection and push delivery can only be verified after real credentials and a device build are available.
+
 ---
 
 ## 15. Open Decisions
@@ -613,7 +628,7 @@ Resolve these early; record the outcome here.
 
 | # | Decision | Needed by | Outcome |
 |--:|----------|-----------|---------|
-| 1 | Firebase client library: Firebase JS SDK vs React Native Firebase (affects Expo Go vs development builds, FCM, phone OTP) | Phase 02 | Pending |
+| 1 | Firebase client library: Firebase JS SDK vs React Native Firebase (affects Expo Go vs development builds, FCM, phone OTP) | Phase 02 | **Firebase JS SDK v13** for Auth/Firestore/Storage (Expo Go compatible) + `expo-notifications` for FCM/APNs tokens. React Native Firebase is not used; revisit if phone OTP/Crashlytics become mandatory. |
 | 2 | Disease classification model: which verified model or hosted service, supported crops, and licensing | Phase 09 | Pending |
 | 3 | Payment gateway access: bKash/Nagad merchant or sandbox credentials and callback URL hosting | Phase 07 | Pending |
 | 4 | Admin provisioning method (script vs custom claims) | Phase 03 | Pending |

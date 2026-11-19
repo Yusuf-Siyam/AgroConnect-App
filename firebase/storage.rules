@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// AgroConnect Cloud Storage Security Rules.
+// Paths are scoped by the owner's Firebase UID. Privileged operations use the
+// Admin SDK, which bypasses these rules.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Product photos are public because the marketplace lists them.
+    match /products/{sellerId}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(sellerId);
+    }
+
+    // Profile images are public but only the owner may change them.
+    match /users/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(uid);
+    }
+
+    // Crop/diagnosis images contain personal farm data.
+    match /diagnoses/{uid}/{fileName} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid);
+    }
+
+    // Deny everything not explicitly allowed above.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
