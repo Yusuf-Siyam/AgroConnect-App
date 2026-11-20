@@ -61,14 +61,15 @@ Update this table at the end of every phase.
 | 04 | UI Foundation | Complete |
 | 05 | Farmer Module | Complete |
 | 06 | Buyer Module | Complete |
-| 07 | Order and Payment | Not started |
+| 07A | Orders and Stock | Not started |
 | 08 | Transporter Module | Not started |
 | 09 | AI Integration | Not started |
 | 10 | Communication | Not started |
 | 11 | Advanced Features | Not started |
 | 12 | Admin and Deployment | Not started |
+| 07B | Payments and Transaction History | Deferred |
 
-Status values: `Not started` / `In progress` / `Complete` / `Blocked`.
+Status values: `Not started` / `In progress` / `Complete` / `Blocked`. `Deferred` means the phase is planned but intentionally scheduled after Phase 12.
 
 ---
 
@@ -169,33 +170,34 @@ Bangla voice assistant, QR product traceability, farmer reputation score, smart 
 pending -> accepted -> paid -> shipment_accepted -> collected -> shipped -> delivered
 ```
 
-Also supported: `rejected`, `cancelled`.
+Also supported: `rejected`, `cancelled`. Phase 07A introduces one canonical backend status module for every status and every allowed transition. **No order can become `paid` until Phase 07B** implements verified payments; Phase 08 delivery tests use emulator fixtures instead.
 
 ### Farmer transitions implemented in Phase 05B
 
-A product-owning farmer may move an order only from `pending` to `accepted` or `rejected`. Acceptance runs in a Firestore transaction, re-checks product ownership and available stock, decrements stock, and writes a stock-history entry. Rejection requires a 3–200 character reason. Farmers never set `paid`, `shipped` or `delivered`; those transitions remain Phase 07 system/transporter rules.
+A product-owning farmer may move an order only from `pending` to `accepted` or `rejected`. Acceptance runs in a Firestore transaction, re-checks product ownership and available stock, decrements stock, and writes a stock-history entry. Rejection requires a 3–200 character reason. Farmers never set `paid`, `shipped` or `delivered`; those transitions remain Phase 07B/08 system and transporter rules.
 
-### Proposed Transition Rules (finalize in Phase 07)
+### Transition Rules by Phase
 
-| From | To | Allowed actor |
-|------|----|---------------|
-| pending | accepted / rejected | Farmer (owner of the products) |
-| pending | cancelled | Buyer |
-| accepted | paid | **System only**, after server-side payment verification |
-| accepted | cancelled | Buyer, Farmer, Admin |
-| paid | shipment_accepted | Transporter (accepts the delivery job) |
-| shipment_accepted | collected | Transporter (pickup confirmation) |
-| collected | shipped | Transporter |
-| shipped | delivered | Transporter (delivery confirmation) |
-| paid or later | cancelled | Admin only (refund handling) |
+| From | To | Allowed actor | Phase |
+|------|----|---------------|-------|
+| pending | accepted / rejected | Farmer (owner of the products) | 05B / 07A |
+| pending | cancelled | Buyer | 07A |
+| accepted | cancelled | Buyer or Admin | 07A |
+| accepted | paid | **System only**, after server-side payment verification | 07B |
+| paid | shipment_accepted | Transporter (accepts the delivery job) | 08 |
+| shipment_accepted | collected | Transporter (pickup confirmation) | 08 |
+| collected | shipped | Transporter | 08 |
+| shipped | delivered | Transporter (delivery confirmation) | 08 |
+| paid or later | cancelled | Admin only (refund handling) | 07B / 08 |
 
 ### Rules
 - Validate **every** status transition on the backend.
 - Users must never be able to set payment or delivery status arbitrarily.
 - Store order item price snapshots at order time.
+- Pending orders do **not** hold stock. Stock is reduced transactionally only when a farmer accepts; cancelling an accepted order restores stock exactly once.
 - Use Firestore transactions for stock updates.
 - Prevent duplicate orders and duplicate payments (idempotency keys).
-- Verify payment gateway callbacks server-side.
+- Verify payment gateway callbacks server-side in Phase 07B.
 
 ---
 
@@ -325,6 +327,8 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 
 **Follow phases in order. Never generate the whole application in one response.**
 
+**Build order from the current baseline:** `06, 07A, 08, 09, 10, 11, 12, then 07B`. Phase 07B is deliberately last because delivery features use emulator fixtures and no order may become `paid` before verified payments exist.
+
 For every phase:
 1. Inspect existing project files.
 2. Understand the existing architecture.
@@ -382,7 +386,7 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 - [x] Sales analytics (Part 5B)
 - [x] Weather and market prices (Part 5B)
 
-**Result:** Phase 05 complete. Part 5A delivered the farmer tabs, real-count dashboard, product CRUD, ownership checks and image uploads. Part 5B delivered transactional stock adjustments and history, pending-order accept/reject with stock re-checks, real order/payment analytics, an Open-Meteo weather proxy with caching and GPS/district fallback, and read-only `priceHistory` market screens with an explicit “no data yet” state. Order creation and all `paid`/`shipped`/`delivered` transitions remain Phase 07.
+**Result:** Phase 05 complete. Part 5A delivered the farmer tabs, real-count dashboard, product CRUD, ownership checks and image uploads. Part 5B delivered transactional stock adjustments and history, pending-order accept/reject with stock re-checks, real order/payment analytics, an Open-Meteo weather proxy with caching and GPS/district fallback, and read-only `priceHistory` market screens with an explicit “no data yet” state. Order creation remains Phase 07A; all `paid`/`shipped`/`delivered` transitions remain Phase 07B/08.
 
 ### Phase 06 - Buyer Module
 - [x] Marketplace, categories, search and filters (Part 6A)
@@ -391,15 +395,18 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 - [x] Checkout (Part 6B)
 - [x] Reviews (Part 6B)
 
-**Result:** Phase 06 complete. Part 6A delivered buyer tabs, a real marketplace with localized categories, search, filters, sorting and pagination, buyer-only product detail, and a privacy-safe public farmer profile. Part 6B delivered backend-managed cart and wishlist operations with live prices and stock/min-order checks, a React Hook Form + Zod checkout preview grouped by farmer, and transactionally aggregated reviews gated by a real delivered order containing the product. Order submission and all `paid`/`shipped`/`delivered` transitions remain Phase 07.
+**Result:** Phase 06 complete. Part 6A delivered buyer tabs, a real marketplace with localized categories, search, filters, sorting and pagination, buyer-only product detail, and a privacy-safe public farmer profile. Part 6B delivered backend-managed cart and wishlist operations with live prices and stock/min-order checks, a React Hook Form + Zod checkout preview grouped by farmer, and transactionally aggregated reviews gated by a real delivered order containing the product. Order submission remains Phase 07A; all `paid`/`shipped`/`delivered` transitions remain Phase 07B/08.
 
-### Phase 07 - Order and Payment
-- [ ] Order creation and stock validation
-- [ ] Order status management
-- [ ] Payment initiation and verification
-- [ ] Transaction history
+### Phase 07A - Orders
+- [ ] Real buyer checkout that creates orders from the server-managed cart
+- [ ] Server-side price snapshots, stock checks and idempotent order creation
+- [ ] One order per farmer per checkout with a shared `checkoutId`
+- [ ] Central backend status module with allowed transitions and status history
+- [ ] Buyer and farmer order list/detail APIs, cancellation and admin cancellation
+- [ ] Transactional stock rules: pending does not reserve, accept reduces, accepted cancellation restores once
+- [ ] Firestore rules, indexes and emulator tests
 
-**Result:** secure order and payment workflow.
+**Result:** real order placement and status management without payment. No order can become `paid` in Phase 07A.
 
 ### Phase 08 - Transporter Module
 - [ ] Transporter profile and vehicle information
@@ -452,11 +459,20 @@ Implement individually:
 
 **Result:** production-ready application.
 
+### Phase 07B - Payments and Transaction History (deferred)
+- [ ] Payment initiation and server-side verification
+- [ ] `accepted -> paid` system transition
+- [ ] Buyer/farmer transaction history
+- [ ] Refund/cancellation handling for paid orders
+- [ ] Gateway sandbox credentials and callback hosting
+
+**Result:** secure payment workflow, built only after Phase 12. No order can become `paid` before this phase.
+
 ### Cross-Phase Dependencies
 
-- **Phases 05 and 06 depend on Phase 07 for order data.** Build the order screens and checkout UI in their phases, but keep order submission disabled (clearly labeled, not mocked) until Phase 07 delivers the real order API.
-- **Phase 07 payments need gateway credentials** (bKash/Nagad merchant or sandbox access).
-- **Phase 08 delivery jobs** require orders from Phase 07 to reach `paid`.
+- **Phases 05 and 06 depend on Phase 07A for order data.** Build the order screens and checkout UI in their phases, but keep order submission disabled (clearly labeled, not mocked) until Phase 07A delivers the real order API.
+- **Phase 07B payments need gateway credentials** (bKash/Nagad merchant or sandbox access).
+- **Phase 08 delivery jobs** use emulator-created order fixtures for development and tests. Production delivery depends on Phase 07B so orders can legitimately reach `paid`.
 - **Phase 10 push notifications** require the FCM setup from Phase 02.
 
 ---
@@ -749,11 +765,11 @@ Resolve these early; record the outcome here.
 |--:|----------|-----------|---------|
 | 1 | Firebase client library: Firebase JS SDK vs React Native Firebase (affects Expo Go vs development builds, FCM, phone OTP) | Phase 02 | **Firebase JS SDK v13** for Auth/Firestore/Storage (Expo Go compatible) + `expo-notifications` for FCM/APNs tokens. React Native Firebase is not used. Native phone OTP is not supported by this JS-SDK path on mobile, so Phase 03 ships email/password + recovery and provides an explicit informational OTP screen; revisit if phone OTP/Crashlytics become mandatory. |
 | 2 | Disease classification model: which verified model or hosted service, supported crops, and licensing | Phase 09 | Pending |
-| 3 | Payment gateway access: bKash/Nagad merchant or sandbox credentials and callback URL hosting | Phase 07 | Pending |
+| 3 | Payment gateway access: bKash/Nagad merchant or sandbox credentials and callback URL hosting | Phase 07B | Pending |
 | 4 | Admin provisioning method (script vs custom claims) | Phase 03 | **Server-side CLI script** that sets the trusted `admin` / `role: admin` custom claim on an existing Firebase Auth user and updates its Firestore profile. There is no public admin registration route. |
 | 5 | Backend hosting and deployment target | Phase 12 | Pending |
 | 6 | Source of market price and price history data (price prediction requires sufficient history) | Phase 05 / 11 | **Partially unblocked:** Phase 05B provides a real `priceHistory` schema, authenticated read API, importer for trusted observations and an explicit empty state. The trusted source itself remains to be selected; no sample prices are bundled. |
-| 7 | Commission rates and delivery pricing formula | Phase 07 / 08 | Pending |
+| 7 | Commission rates and delivery pricing formula | Phase 07B / 08 | Pending |
 
 ---
 
