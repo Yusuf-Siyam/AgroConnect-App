@@ -43,6 +43,14 @@ service cloud.firestore {
       return signedIn() && get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid;
     }
 
+    function canReadOrder(order) {
+      return isAdmin() || (signedIn() && (
+        request.auth.uid == order.get('buyerId', null) ||
+        request.auth.uid in order.get('sellerIds', []) ||
+        request.auth.uid == order.get('transporterId', null)
+      ));
+    }
+
     // ---------- Users ----------
     match /users/{uid} {
       allow read: if isSelf(uid) || isAdmin();
@@ -74,19 +82,20 @@ service cloud.firestore {
       }
     }
 
-    // ---------- Orders (state changes only through the backend) ----------
+    // ---------- Orders (all creation and state changes through the backend) ----------
     match /orders/{orderId} {
-      allow read: if isAdmin() || (signedIn() && (
-                    request.auth.uid == resource.data.get('buyerId', null) ||
-                    request.auth.uid == resource.data.get('sellerId', null) ||
-                    request.auth.uid in resource.data.get('sellerIds', []) ||
-                    request.auth.uid == resource.data.get('transporterId', null)
-                  ));
-      allow create: if hasRole('buyer')
-                    && hasTimestamps()
-                    && request.resource.data.buyerId == request.auth.uid
-                    && request.resource.data.status == 'pending';
-      allow update, delete: if false;
+      allow read: if canReadOrder(resource.data);
+      allow create, update, delete: if false;
+
+      match /statusHistory/{eventId} {
+        allow read: if canReadOrder(get(/databases/$(database)/documents/orders/$(orderId)).data);
+        allow write: if false;
+      }
+    }
+
+    // Checkout idempotency records are backend-owned.
+    match /orderCheckouts/{checkoutId} {
+      allow read, write: if false;
     }
 
     // ---------- Buyer state ----------

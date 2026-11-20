@@ -61,7 +61,7 @@ Update this table at the end of every phase.
 | 04 | UI Foundation | Complete |
 | 05 | Farmer Module | Complete |
 | 06 | Buyer Module | Complete |
-| 07A | Orders and Stock | Not started |
+| 07A | Orders and Stock | In progress |
 | 08 | Transporter Module | Not started |
 | 09 | AI Integration | Not started |
 | 10 | Communication | Not started |
@@ -301,6 +301,8 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 **Phase 04 additions:** Design tokens live in `src/theme/` and `tailwind.config.js`. Reusable UI lives in `src/components/common/`, shared dashboard chrome in `src/components/navigation/`, and typed Bangla/English dictionaries in `src/locales/` with the locale store in `src/store/locale.ts`.
 
 **Phase 05A additions:** Farmer-only tabs live in `src/components/navigation/FarmerTabs.tsx` with screens under `src/app/farmer/`. Product forms, services and upload helpers live in `src/features/farmer/` and `src/components/product/`. The backend product API is in `backend/src/routes/products.ts` and `backend/src/services/product.ts`. Product writes are backend-only in Firestore rules; images must be uploaded to `products/{uid}/{productId}/...` and validated server-side. Composite indexes are declared in `firebase/firestore.indexes.json`.
+
+**Phase 07A additions:** Canonical order statuses and transitions live in `backend/src/services/orderStatus.ts`. Buyer checkout, buyer/farmer list/detail, cancellation and admin cancellation are handled by `backend/src/routes/orders.ts` and `backend/src/services/order.ts`. Idempotent checkout records live in `orderCheckouts/{hash}` and immutable transition events in `orders/{orderId}/statusHistory/{eventId}`; both are backend-only in Firestore rules.
 
 ---
 

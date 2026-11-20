@@ -1,16 +1,7 @@
-export const ORDER_STATUSES = [
-  'pending',
-  'accepted',
-  'paid',
-  'shipment_accepted',
-  'collected',
-  'shipped',
-  'delivered',
-  'rejected',
-  'cancelled',
-] as const;
+import type { OrderStatus } from '../services/orderStatus';
 
-export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export { ORDER_STATUSES, PAID_OR_LATER_STATUSES } from '../services/orderStatus';
+export type { OrderStatus, OrderTransitionActor } from '../services/orderStatus';
 
 export type OrderItem = {
   productId: string;
@@ -21,6 +12,24 @@ export type OrderItem = {
   unit: string;
 };
 
+export type DeliveryAddress = {
+  addressLine: string;
+  district: string;
+  phoneNumber: string;
+};
+
+export type OrderStatusEvent = {
+  id: string;
+  from: OrderStatus | null;
+  to: OrderStatus;
+  actorId: string;
+  actorRole: string;
+  reason?: string;
+  stockAdjusted?: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Order = {
   id: string;
   buyerId: string;
@@ -28,7 +37,12 @@ export type Order = {
   items: OrderItem[];
   status: OrderStatus;
   totalAmount: number;
+  deliveryFee: number | null;
+  deliveryAddress?: DeliveryAddress;
   rejectionReason?: string;
+  stockAdjusted?: boolean;
+  stockRestored?: boolean;
+  statusHistory: OrderStatusEvent[];
   createdAt: string;
   updatedAt: string;
 };
@@ -40,10 +54,12 @@ export type OrderListResponse = {
   offset: number;
 };
 
-export const PAID_OR_LATER_STATUSES: OrderStatus[] = [
-  'paid',
-  'shipment_accepted',
-  'collected',
-  'shipped',
-  'delivered',
-];
+export type OrderCheckoutResponse = {
+  checkoutId: string;
+  orders: Order[];
+  orderIds: string[];
+  farmerCount: number;
+  itemCount: number;
+  totalAmount: number;
+  deliveryFee: null;
+};

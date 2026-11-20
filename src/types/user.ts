@@ -1,3 +1,5 @@
+import type { Href } from 'expo-router';
+
 export const ROLES = ['farmer', 'buyer', 'transporter', 'admin'] as const;
 
 /** Roles a user may select during public registration. Admin is provisioned server-side. */
@@ -23,24 +25,24 @@ export type UserProfile = {
   updatedAt?: string;
 };
 
-export type RoleHome =
-  | '/farmer'
-  | '/buyer'
-  | '/transporter'
-  | '/admin'
-  | '/login';
+/**
+ * Runtime paths stay canonical (`/farmer`, `/buyer`, ...). Expo's generated
+ * typed-route union may expose them as `/farmer/index`, so the narrow literals
+ * are asserted as Href for navigation while runtime behavior is unchanged.
+ */
+export type RoleHome = Href;
 
 export function homePathForRole(role?: Role | null): RoleHome {
   switch (role) {
     case 'farmer':
-      return '/farmer';
+      return '/farmer' as Href;
     case 'buyer':
-      return '/buyer';
+      return '/buyer' as Href;
     case 'transporter':
-      return '/transporter';
+      return '/transporter' as Href;
     case 'admin':
-      return '/admin';
+      return '/admin' as Href;
     default:
-      return '/login';
+      return '/login' as Href;
   }
 }
