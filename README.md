@@ -115,10 +115,10 @@ React Native App  ->  Express REST API  ->  Firebase / External Services
 
 | Role | Registration | Dashboard |
 |------|--------------|-----------|
-| Farmer | Public | `/farmer/index` |
-| Buyer | Public | `/buyer/index` |
-| Transporter | Public (with vehicle details, subject to verification) | `/transporter/index` |
-| Admin | Secure provisioning only | `/admin/index` |
+| Farmer | Public | `/farmer` |
+| Buyer | Public | `/buyer` |
+| Transporter | Public (with vehicle details, subject to verification) | `/transporter` |
+| Admin | Secure provisioning only | `/admin` |
 
 After authentication, users are redirected to the dashboard for their role.
 
