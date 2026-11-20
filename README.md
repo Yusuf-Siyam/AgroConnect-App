@@ -659,7 +659,7 @@ Verification performed in this repository: mobile `npm run typecheck`, `npm run 
 
 ### Local Firebase emulator verification (Auth + Firestore + Storage)
 
-The Firebase CLI is a root dev dependency. Install Java 21+ (required by the current Firestore emulator), then install both dependency trees:
+The Firebase CLI is a root dev dependency. Install Java 21+ (required by the current Firestore emulator), then install both dependency trees. Windows/PowerShell users should follow [RUN.md](RUN.md) for exact commands and platform-specific host settings:
 
 ```bash
 npm install
@@ -682,15 +682,17 @@ npm run test:emulators
 
 The suite uses real emulator tokens and real HTTP calls. Phase 3 covers registration/login, a valid token returning 200 from `GET /api/auth/me`, 401 for missing/invalid tokens, 403 for a non-admin token on `GET /api/auth/admin-status`, trusted Admin SDK claim propagation, rejection of public admin creation, and Firestore rules denial for unauthorized reads/writes. Phase 05A additionally verifies buyer 403s, Zod validation, product ownership, image-URL ownership, pagination/search/status filtering/soft delete, signed-in active-product reads, backend-only Firestore writes, and owner-only Storage uploads. Phase 05B verifies Zod validation on every new endpoint, product ownership, negative-stock rejection, stock-history entries, pending-only order transitions, stock re-checks, no payment/delivery fields written by accept/reject, analytics from real orders/payments, read-only market history, and weather caching/fallback against a local fake provider. Phase 06A verifies buyer-only marketplace access, hidden drafts/out-of-stock products, category/price/district/unit/search filters, sorting, pagination, and privacy-safe farmer profiles. Phase 06B verifies buyer-only cart/wishlist/review access, Zod validation, live cart prices, stock/min-order checks, own/inactive product blocks, multiple-farmer carts, wishlist duplicate prevention, delivered-order review eligibility, one review per buyer/product, and transactional product/farmer rating aggregates.
 
-For manual mobile/backend testing against the emulators, set `EXPO_PUBLIC_USE_EMULATOR=true` in the root `.env` and restart Expo. The client calls `connectAuthEmulator` and `connectFirestoreEmulator` **only** when this value is exactly `true`; real-project `.env` files must leave it empty or set it to `false`. Set these in `backend/.env` (no service account is needed in emulator mode):
+For manual mobile/backend testing against the emulators, set `EXPO_PUBLIC_USE_EMULATOR=true` in the root `.env` and restart Expo. The client connects Auth, Firestore and Storage to emulators **only** when this value is exactly `true`; real-project `.env` files must leave it empty or set it to `false`. The client selects `127.0.0.1` on web/iOS and `10.0.2.2` on Android; set `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST` to override it for a physical device. Set these in `backend/.env` (no service account is needed in emulator mode):
 
 `backend/.env`:
 
 ```text
 FIREBASE_PROJECT_ID=demo-agroconnect
+FIREBASE_STORAGE_BUCKET=demo-agroconnect.appspot.com
 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
+CORS_ORIGINS=http://localhost:8081,http://127.0.0.1:8081
 ```
 
 Root `.env`, when the mobile app also calls the local backend:
@@ -699,7 +701,7 @@ Root `.env`, when the mobile app also calls the local backend:
 EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:4000
 ```
 
-Physical devices cannot reach `127.0.0.1` on the development machine; use an Android emulator, web, or a LAN-reachable host mapping.
+Use `http://10.0.2.2:4000` as `EXPO_PUBLIC_API_BASE_URL` on an Android emulator. Physical devices cannot reach `127.0.0.1` or `10.0.2.2` on the development machine; use this computer's LAN IP, bind the emulators to `0.0.0.0` in `firebase.json`, and set `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST` to that LAN IP. Expo inlines `EXPO_PUBLIC_*` values at build time, so perform a full app reload after changing `.env`.
 
 ### Phase 05A setup (Products)
 

@@ -9,7 +9,7 @@ import {
   type Auth,
 } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
-import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
 import { Platform } from 'react-native';
 
 import { env } from '@/config/env';
@@ -22,6 +22,17 @@ export type FirebaseServices = {
 };
 
 let services: FirebaseServices | undefined;
+
+const configuredEmulatorHost = process.env.EXPO_PUBLIC_FIREBASE_EMULATOR_HOST?.trim();
+
+/**
+ * `127.0.0.1` is the host machine for web/iOS Simulator, while `10.0.2.2` is
+ * the Android emulator alias for the host loopback interface.
+ */
+function getEmulatorHost(): string {
+  if (configuredEmulatorHost) return configuredEmulatorHost;
+  return Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+}
 
 /** True only when all public Firebase values have been supplied in .env. */
 export function isFirebaseConfigured(): boolean {
@@ -60,20 +71,26 @@ export function getFirebase(): FirebaseServices {
       }
     }
 
+    const emulatorHost = getEmulatorHost();
     if (env.useEmulator) {
-      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+      connectAuthEmulator(auth, `http://${emulatorHost}:9099`, { disableWarnings: true });
     }
 
     const firestore = getFirestore(app);
     if (env.useEmulator) {
-      connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
+      connectFirestoreEmulator(firestore, emulatorHost, 8080);
+    }
+
+    const storage = getStorage(app);
+    if (env.useEmulator) {
+      connectStorageEmulator(storage, emulatorHost, 9199);
     }
 
     services = {
       app,
       auth,
       firestore,
-      storage: getStorage(app),
+      storage,
     };
   }
 

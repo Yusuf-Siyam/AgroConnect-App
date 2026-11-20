@@ -14,10 +14,13 @@
 - Phase 06B implementation: backend-managed cart/wishlist/review endpoints with Zod and buyer role checks, live-price cart rules, wishlist duplicate prevention, delivered-order review eligibility, transactional rating aggregates, checkout form/summary UI, paginated reviews UI, and emulator fixtures/tests.
 - Phase 06B verification: root `tsc --noEmit` and `expo lint`; backend `tsc --noEmit`, 12/12 unit tests and `tsc` build; full emulator suite (Phase 3 6/6, Phase 05A 5/5, Phase 05B 6/6, Phase 06A 4/4, Phase 06B 4/4); `git diff --check` all passed.
 
+- Windows/PowerShell run support: added `RUN.md`, expanded the root/backend `.env.example` templates with emulator and host guidance, made `test:emulators` use a cross-platform Node runner, and made client emulator hosts Android-aware with Storage emulator support. No feature behavior changed.
+- Windows setup verification: root `tsc --noEmit` and `expo lint`; backend `tsc --noEmit` and 12/12 unit tests; full emulator suite (Phase 3 6/6, Phase 05A 5/5, Phase 05B 6/6, Phase 06A 4/4, Phase 06B 4/4); backend `/api/auth/me` returned HTTP 401 `UNAUTHORIZED`. Actual Windows/PowerShell execution, physical-device access and EAS remain UNVERIFIED.
+
 ## In progress
 
-- None. Phase 06B is verified and ready for its commit.
+- None.
 
 ## Next step
 
-- Commit Phase 06B, produce the final status report, and stop. Do not begin Phase 07+ without approval.
+- Stop. Do not begin Phase 07+ without approval. Provide the exact Windows command/error output or device results if further setup diagnosis is needed.
