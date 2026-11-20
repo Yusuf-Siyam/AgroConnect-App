@@ -21,6 +21,8 @@ const validationKeys = new Set<TranslationKey>([
   'validation.vehicleTypeRequired',
   'validation.registrationRequired',
   'validation.passwordsMatch',
+  'validation.addressRequired',
+  'validation.addressMin',
 ]);
 
 export function authErrorKey(code: AuthErrorCode | null): TranslationKey {

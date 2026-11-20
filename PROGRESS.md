@@ -10,11 +10,14 @@
 - Phase 06 gate: fixed the stale README Progress Tracker (Phase 05 now `Complete`). `npm run test:emulators` passed (Java 21 installed locally at `/tmp/opencode/jdk` because the environment had no Java) and `npx tsc --noEmit` passed.
 - Phase 06A implementation: buyer tabs, marketplace API with Zod validation and hidden-product enforcement, localized category constants/endpoint, privacy-safe farmer profile endpoint and screen, real marketplace grid with search/filter/sort/pagination, and product detail with image gallery, rating, stock/harvest data and unit-conversion display.
 - Phase 06A verification: root `tsc --noEmit`, `expo lint`, backend `tsc --noEmit`, backend 12 unit tests, and full emulator suite (Phase 3 6/6, Phase 05A 5/5, Phase 05B 6/6, Phase 06A 4/4) all passed.
+- Phase 06A commit `5ecf361`: buyer marketplace, product details, public farmer profiles, categories, indexes, translations, and emulator tests.
+- Phase 06B implementation: backend-managed cart/wishlist/review endpoints with Zod and buyer role checks, live-price cart rules, wishlist duplicate prevention, delivered-order review eligibility, transactional rating aggregates, checkout form/summary UI, paginated reviews UI, and emulator fixtures/tests.
+- Phase 06B verification: root `tsc --noEmit` and `expo lint`; backend `tsc --noEmit`, 12/12 unit tests and `tsc` build; full emulator suite (Phase 3 6/6, Phase 05A 5/5, Phase 05B 6/6, Phase 06A 4/4, Phase 06B 4/4); `git diff --check` all passed.
 
 ## In progress
 
-- Phase 06B: backend-managed cart and wishlist, checkout UI, and eligibility-gated reviews.
+- None. Phase 06B is verified and ready for its commit.
 
 ## Next step
 
-- Commit Phase 06A, then implement 06B cart/wishlist/checkout/reviews, verify, and commit 06B. Do not begin Phase 07+ without approval.
+- Commit Phase 06B, produce the final status report, and stop. Do not begin Phase 07+ without approval.

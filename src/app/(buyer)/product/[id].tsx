@@ -1,14 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Image, ScrollView, View } from 'react-native';
 
 import { BuyerPage } from '@/components/buyer/BuyerPage';
+import { ReviewSection } from '@/components/buyer/ReviewSection';
 import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { StateView } from '@/components/common/StateView';
+import { TextField } from '@/components/common/TextField';
+import { addToCart } from '@/features/buyer/cartService';
 import { buyerApiErrorKey } from '@/features/buyer/errorMessages';
 import { getMarketplaceProduct } from '@/features/buyer/marketplaceService';
+import {
+  addToWishlist,
+  listWishlist,
+  removeFromWishlist,
+} from '@/features/buyer/wishlistService';
 import type { TranslationKey } from '@/i18n';
 import { useTranslation } from '@/i18n';
 import { formatNumber, unitConversionLabel } from '@/utils/units';
@@ -16,11 +25,42 @@ import { formatNumber, unitConversionLabel } from '@/utils/units';
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t, locale } = useTranslation();
+  const queryClient = useQueryClient();
+  const [quantityInput, setQuantityInput] = useState('');
+  const [actionMessage, setActionMessage] = useState<TranslationKey | null>(null);
 
   const product = useQuery({
     queryKey: ['buyer', 'product', id],
     queryFn: () => getMarketplaceProduct(id),
     enabled: Boolean(id),
+  });
+  const wishlist = useQuery({
+    queryKey: ['buyer', 'wishlist'],
+    queryFn: () => listWishlist(100, 0),
+  });
+
+  const cartMutation = useMutation({
+    mutationFn: ({ productId, quantity }: { productId: string; quantity: number }) =>
+      addToCart(productId, quantity),
+    onSuccess: async () => {
+      setActionMessage('buyer.product.addedToCart');
+      await queryClient.invalidateQueries({ queryKey: ['buyer', 'cart'] });
+    },
+  });
+  const wishlistMutation = useMutation({
+    mutationFn: ({
+      productId,
+      saved,
+    }: {
+      productId: string;
+      saved: boolean;
+    }) => (saved ? removeFromWishlist(productId) : addToWishlist(productId)),
+    onSuccess: async (_data, variables) => {
+      setActionMessage(
+        variables.saved ? 'buyer.product.removedFromWishlist' : 'buyer.product.addedToWishlist',
+      );
+      await queryClient.invalidateQueries({ queryKey: ['buyer', 'wishlist'] });
+    },
   });
 
   if (product.isPending) {
@@ -47,6 +87,9 @@ export default function ProductDetailScreen() {
   const rating = item.ratingSummary ?? { average: 0, count: 0 };
   const name = locale === 'bn' ? item.name.bn : item.name.en;
   const description = locale === 'bn' ? item.description.bn : item.description.en;
+  const quantity = quantityInput.trim() === '' ? item.minOrderQty : Number(quantityInput);
+  const saved = Boolean(wishlist.data?.items.some((productItem) => productItem.id === item.id));
+  const actionError = cartMutation.error ?? wishlistMutation.error;
 
   return (
     <BuyerPage title={name} subtitle={t('buyer.product.title')}>
@@ -110,11 +153,35 @@ export default function ProductDetailScreen() {
           </Link>
         </Card>
 
-        <View className="gap-2">
-          <Button label={t('buyer.product.addToCart')} disabled />
-          <Button label={t('buyer.product.addToWishlist')} variant="outline" disabled />
-          <AppText variant="caption">{t('buyer.product.actionsComingSoon')}</AppText>
-        </View>
+        <Card className="gap-3">
+          <TextField
+            label={t('common.quantity')}
+            value={quantityInput}
+            onChangeText={setQuantityInput}
+            keyboardType="numeric"
+          />
+          <Button
+            label={t('buyer.product.addToCart')}
+            loading={cartMutation.isPending}
+            onPress={() => cartMutation.mutate({ productId: item.id, quantity })}
+          />
+          <Button
+            label={
+              saved ? t('buyer.product.removeFromWishlist') : t('buyer.product.addToWishlist')
+            }
+            variant="outline"
+            loading={wishlistMutation.isPending}
+            onPress={() => wishlistMutation.mutate({ productId: item.id, saved })}
+          />
+          {actionError ? (
+            <AppText variant="error">
+              {t(buyerApiErrorKey((actionError as { code?: string }).code))}
+            </AppText>
+          ) : null}
+          {actionMessage ? <AppText>{t(actionMessage)}</AppText> : null}
+        </Card>
+
+        <ReviewSection productId={item.id} />
       </View>
     </BuyerPage>
   );

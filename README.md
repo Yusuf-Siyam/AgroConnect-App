@@ -60,7 +60,7 @@ Update this table at the end of every phase.
 | 03 | Authentication | Complete |
 | 04 | UI Foundation | Complete |
 | 05 | Farmer Module | Complete |
-| 06 | Buyer Module | In progress |
+| 06 | Buyer Module | Complete |
 | 07 | Order and Payment | Not started |
 | 08 | Transporter Module | Not started |
 | 09 | AI Integration | Not started |
@@ -387,11 +387,11 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 ### Phase 06 - Buyer Module
 - [x] Marketplace, categories, search and filters (Part 6A)
 - [x] Product details (Part 6A)
-- [ ] Cart and wishlist (Part 6B)
-- [ ] Checkout (Part 6B)
-- [ ] Reviews (Part 6B)
+- [x] Cart and wishlist (Part 6B)
+- [x] Checkout (Part 6B)
+- [x] Reviews (Part 6B)
 
-**Result:** Part 6A delivered buyer tabs, a real marketplace with localized categories, search, filters, sorting and pagination, buyer-only product detail, and a privacy-safe public farmer profile. Cart/wishlist actions on product details remain disabled until the backend-managed Part 6B endpoints land.
+**Result:** Phase 06 complete. Part 6A delivered buyer tabs, a real marketplace with localized categories, search, filters, sorting and pagination, buyer-only product detail, and a privacy-safe public farmer profile. Part 6B delivered backend-managed cart and wishlist operations with live prices and stock/min-order checks, a React Hook Form + Zod checkout preview grouped by farmer, and transactionally aggregated reviews gated by a real delivered order containing the product. Order submission and all `paid`/`shipped`/`delivered` transitions remain Phase 07.
 
 ### Phase 07 - Order and Payment
 - [ ] Order creation and stock validation
@@ -680,7 +680,7 @@ Run the automated Phase 3 checks (emulators start and stop automatically):
 npm run test:emulators
 ```
 
-The suite uses real emulator tokens and real HTTP calls. Phase 3 covers registration/login, a valid token returning 200 from `GET /api/auth/me`, 401 for missing/invalid tokens, 403 for a non-admin token on `GET /api/auth/admin-status`, trusted Admin SDK claim propagation, rejection of public admin creation, and Firestore rules denial for unauthorized reads/writes. Phase 05A additionally verifies buyer 403s, Zod validation, product ownership, image-URL ownership, pagination/search/status filtering/soft delete, signed-in active-product reads, backend-only Firestore writes, and owner-only Storage uploads. Phase 05B verifies Zod validation on every new endpoint, product ownership, negative-stock rejection, stock-history entries, pending-only order transitions, stock re-checks, no payment/delivery fields written by accept/reject, analytics from real orders/payments, read-only market history, and weather caching/fallback against a local fake provider.
+The suite uses real emulator tokens and real HTTP calls. Phase 3 covers registration/login, a valid token returning 200 from `GET /api/auth/me`, 401 for missing/invalid tokens, 403 for a non-admin token on `GET /api/auth/admin-status`, trusted Admin SDK claim propagation, rejection of public admin creation, and Firestore rules denial for unauthorized reads/writes. Phase 05A additionally verifies buyer 403s, Zod validation, product ownership, image-URL ownership, pagination/search/status filtering/soft delete, signed-in active-product reads, backend-only Firestore writes, and owner-only Storage uploads. Phase 05B verifies Zod validation on every new endpoint, product ownership, negative-stock rejection, stock-history entries, pending-only order transitions, stock re-checks, no payment/delivery fields written by accept/reject, analytics from real orders/payments, read-only market history, and weather caching/fallback against a local fake provider. Phase 06A verifies buyer-only marketplace access, hidden drafts/out-of-stock products, category/price/district/unit/search filters, sorting, pagination, and privacy-safe farmer profiles. Phase 06B verifies buyer-only cart/wishlist/review access, Zod validation, live cart prices, stock/min-order checks, own/inactive product blocks, multiple-farmer carts, wishlist duplicate prevention, delivered-order review eligibility, one review per buyer/product, and transactional product/farmer rating aggregates.
 
 For manual mobile/backend testing against the emulators, set `EXPO_PUBLIC_USE_EMULATOR=true` in the root `.env` and restart Expo. The client calls `connectAuthEmulator` and `connectFirestoreEmulator` **only** when this value is exactly `true`; real-project `.env` files must leave it empty or set it to `false`. Set these in `backend/.env` (no service account is needed in emulator mode):
 

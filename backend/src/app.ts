@@ -5,13 +5,16 @@ import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { createAnalyticsRouter } from './routes/analytics';
 import { createAuthRouter } from './routes/auth';
+import { createCartRouter } from './routes/cart';
 import { createCategoriesRouter } from './routes/categories';
 import { createFarmerProfileRouter } from './routes/farmers';
 import { createBuyerMarketplaceRouter } from './routes/marketplace';
 import { createMarketRouter } from './routes/market';
 import { createOrdersRouter } from './routes/orders';
 import { createProductsRouter } from './routes/products';
+import { createReviewsRouter } from './routes/reviews';
 import { createWeatherRouter } from './routes/weather';
+import { createWishlistRouter } from './routes/wishlist';
 import { healthRouter } from './routes/health';
 
 export function createApp() {
@@ -27,6 +30,9 @@ export function createApp() {
   app.use('/api/marketplace', createBuyerMarketplaceRouter());
   app.use('/api/categories', createCategoriesRouter());
   app.use('/api/farmers', createFarmerProfileRouter());
+  app.use('/api/cart', createCartRouter());
+  app.use('/api/wishlist', createWishlistRouter());
+  app.use('/api/reviews', createReviewsRouter());
   app.use('/api/orders', createOrdersRouter());
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/weather', createWeatherRouter());

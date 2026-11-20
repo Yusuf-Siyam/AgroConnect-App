@@ -39,3 +39,49 @@ export const DEFAULT_MARKETPLACE_FILTERS: Omit<MarketplaceFilters, 'offset'> = {
 };
 
 export type { ProductList as MarketplaceList };
+
+export type CartItem = {
+  productId: string;
+  sellerId: string;
+  name: { bn: string; en: string };
+  imageUrl?: string;
+  unit: ProductUnit;
+  quantity: number;
+  minOrderQty: number;
+  stock: number;
+  unitPrice: number;
+  lineTotal: number;
+  available: boolean;
+  unavailableReason?: 'PRODUCT_NOT_FOUND' | 'PRODUCT_UNAVAILABLE' | 'OWN_PRODUCT';
+};
+
+export type CartResponse = {
+  items: CartItem[];
+  total: number;
+  farmerCount: number;
+  updatedAt?: string;
+};
+
+export type Review = {
+  id: string;
+  productId: string;
+  buyerId: string;
+  sellerId: string;
+  rating: number;
+  text?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReviewList = {
+  items: Review[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type ReviewEligibility = {
+  eligible: boolean;
+  hasReviewed: boolean;
+  reason?: 'NOT_DELIVERED' | 'NO_DELIVERED_PRODUCT' | 'ALREADY_REVIEWED';
+};
