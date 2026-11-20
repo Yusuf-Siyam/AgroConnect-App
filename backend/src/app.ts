@@ -10,6 +10,7 @@ import { createCategoriesRouter } from './routes/categories';
 import { createFarmerProfileRouter } from './routes/farmers';
 import { createBuyerMarketplaceRouter } from './routes/marketplace';
 import { createMarketRouter } from './routes/market';
+import { createDeliveryRouter } from './routes/delivery';
 import { createOrdersRouter } from './routes/orders';
 import { createProductsRouter } from './routes/products';
 import { createReviewsRouter } from './routes/reviews';
@@ -34,6 +35,7 @@ export function createApp() {
   app.use('/api/wishlist', createWishlistRouter());
   app.use('/api/reviews', createReviewsRouter());
   app.use('/api/orders', createOrdersRouter());
+  app.use('/api/delivery', createDeliveryRouter());
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/weather', createWeatherRouter());
   app.use('/api/market', createMarketRouter());

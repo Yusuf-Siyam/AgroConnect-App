@@ -2,9 +2,9 @@ import { HttpError } from '../middleware/error';
 import type { Role } from '../types/auth';
 
 /**
- * Canonical Phase 06 order statuses and transitions.
- * Payment and delivery transitions are defined here for completeness but are
- * deliberately not exposed by any Phase 07A API.
+ * Canonical order statuses and transitions introduced in Phase 07A.
+ * Payment transitions remain deferred to Phase 07B. Transporter delivery
+ * transitions are exposed only by the Phase 08 /api/delivery routes.
  */
 export const ORDER_STATUSES = [
   'pending',

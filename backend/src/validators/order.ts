@@ -26,8 +26,15 @@ export const createOrderSchema = z
         addressLine: z.string().trim().min(10).max(300),
         district: z.string().trim().min(2).max(100),
         phoneNumber: z.string().trim().regex(/^\+?[0-9]{7,15}$/),
+        latitude: z.number().finite().min(-90).max(90).optional(),
+        longitude: z.number().finite().min(-180).max(180).optional(),
       })
-      .strict(),
+      .strict()
+      .refine(
+        (address) =>
+          (address.latitude === undefined) === (address.longitude === undefined),
+        { message: 'Latitude and longitude must be provided together', path: ['latitude'] },
+      ),
   })
   .strict();
 

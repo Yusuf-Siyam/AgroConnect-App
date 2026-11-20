@@ -118,16 +118,10 @@ service cloud.firestore {
     }
 
     // ---------- Transporters ----------
+    // All writes go through the Express backend (Admin SDK bypasses these rules).
     match /transporters/{transporterId} {
       allow read: if true;
-      allow create: if isSelf(transporterId)
-                    && hasRole('transporter')
-                    && hasTimestamps()
-                    && (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false);
-      allow update: if isAdmin() || (isSelf(transporterId)
-                    && unchanged('isVerified')
-                    && unchanged('createdAt'));
-      allow delete: if isAdmin();
+      allow write: if false;
     }
 
     // ---------- Logistics, payments and notifications (backend-owned) ----------
@@ -137,6 +131,12 @@ service cloud.firestore {
                     request.auth.uid == resource.data.get('farmerId', null) ||
                     request.auth.uid == resource.data.get('buyerId', null)
                   ));
+      allow write: if false;
+    }
+
+    // Earnings are visible only to the transporter who earned them.
+    match /earnings/{earningsId} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == resource.data.transporterId);
       allow write: if false;
     }
 

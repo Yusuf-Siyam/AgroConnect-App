@@ -62,7 +62,7 @@ Update this table at the end of every phase.
 | 05 | Farmer Module | Complete |
 | 06 | Buyer Module | Complete |
 | 07A | Orders and Stock | Complete |
-| 08 | Transporter Module | Not started |
+| 08 | Transporter Module | In progress |
 | 09 | AI Integration | Not started |
 | 10 | Communication | Not started |
 | 11 | Advanced Features | Not started |
@@ -304,6 +304,8 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 
 **Phase 07A additions:** Canonical order statuses and transitions live in `backend/src/services/orderStatus.ts`. Buyer checkout, buyer/farmer list/detail, cancellation and admin cancellation are handled by `backend/src/routes/orders.ts` and `backend/src/services/order.ts`. Idempotent checkout records live in `orderCheckouts/{hash}` and immutable transition events in `orders/{orderId}/statusHistory/{eventId}`; both are backend-only in Firestore rules. Mobile checkout uses `Crypto.randomUUID()` from `expo-crypto` as the idempotency key. Shared client parsing lives in `src/features/orders/`; buyer order screens are under `src/app/buyer/orders/`, and farmer accept/reject reuses the same canonical order model.
 
+**Phase 08 backend additions:** `/api/delivery` is mounted in `backend/src/app.ts` and implemented in `backend/src/routes/delivery.ts`. Transporter profiles, delivery jobs, one-time earnings and throttled location live under `backend/src/services/`. Pricing and Haversine distance live in `backend/src/config/deliveryPricing.ts` and `backend/src/utils/geo.ts`. `createDeliveryJobForOrder(order)` is the only job-creation entry point and is intentionally not exposed as a route; Phase 07B will call it after verified payment. Firestore rules make `transporters/`, `deliveryJobs/` and `earnings/` backend-owned.
+
 ---
 
 ## 10. UI/UX and Localization
@@ -412,13 +414,16 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** Phase 07A complete. Buyers place real idempotent orders from the server-managed cart, follow status history and cancel eligible orders. Farmers accept or reject their own orders with transactional stock re-checks. No order can become `paid`, shipped or delivered in Phase 07A; delivery and payment work remains Phase 07B/08.
 
 ### Phase 08 - Transporter Module
-- [ ] Transporter profile and vehicle information
-- [ ] Delivery jobs and job acceptance
-- [ ] Delivery status and GPS tracking
-- [ ] Delivery pricing
-- [ ] Earnings
+- [x] Backend transporter profile and vehicle information (`/api/delivery/transporter-profile`)
+- [x] Backend delivery jobs, verified-transporter listing, accept/reject and concurrent-accept protection
+- [x] Backend delivery status transitions, delivery code, throttled GPS location and one-time earnings
+- [x] Delivery pricing function, Haversine distance, Firestore rules/indexes, emulator tests and dev seed
+- [ ] Mobile transporter tabs, profile, jobs, delivery steps, GPS and earnings
+- [ ] Buyer-side delivery code/location display and localized text
 
-**Result:** working Transporter Dashboard.
+**Pricing placeholders — owner must confirm:** base 40 BDT, 10 BDT/km, 2 BDT/kg and 10% platform commission. Values are env-overridable in the backend. **Phase 07B must call `calculateDeliveryFee()` before payment** so the buyer sees the full amount, then snapshot the fee on the order.
+
+**Result:** backend complete; mobile implementation remains.
 
 ### Phase 09 - AI Integration
 - [ ] Crop image upload
@@ -772,7 +777,7 @@ Resolve these early; record the outcome here.
 | 4 | Admin provisioning method (script vs custom claims) | Phase 03 | **Server-side CLI script** that sets the trusted `admin` / `role: admin` custom claim on an existing Firebase Auth user and updates its Firestore profile. There is no public admin registration route. |
 | 5 | Backend hosting and deployment target | Phase 12 | Pending |
 | 6 | Source of market price and price history data (price prediction requires sufficient history) | Phase 05 / 11 | **Partially unblocked:** Phase 05B provides a real `priceHistory` schema, authenticated read API, importer for trusted observations and an explicit empty state. The trusted source itself remains to be selected; no sample prices are bundled. |
-| 7 | Commission rates and delivery pricing formula | Phase 07B / 08 | Pending |
+| 7 | Commission rates and delivery pricing formula | Phase 07B / 08 | **Placeholder implemented, owner must confirm:** 40 BDT base, 10 BDT/km, 2 BDT/kg, 10% commission in `backend/src/config/deliveryPricing.ts` with env overrides. |
 
 ---
 

@@ -48,10 +48,16 @@ README conflicts / stale documentation to resolve in this phase:
 5. `orderStatus.ts` has a stale "Phase 06" comment and `RUN.md` still says checkout is a preview. Both will be corrected in the implementation steps.
 6. Firestore rules anticipate delivery fields not yet present in `Order`/services. Phase 08 will define the concrete job/location/earnings schemas consistently with those rules.
 
+## Phase 08 STEP 1 - backend and tests (complete)
+
+Implemented `/api/delivery` with transporter profile create/read/update, verified-only paginated available jobs, assigned-delivery list, accept/reject, transactional status steps, delivery-code confirmation with attempt lockout, rate-limited latest-location capture, buyer delivery read, and transporter earnings summary/history. Added `createDeliveryJobForOrder(order)` as the only job-creation entry point (no API route); Phase 07B must call it after verified payment. Added optional `pickupAddress.latitude/longitude` and `deliveryAddress.latitude/longitude` capture because the paid-order fixture/seed needs both coordinates for Haversine distance; this is the smallest schema addition and is reported as an assumption. Pricing is an env-overridable placeholder in one config file, with a note that Phase 07B must call `calculateDeliveryFee()` before payment. Firestore rules make transporter/delivery/earnings writes backend-only and indexes were added. Added `npm run seed:dev-paid-order`, guarded by emulator/NODE_ENV checks.
+
+Verification: backend typecheck passed, backend unit tests 18/18 passed, full emulator suite passed including new Phase 08 6/6; seed script ran successfully under `emulators:exec` and printed the expected fee/commission/net. Manual Windows/dev-build verification remains out of scope here.
+
 ## In progress
 
-- Phase 08 STEP 1: backend profile, delivery jobs, transitions, GPS, earnings, rules, seed script and emulator tests.
+- Phase 08 STEP 2: mobile transporter group, buyer delivery display, localization and docs.
 
 ## Next step
 
-- Finish STEP 1, verify, commit, then proceed to STEP 2 mobile. Do not start Phase 07B, Phase 09 or any later phase.
+- Finish STEP 2, verify, update README/PROGRESS, then stop. Do not start Phase 07B, Phase 09 or any later phase.

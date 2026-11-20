@@ -156,14 +156,24 @@ npm test
 Pop-Location
 ```
 
-`npm run test:emulators` starts Auth/Firestore/Storage, runs the five TypeScript suites sequentially through a Node runner, and stops the emulators afterwards. It does not rely on Linux `&&` chaining.
+`npm run test:emulators` starts Auth/Firestore/Storage, runs all TypeScript suites (including Phase 08) sequentially through a Node runner, and stops the emulators afterwards. It does not rely on Linux `&&` chaining.
 
 ## 7. Manual buyer/farmer smoke test
 
 1. Open <http://127.0.0.1:4004> and confirm the Auth, Firestore and Storage emulators are active.
 2. In the app, register a **farmer**, create a product, set available stock, and publish it as active.
 3. Log out and register a **buyer** (or use a separate browser profile). Open the marketplace, search/filter for the product, view its detail page, add it to the cart and wishlist, and open the checkout preview.
-4. Confirm the cart shows the current backend price and grouped farmer summary. Do not expect order submission: checkout is intentionally a preview, and `paid`/`shipped`/`delivered` remain later-phase work.
+4. Confirm the cart shows the current backend price and grouped farmer summary. Real order submission is available (Phase 07A), but no order can become `paid` until deferred Phase 07B.
+
+### Phase 08 dev seed (emulator only)
+
+With the emulators running and the backend not required for the seed itself, create a real `paid` order plus its delivery job:
+
+```powershell
+npm run seed:dev-paid-order -- --verify-transporter
+```
+
+The script refuses to run unless `FIRESTORE_EMULATOR_HOST` is set and `NODE_ENV` is not `production`. It creates or reuses three demo users, a product, a paid order and one delivery job. Default credentials are printed after it finishes. It is a dev-only script and is never bundled into the app.
 
 ## 8. Troubleshooting
 

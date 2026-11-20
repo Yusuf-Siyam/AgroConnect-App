@@ -29,6 +29,17 @@ const deliveryAddressSchema = z
     addressLine: z.string(),
     district: z.string(),
     phoneNumber: z.string(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+  })
+  .strict();
+
+const pickupAddressSchema = z
+  .object({
+    addressLine: z.string().optional(),
+    district: z.string().optional(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
   })
   .strict();
 
@@ -51,6 +62,7 @@ const storedOrderSchema = z
     id: z.string().min(1),
     buyerId: z.string().min(1),
     sellerIds: z.array(z.string()).default([]),
+    transporterId: z.string().optional(),
     items: z.array(
       z.object({
         productId: z.string().min(1),
@@ -64,6 +76,7 @@ const storedOrderSchema = z
     status: z.enum(ORDER_STATUSES),
     totalAmount: z.number().nonnegative(),
     deliveryFee: z.number().nullable().default(null),
+    pickupAddress: pickupAddressSchema.optional(),
     deliveryAddress: deliveryAddressSchema.optional(),
     rejectionReason: z.string().optional(),
     stockAdjusted: z.boolean().optional(),
@@ -124,10 +137,12 @@ function serializeOrder(data: unknown): Order {
     buyerId: raw.buyerId,
     sellerIds:
       raw.sellerIds.length > 0 ? raw.sellerIds : [...new Set(raw.items.map((item) => item.sellerId))],
+    ...(raw.transporterId ? { transporterId: raw.transporterId } : {}),
     items: raw.items,
     status: raw.status,
     totalAmount: raw.totalAmount,
     deliveryFee: raw.deliveryFee,
+    ...(raw.pickupAddress ? { pickupAddress: raw.pickupAddress } : {}),
     ...(raw.deliveryAddress ? { deliveryAddress: raw.deliveryAddress } : {}),
     ...(raw.rejectionReason ? { rejectionReason: raw.rejectionReason } : {}),
     ...(raw.stockAdjusted === undefined ? {} : { stockAdjusted: raw.stockAdjusted }),
@@ -142,6 +157,8 @@ function ordersCollection() {
   const { firestore } = getFirebaseAdmin();
   return firestore.collection('orders');
 }
+
+export { createStatusEvent, ordersCollection, serializeOrder };
 
 function checkoutsCollection() {
   const { firestore } = getFirebaseAdmin();
@@ -209,6 +226,7 @@ function assertVisibleOrder(order: Order, uid: string, role: string): void {
   if (role === 'admin') return;
   if (role === 'buyer' && order.buyerId === uid) return;
   if (role === 'farmer' && order.sellerIds.includes(uid)) return;
+  if (role === 'transporter' && order.transporterId === uid) return;
   throw new HttpError(404, 'ORDER_NOT_FOUND', 'Order not found.');
 }
 

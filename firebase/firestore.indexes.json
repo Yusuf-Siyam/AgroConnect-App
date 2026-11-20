@@ -140,6 +140,30 @@
         { "fieldPath": "buyerId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "deliveryJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "transporterId", "order": "ASCENDING" },
+        { "fieldPath": "orderStatus", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "deliveryJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "transporterId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "earnings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "transporterId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

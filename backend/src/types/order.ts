@@ -16,6 +16,17 @@ export type DeliveryAddress = {
   addressLine: string;
   district: string;
   phoneNumber: string;
+  /** Optional Phase 08 capture; required for distance-based pricing. */
+  latitude?: number;
+  longitude?: number;
+};
+
+/** Optional Phase 08 capture. Phase 07B will populate it from trusted seller data. */
+export type PickupAddress = {
+  addressLine?: string;
+  district?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 export type OrderStatusEvent = {
@@ -34,10 +45,12 @@ export type Order = {
   id: string;
   buyerId: string;
   sellerIds: string[];
+  transporterId?: string;
   items: OrderItem[];
   status: OrderStatus;
   totalAmount: number;
   deliveryFee: number | null;
+  pickupAddress?: PickupAddress;
   deliveryAddress?: DeliveryAddress;
   rejectionReason?: string;
   stockAdjusted?: boolean;
