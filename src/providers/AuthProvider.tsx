@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null);
   const userRef = useRef<User | null>(null);
+  const authActionInProgressRef = useRef(false);
 
   const loadProfile = useCallback(async (user: User): Promise<UserProfile> => {
     const { firestore } = getFirebase();
@@ -108,6 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return created;
   }, []);
 
+  const failAuthentication = useCallback(async () => {
+    try {
+      await signOutUser();
+    } catch {
+      // The local session is still cleared even if Firebase cannot be reached.
+    }
+    userRef.current = null;
+    setFirebaseUser(null);
+    setProfile(null);
+    setStatus('unauthenticated');
+  }, []);
+
   useEffect(() => {
     if (!env.isFirebaseConfigured) return;
 
@@ -117,6 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       userRef.current = user;
       setFirebaseUser(user);
+
+      // signIn/signUp/logout finish the state transition themselves. Handling
+      // the intermediate Firebase event here can write a fallback profile
+      // before registration has stored the selected role.
+      if (authActionInProgressRef.current) return;
 
       if (!user) {
         setProfile(null);
@@ -132,9 +150,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .catch(() => {
           if (!active) return;
-          // Authentication succeeded but the profile could not be read.
-          setProfile(null);
-          setStatus('authenticated');
+          // Never leave an authenticated user without a role: the route guards
+          // would bounce between the dashboard and /login.
+          void failAuthentication();
         });
     });
 
@@ -142,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       unsubscribe();
     };
-  }, [loadProfile]);
+  }, [failAuthentication, loadProfile]);
 
   useEffect(() => {
     setAuthTokenProvider(async () => {
@@ -161,34 +179,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const runAuthAction = useCallback(
+    <T,>(operation: () => Promise<T>): Promise<T> => {
+      authActionInProgressRef.current = true;
+      return wrap(operation).finally(() => {
+        authActionInProgressRef.current = false;
+      });
+    },
+    [wrap],
+  );
+
   const signIn = useCallback(
     async (values: LoginValues) => {
-      return wrap(async () => {
+      return runAuthAction(async () => {
         const user = await signInWithFirebase(values.email, values.password);
         userRef.current = user;
         setFirebaseUser(user);
-        const resolved = await loadProfile(user);
-        setProfile(resolved);
-        setStatus('authenticated');
-        return resolved;
+        try {
+          const resolved = await loadProfile(user);
+          setProfile(resolved);
+          setStatus('authenticated');
+          return resolved;
+        } catch (error) {
+          await failAuthentication();
+          throw error;
+        }
       });
     },
-    [loadProfile, wrap],
+    [failAuthentication, loadProfile, runAuthAction],
   );
 
   const signUp = useCallback(
     async (values: RegisterValues) => {
-      return wrap(async () => {
+      return runAuthAction(async () => {
         const user = await registerWithFirebase(values);
         userRef.current = user;
         setFirebaseUser(user);
-        const resolved = await loadProfile(user);
-        setProfile(resolved);
-        setStatus('authenticated');
-        return resolved;
+        try {
+          const resolved = await loadProfile(user);
+          setProfile(resolved);
+          setStatus('authenticated');
+          return resolved;
+        } catch (error) {
+          await failAuthentication();
+          throw error;
+        }
       });
     },
-    [loadProfile, wrap],
+    [failAuthentication, loadProfile, runAuthAction],
   );
 
   const resetPassword = useCallback(
@@ -197,12 +235,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    await wrap(() => signOutUser());
-    userRef.current = null;
-    setFirebaseUser(null);
-    setProfile(null);
-    setStatus('unauthenticated');
-  }, [wrap]);
+    await runAuthAction(async () => {
+      await signOutUser();
+      userRef.current = null;
+      setFirebaseUser(null);
+      setProfile(null);
+      setStatus('unauthenticated');
+    });
+  }, [runAuthAction]);
 
   const refreshProfile = useCallback(async () => {
     const user = userRef.current;

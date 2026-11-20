@@ -24,22 +24,22 @@ export type UserProfile = {
 };
 
 export type RoleHome =
-  | '/farmer'
-  | '/buyer'
-  | '/transporter'
-  | '/admin'
+  | '/farmer/index'
+  | '/buyer/index'
+  | '/transporter/index'
+  | '/admin/index'
   | '/login';
 
 export function homePathForRole(role?: Role | null): RoleHome {
   switch (role) {
     case 'farmer':
-      return '/farmer';
+      return '/farmer/index';
     case 'buyer':
-      return '/buyer';
+      return '/buyer/index';
     case 'transporter':
-      return '/transporter';
+      return '/transporter/index';
     case 'admin':
-      return '/admin';
+      return '/admin/index';
     default:
       return '/login';
   }

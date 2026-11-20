@@ -21,15 +21,16 @@ function AppNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={status === 'unauthenticated'} redirectTo="/login">
+      {/* /login is inside (auth); redirecting there when authenticated would loop. */}
+      <Stack.Protected guard={status === 'unauthenticated'} redirectTo="/">
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
 
       <Stack.Protected guard={status === 'authenticated'} redirectTo="/login">
-        <Stack.Screen name="(farmer)" />
-        <Stack.Screen name="(buyer)" />
-        <Stack.Screen name="(transporter)" />
-        <Stack.Screen name="(admin)" />
+        <Stack.Screen name="farmer" />
+        <Stack.Screen name="buyer" />
+        <Stack.Screen name="transporter" />
+        <Stack.Screen name="admin" />
         <Stack.Screen name="profile" />
       </Stack.Protected>
 

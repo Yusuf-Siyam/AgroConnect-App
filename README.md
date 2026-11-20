@@ -115,10 +115,10 @@ React Native App  ->  Express REST API  ->  Firebase / External Services
 
 | Role | Registration | Dashboard |
 |------|--------------|-----------|
-| Farmer | Public | `(farmer)` |
-| Buyer | Public | `(buyer)` |
-| Transporter | Public (with vehicle details, subject to verification) | `(transporter)` |
-| Admin | Secure provisioning only | `(admin)` |
+| Farmer | Public | `/farmer/index` |
+| Buyer | Public | `/buyer/index` |
+| Transporter | Public (with vehicle details, subject to verification) | `/transporter/index` |
+| Admin | Secure provisioning only | `/admin/index` |
 
 After authentication, users are redirected to the dashboard for their role.
 
@@ -253,10 +253,10 @@ Required middleware and practices:
 AgroConnect/
 ├── app/
 │   ├── (auth)/
-│   ├── (farmer)/
-│   ├── (buyer)/
-│   ├── (transporter)/
-│   ├── (admin)/
+│   ├── farmer/
+│   ├── buyer/
+│   ├── transporter/
+│   ├── admin/
 │   ├── chat/
 │   └── profile/
 ├── components/
@@ -294,11 +294,11 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 
 **Phase 02 additions:** Firebase client initialization and push-token helpers live in `src/services/`. The Admin SDK initializer lives in `backend/src/config/firebase.ts`. Security Rules and their Firebase CLI configuration live in `firebase/firestore.rules`, `firebase/storage.rules`, and `firebase.json`.
 
-**Phase 03 additions:** Auth forms and profile parsing live in `src/features/authentication/`; session state is provided by `src/providers/AuthProvider.tsx`. Backend verification is in `backend/src/middleware/auth.ts`, profile endpoints in `backend/src/routes/auth.ts`, and secure admin provisioning in `backend/src/scripts/provision-admin.ts`. Rule-based role screens live under the `(farmer)`, `(buyer)`, `(transporter)`, and `(admin)` route groups.
+**Phase 03 additions:** Auth forms and profile parsing live in `src/features/authentication/`; session state is provided by `src/providers/AuthProvider.tsx`. Backend verification is in `backend/src/middleware/auth.ts`, profile endpoints in `backend/src/routes/auth.ts`, and secure admin provisioning in `backend/src/scripts/provision-admin.ts`. Rule-based role screens live under the `farmer`, `buyer`, `transporter`, and `admin` routes.
 
 **Phase 04 additions:** Design tokens live in `src/theme/` and `tailwind.config.js`. Reusable UI lives in `src/components/common/`, shared dashboard chrome in `src/components/navigation/`, and typed Bangla/English dictionaries in `src/locales/` with the locale store in `src/store/locale.ts`.
 
-**Phase 05A additions:** Farmer-only tabs live in `src/components/navigation/FarmerTabs.tsx` with screens under `src/app/(farmer)/`. Product forms, services and upload helpers live in `src/features/farmer/` and `src/components/product/`. The backend product API is in `backend/src/routes/products.ts` and `backend/src/services/product.ts`. Product writes are backend-only in Firestore rules; images must be uploaded to `products/{uid}/{productId}/...` and validated server-side. Composite indexes are declared in `firebase/firestore.indexes.json`.
+**Phase 05A additions:** Farmer-only tabs live in `src/components/navigation/FarmerTabs.tsx` with screens under `src/app/farmer/`. Product forms, services and upload helpers live in `src/features/farmer/` and `src/components/product/`. The backend product API is in `backend/src/routes/products.ts` and `backend/src/services/product.ts`. Product writes are backend-only in Firestore rules; images must be uploaded to `products/{uid}/{productId}/...` and validated server-side. Composite indexes are declared in `firebase/firestore.indexes.json`.
 
 ---
 

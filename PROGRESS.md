@@ -16,6 +16,8 @@
 
 - Windows/PowerShell run support: added `RUN.md`, expanded the root/backend `.env.example` templates with emulator and host guidance, made `test:emulators` use a cross-platform Node runner, and made client emulator hosts Android-aware with Storage emulator support. No feature behavior changed.
 - Windows setup verification: root `tsc --noEmit` and `expo lint`; backend `tsc --noEmit` and 12/12 unit tests; full emulator suite (Phase 3 6/6, Phase 05A 5/5, Phase 05B 6/6, Phase 06A 4/4, Phase 06B 4/4); backend `/api/auth/me` returned HTTP 401 `UNAUTHORIZED`. Actual Windows/PowerShell execution, physical-device access and EAS remain UNVERIFIED.
+- Farmer registration fix: suppressed Firebase's intermediate auth-state callback while sign-in/sign-up/logout complete, so the fallback profile write cannot race the selected-role profile write and trigger the Firestore `role unchanged` rule. Profile-load failures now clear the local session instead of leaving an authenticated user without a role. Fixed the root `Stack.Protected` redirect loop and moved role screens from route groups to real `/farmer`, `/buyer`, `/transporter`, and `/admin` routes so role-home redirects resolve.
+- Registration-fix verification: root `tsc --noEmit` and `expo lint`; backend typecheck (via root TypeScript because the backend's optional native binary is unavailable here) and 12/12 unit tests; full emulator suite (Phase 3 6/6, Phase 05A 5/5, Phase 05B 6/6, Phase 06A 4/4, Phase 06B 4/4); `git diff --check` all passed.
 
 ## In progress
 
