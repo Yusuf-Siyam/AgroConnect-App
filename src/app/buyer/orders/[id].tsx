@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
+import { BuyerDeliveryCard } from '@/components/buyer/BuyerDeliveryCard';
 import { BuyerPage } from '@/components/buyer/BuyerPage';
 import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
@@ -89,6 +90,8 @@ export default function BuyerOrderDetailScreen() {
           {data.deliveryAddress?.phoneNumber ?? t('common.notAvailable')}
         </AppText>
       </Card>
+
+      <BuyerDeliveryCard orderId={data.id} items={data.items} />
 
       <AppText variant="subtitle">{t('farmer.orders.itemsTitle')}</AppText>
       {data.items.map((item) => (

@@ -326,8 +326,7 @@ describe('Phase 08 transporter emulator verification', () => {
     const acceptedResponse = await acceptJob(assigned, job.id);
     assert.equal(acceptedResponse.status, 200, await acceptedResponse.clone().text());
     const accepted = await json(acceptedResponse);
-    const deliveryCode: string = accepted.deliveryCode;
-    assert.match(deliveryCode, /^\d{6}$/);
+    assert.equal(accepted.deliveryCode, null);
 
     const wrongTransporterCollect = await postJobAction(other, job.id, 'collect');
     assert.equal(wrongTransporterCollect.status, 403);
@@ -345,7 +344,7 @@ describe('Phase 08 transporter emulator verification', () => {
 
     const buyerView = await fetchAs(`/api/delivery/buyer/orders/${order.id}/delivery`, buyer.token);
     assert.equal(buyerView.status, 200);
-    assert.equal((await json(buyerView)).deliveryCode, deliveryCode);
+    assert.equal((await json(buyerView)).deliveryCode, null);
     const otherBuyerView = await fetchAs(
       `/api/delivery/buyer/orders/${order.id}/delivery`,
       otherBuyer.token,
@@ -354,6 +353,10 @@ describe('Phase 08 transporter emulator verification', () => {
 
     const collect = await postJobAction(assigned, job.id, 'collect');
     assert.equal(collect.status, 200, await collect.clone().text());
+    const deliveryCode: string = (await json(collect)).deliveryCode;
+    assert.match(deliveryCode, /^\d{6}$/);
+    const codeVisible = await fetchAs(`/api/delivery/buyer/orders/${order.id}/delivery`, buyer.token);
+    assert.equal((await json(codeVisible)).deliveryCode, deliveryCode);
     const reverse = await postJobAction(assigned, job.id, 'collect');
     assert.equal(reverse.status, 409);
 

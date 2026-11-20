@@ -62,7 +62,7 @@ Update this table at the end of every phase.
 | 05 | Farmer Module | Complete |
 | 06 | Buyer Module | Complete |
 | 07A | Orders and Stock | Complete |
-| 08 | Transporter Module | In progress |
+| 08 | Transporter Module | Complete |
 | 09 | AI Integration | Not started |
 | 10 | Communication | Not started |
 | 11 | Advanced Features | Not started |
@@ -418,12 +418,12 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 - [x] Backend delivery jobs, verified-transporter listing, accept/reject and concurrent-accept protection
 - [x] Backend delivery status transitions, delivery code, throttled GPS location and one-time earnings
 - [x] Delivery pricing function, Haversine distance, Firestore rules/indexes, emulator tests and dev seed
-- [ ] Mobile transporter tabs, profile, jobs, delivery steps, GPS and earnings
-- [ ] Buyer-side delivery code/location display and localized text
+- [x] Mobile transporter tabs, profile, jobs, delivery steps, foreground-only GPS and earnings
+- [x] Buyer-side delivery code/location display and localized text (Bangla default, English switchable)
 
 **Pricing placeholders — owner must confirm:** base 40 BDT, 10 BDT/km, 2 BDT/kg and 10% platform commission. Values are env-overridable in the backend. **Phase 07B must call `calculateDeliveryFee()` before payment** so the buyer sees the full amount, then snapshot the fee on the order.
 
-**Result:** backend complete; mobile implementation remains.
+**Result:** Phase 08 complete. Transporters manage a verified profile, accept/reject real paid jobs, collect/ship/deliver with a buyer-visible code, share location for about 15 seconds in the foreground only, and see earnings. Buyers see the code, latest location and a review prompt after delivery. No payment, notification, chat or admin screen was added.
 
 ### Phase 09 - AI Integration
 - [ ] Crop image upload

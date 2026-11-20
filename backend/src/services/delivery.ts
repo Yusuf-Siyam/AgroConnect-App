@@ -298,14 +298,9 @@ export async function acceptDeliveryJob(
       actorRole: 'transporter',
       at,
     });
-    const code = generateDeliveryCode();
-
     transaction.update(jobRef, {
       transporterId,
       orderStatus: 'shipment_accepted',
-      deliveryCode: code,
-      codeAttempts: 0,
-      codeLockedUntil: null,
       updatedAt: FieldValue.serverTimestamp(),
     });
     transaction.update(orderRef, {
@@ -320,9 +315,6 @@ export async function acceptDeliveryJob(
       ...job,
       transporterId,
       orderStatus: 'shipment_accepted',
-      deliveryCode: code,
-      codeAttempts: 0,
-      codeLockedUntil: null,
     };
   });
 }
@@ -426,7 +418,11 @@ async function updateJobAndOrderStatus(
 }
 
 export function confirmPickup(transporterId: string, jobId: string): Promise<DeliveryJob> {
-  return updateJobAndOrderStatus(transporterId, jobId, 'collected');
+  return updateJobAndOrderStatus(transporterId, jobId, 'collected', {
+    deliveryCode: generateDeliveryCode(),
+    codeAttempts: 0,
+    codeLockedUntil: null,
+  });
 }
 
 export function startDelivery(transporterId: string, jobId: string): Promise<DeliveryJob> {

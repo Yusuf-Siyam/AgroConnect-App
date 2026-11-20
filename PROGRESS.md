@@ -54,10 +54,18 @@ Implemented `/api/delivery` with transporter profile create/read/update, verifie
 
 Verification: backend typecheck passed, backend unit tests 18/18 passed, full emulator suite passed including new Phase 08 6/6; seed script ran successfully under `emulators:exec` and printed the expected fee/commission/net. Manual Windows/dev-build verification remains out of scope here.
 
+## Phase 08 STEP 2 - mobile and docs (complete)
+
+Added a transporter tab group (Dashboard, Jobs, My Deliveries, Profile) backed by real `/api/delivery` calls, with forms for transporter profile and the six-digit delivery code. Job detail implements pickup → ship → deliver transitions, a buyer-visible code generated when the job becomes `collected`, and foreground-only location sharing for about 15 seconds (no background permission or tracking). Earnings summary and history are shown on the dashboard and profile. Buyer order detail now shows delivery status, code once available, latest location, and a review prompt for delivered products. All new copy is localized in Bangla and English; Bangla remains the default locale. No payment, notification, chat or admin screen was added.
+
+A small backend correction was included in this step: the delivery code is generated at `collected` rather than at accept, matching the requirement that the buyer only sees it after pickup. The Phase 08 emulator suite was updated accordingly.
+
+Verification: root `npx tsc --noEmit`, `npx expo lint --max-warnings 0`, backend typecheck, backend unit tests 18/18, and full emulator suite (6/6 Phase 08) all passed after these changes. Real-device GPS/camera/location permission behavior is not automatable here and remains UNVERIFIED.
+
 ## In progress
 
-- Phase 08 STEP 2: mobile transporter group, buyer delivery display, localization and docs.
+- None. Phase 08 is complete.
 
 ## Next step
 
-- Finish STEP 2, verify, update README/PROGRESS, then stop. Do not start Phase 07B, Phase 09 or any later phase.
+- STOP. Phase 07B, Phase 09 and later phases remain untouched.

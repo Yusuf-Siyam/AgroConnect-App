@@ -41,7 +41,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow AgroConnect to use your location for local weather forecasts."
+          "locationWhenInUsePermission": "Allow AgroConnect to use your location for local weather forecasts and to share delivery progress."
         }
       ]
     ],

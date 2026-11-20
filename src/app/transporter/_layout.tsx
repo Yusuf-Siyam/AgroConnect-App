@@ -1,10 +1,10 @@
 import { RoleGuard } from '@/components/common/RoleGuard';
-import { RoleNavigator } from '@/components/navigation/RoleNavigator';
+import { TransporterTabs } from '@/components/navigation/TransporterTabs';
 
 export default function TransporterLayout() {
   return (
     <RoleGuard role="transporter">
-      <RoleNavigator />
+      <TransporterTabs />
     </RoleGuard>
   );
 }

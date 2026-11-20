@@ -175,6 +175,15 @@ npm run seed:dev-paid-order -- --verify-transporter
 
 The script refuses to run unless `FIRESTORE_EMULATOR_HOST` is set and `NODE_ENV` is not `production`. It creates or reuses three demo users, a product, a paid order and one delivery job. Default credentials are printed after it finishes. It is a dev-only script and is never bundled into the app.
 
+### Phase 08 mobile smoke test
+
+1. Run the seed above, start the backend and Expo, and sign in as `transporter.demo@agroconnect.test` / `SeedDemo123!`.
+2. Open the Transporter tab group. Complete the profile form first if it is empty; verification stays backend-controlled (`--verify-transporter` on the seed makes this demo user verified).
+3. In **Jobs**, accept the seeded job. In **My Deliveries**, open it, confirm pickup, then start delivery. The six-digit code appears only after pickup.
+4. Sign in as `buyer.demo@agroconnect.test` / `SeedDemo123!` in another profile, open the seeded order detail, and confirm the code and latest location appear. Give the code back to the transporter.
+5. The transporter confirms delivery with the code; the buyer then sees the review prompt linking to each purchased product. Earnings appear on the transporter dashboard and profile.
+6. Location sharing is foreground-only for about 15 seconds and uses `expo-location`; no background location permission is requested. Real-device GPS behavior must be checked manually on a phone or simulator.
+
 ## 8. Troubleshooting
 
 | Symptom | Fix |
