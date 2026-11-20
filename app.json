@@ -37,6 +37,12 @@
           "supportedLocales": ["bn", "en"],
           "supportsRTL": false
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow AgroConnect to use your location for local weather forecasts."
+        }
       ]
     ],
     "experiments": {

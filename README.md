@@ -59,7 +59,7 @@ Update this table at the end of every phase.
 | 02 | Firebase Integration | Complete |
 | 03 | Authentication | Complete |
 | 04 | UI Foundation | Complete |
-| 05 | Farmer Module | Not started |
+| 05 | Farmer Module | In progress |
 | 06 | Buyer Module | Not started |
 | 07 | Order and Payment | Not started |
 | 08 | Transporter Module | Not started |
@@ -294,6 +294,8 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 
 **Phase 04 additions:** Design tokens live in `src/theme/` and `tailwind.config.js`. Reusable UI lives in `src/components/common/`, shared dashboard chrome in `src/components/navigation/`, and typed Bangla/English dictionaries in `src/locales/` with the locale store in `src/store/locale.ts`.
 
+**Phase 05A additions:** Farmer-only tabs live in `src/components/navigation/FarmerTabs.tsx` with screens under `src/app/(farmer)/`. Product forms, services and upload helpers live in `src/features/farmer/` and `src/components/product/`. The backend product API is in `backend/src/routes/products.ts` and `backend/src/services/product.ts`. Product writes are backend-only in Firestore rules; images must be uploaded to `products/{uid}/{productId}/...` and validated server-side. Composite indexes are declared in `firebase/firestore.indexes.json`.
+
 ---
 
 ## 10. UI/UX and Localization
@@ -311,6 +313,7 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 - Centralized translation files. **No hardcoded UI text.**
 - Localized notifications and order statuses.
 - Supported units: kg, gram, মণ (maund), ton, with conversion.
+- **Confirmation needed:** the conversion utility currently uses the common Bangladesh value `1 mon = 40 kg` (`MAUND_TO_KG` in `backend/src/utils/units.ts` and `src/features/farmer/types.ts`). Confirm this before production pricing.
 
 ---
 
@@ -368,14 +371,14 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** consistent mobile design system with Bangla as the default language, English switching, shared role-dashboard chrome, and reusable state components.
 
 ### Phase 05 - Farmer Module
-- [ ] Dashboard
-- [ ] Product CRUD and image uploads
+- [x] Dashboard
+- [x] Product CRUD and image uploads (Part 5A)
 - [ ] Inventory
 - [ ] Order management
 - [ ] Sales analytics
 - [ ] Weather and market prices
 
-**Result:** working Farmer Dashboard.
+**Result:** Part 5A complete: farmer tabs, real product-count dashboard, Zod-validated product API, ownership checks, image uploads, and emulator-verified rules. Part 5B is next.
 
 ### Phase 06 - Buyer Module
 - [ ] Marketplace, categories, search and filters
@@ -623,7 +626,7 @@ The backend exposes `GET /api/health` and a consistent JSON 404/error format. Af
 1. Create a Firebase project and enable **Authentication**, **Cloud Firestore**, **Cloud Storage**, and **Cloud Messaging**.
 2. Register a **web app** in that project; copy its config values into the root `.env` as `EXPO_PUBLIC_FIREBASE_*` (the Firebase JS SDK uses this web-style config on native too).
 3. Create a least-privilege service account in Firebase **Settings → Service accounts**. Store the downloaded JSON outside the repository and copy its `project_id`, `client_email`, and `private_key` into `backend/.env` (the supported method in this phase). Keep `FIREBASE_STORAGE_BUCKET` empty unless a non-default bucket is used.
-4. Deploy the rules with the Firebase CLI (external tool, not a project script): `firebase use --add <project-id>`, then `firebase deploy --only firestore:rules,storage`. The source of truth is `firebase/firestore.rules` and `firebase/storage.rules`, wired through `firebase.json`.
+4. Deploy the rules with the Firebase CLI (external tool, not a project script): `firebase use --add <project-id>`, then `firebase deploy --only firestore:rules,firestore:indexes,storage`. The source of truth is `firebase/firestore.rules` and `firebase/storage.rules`, wired through `firebase.json`.
 5. Admin access is a server-assigned custom claim (`admin: true`). Never add admins through public registration or client-side code.
 6. FCM: `expo-notifications` is installed and configured via the app config plugin with a `default` Android channel. Remote push requires a development/production build (not Expo Go on Android, SDK 53+). Configure Android FCM V1 credentials per <https://docs.expo.dev/push-notifications/fcm-credentials.md> and iOS APNs credentials via Expo EAS. Set `extra.eas.projectId` in the app config when the EAS project exists so Expo push tokens can be issued; no placeholder ID is committed.
 
@@ -650,7 +653,7 @@ Verification performed in this repository: mobile `npm run typecheck`, `npm run 
 - Loading, error, and empty states use `StateView`; profile mutations show a real loading/error state with retry. No simulated data or mock success responses were added.
 - This phase needs no new credentials. Verification: mobile `npm run typecheck`, `npm run lint`, `npx expo-doctor` (20/20), and web/iOS/Android exports. Visual review on physical devices is **UNVERIFIED** in this environment.
 
-### Local Firebase emulator verification (Auth + Firestore)
+### Local Firebase emulator verification (Auth + Firestore + Storage)
 
 The Firebase CLI is a root dev dependency. Install Java 21+ (required by the current Firestore emulator), then install both dependency trees:
 
@@ -665,7 +668,7 @@ Start the emulators for interactive use:
 npm run emulators
 ```
 
-This starts Auth on `127.0.0.1:9099`, Firestore on `127.0.0.1:8080`, and the Emulator Suite UI on <http://127.0.0.1:4004> (4004 avoids the backend's default port 4000). The project is `demo-agroconnect` from `.firebaserc`, and Firestore loads `firebase/firestore.rules` through `firebase.json`.
+This starts Auth on `127.0.0.1:9099`, Firestore on `127.0.0.1:8080`, Storage on `127.0.0.1:9199`, and the Emulator Suite UI on <http://127.0.0.1:4004> (4004 avoids the backend's default port 4000). The project is `demo-agroconnect` from `.firebaserc`; Firestore loads `firebase/firestore.rules` and indexes from `firebase/firestore.indexes.json`, and Storage loads `firebase/storage.rules` through `firebase.json`.
 
 Run the automated Phase 3 checks (emulators start and stop automatically):
 
@@ -673,7 +676,7 @@ Run the automated Phase 3 checks (emulators start and stop automatically):
 npm run test:emulators
 ```
 
-The suite uses real emulator tokens and real HTTP calls. It covers registration/login, a valid token returning 200 from `GET /api/auth/me`, 401 for missing/invalid tokens, 403 for a non-admin token on `GET /api/auth/admin-status`, trusted Admin SDK claim propagation, rejection of public admin creation, and Firestore rules denial for unauthorized reads/writes.
+The suite uses real emulator tokens and real HTTP calls. Phase 3 covers registration/login, a valid token returning 200 from `GET /api/auth/me`, 401 for missing/invalid tokens, 403 for a non-admin token on `GET /api/auth/admin-status`, trusted Admin SDK claim propagation, rejection of public admin creation, and Firestore rules denial for unauthorized reads/writes. Phase 05A additionally verifies buyer 403s, Zod validation, product ownership, image-URL ownership, pagination/search/status filtering/soft delete, signed-in active-product reads, backend-only Firestore writes, and owner-only Storage uploads.
 
 For manual mobile/backend testing against the emulators, set `EXPO_PUBLIC_USE_EMULATOR=true` in the root `.env` and restart Expo. The client calls `connectAuthEmulator` and `connectFirestoreEmulator` **only** when this value is exactly `true`; real-project `.env` files must leave it empty or set it to `false`. Set these in `backend/.env` (no service account is needed in emulator mode):
 
@@ -683,6 +686,7 @@ For manual mobile/backend testing against the emulators, set `EXPO_PUBLIC_USE_EM
 FIREBASE_PROJECT_ID=demo-agroconnect
 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
 ```
 
 Root `.env`, when the mobile app also calls the local backend:
@@ -693,6 +697,13 @@ EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:4000
 
 Physical devices cannot reach `127.0.0.1` on the development machine; use an Android emulator, web, or a LAN-reachable host mapping.
 
+### Phase 05A setup (Products)
+
+1. The farmer dashboard, products list, product form and image picker are available under `/farmer`. The dashboard calls `GET /api/products/stats`; no counts are hard-coded.
+2. Product images are compressed on device and uploaded to `products/{uid}/{productId}/...`. Storage rules allow owner writes only, accept JPEG/PNG/WebP, and cap files at 5 MB. The backend rejects image URLs outside the authenticated farmer's UID/product path.
+3. Firestore product documents are written only through the backend. Signed-in users can read `active` products; owners and admins can also read their drafts. `GET /api/products` supports `search`, `status`, `limit` and `offset`.
+4. Deploy indexes with the rules: `npx firebase deploy --only firestore:rules,firestore:indexes,storage`.
+
 ### Real Firebase project setup (after emulator verification)
 
 1. Leave `EXPO_PUBLIC_USE_EMULATOR` empty/false and remove both emulator host variables from `backend/.env`. Fill the real public Firebase values in root `.env` and service-account values in `backend/.env`; never commit either file.
@@ -701,7 +712,7 @@ Physical devices cannot reach `127.0.0.1` on the development machine; use an And
 ```bash
 npx firebase login
 npx firebase use --add <your-firebase-project-id>
-npx firebase deploy --only firestore:rules,storage
+npx firebase deploy --only firestore:rules,firestore:indexes,storage
 ```
 
 3. Enable Email/Password sign-in, add authorized domains, and provision admins only with `cd backend && npm run admin:provision -- <firebase-uid>`. Live Firebase behavior remains unverified until these real credentials and project settings are supplied.

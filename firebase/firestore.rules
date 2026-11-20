@@ -39,6 +39,10 @@ service cloud.firestore {
       return signedIn() && resource.data.get(field, null) == request.auth.uid;
     }
 
+    function ownsProduct(productId) {
+      return signedIn() && get(/databases/$(database)/documents/products/$(productId)).data.sellerId == request.auth.uid;
+    }
+
     // ---------- Users ----------
     match /users/{uid} {
       allow read: if isSelf(uid) || isAdmin();
@@ -54,16 +58,20 @@ service cloud.firestore {
     }
 
     // ---------- Products (farmer inventory / marketplace) ----------
+    // Product writes are backend-only: the API owns pricing, stock transactions,
+    // ownership checks and image URL verification.
     match /products/{productId} {
-      allow read: if true;
-      allow create: if hasRole('farmer')
-                    && hasTimestamps()
-                    && request.resource.data.sellerId == request.auth.uid;
-      allow update: if isAdmin() || (hasRole('farmer')
-                    && ownsField('sellerId')
-                    && unchanged('sellerId')
-                    && unchanged('createdAt'));
-      allow delete: if isAdmin() || (hasRole('farmer') && ownsField('sellerId'));
+      allow read: if signedIn() && (
+                    resource.data.status == 'active' ||
+                    isAdmin() ||
+                    ownsField('sellerId')
+                  );
+      allow write: if false;
+
+      match /stockHistory/{historyId} {
+        allow read: if isAdmin() || ownsProduct(productId);
+        allow write: if false;
+      }
     }
 
     // ---------- Orders (state changes only through the backend) ----------

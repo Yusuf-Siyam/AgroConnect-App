@@ -1,10 +1,10 @@
 import { RoleGuard } from '@/components/common/RoleGuard';
-import { RoleNavigator } from '@/components/navigation/RoleNavigator';
+import { FarmerTabs } from '@/components/navigation/FarmerTabs';
 
 export default function FarmerLayout() {
   return (
     <RoleGuard role="farmer">
-      <RoleNavigator />
+      <FarmerTabs />
     </RoleGuard>
   );
 }

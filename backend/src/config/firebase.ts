@@ -60,7 +60,9 @@ export function isFirebaseAdminConfigured(): boolean {
 /** The Admin SDK honors these host variables and bypasses real credentials. */
 export function isFirebaseEmulatorEnabled(): boolean {
   return Boolean(
-    process.env.FIREBASE_AUTH_EMULATOR_HOST?.trim() || process.env.FIRESTORE_EMULATOR_HOST?.trim(),
+    process.env.FIREBASE_AUTH_EMULATOR_HOST?.trim() ||
+      process.env.FIRESTORE_EMULATOR_HOST?.trim() ||
+      process.env.FIREBASE_STORAGE_EMULATOR_HOST?.trim(),
   );
 }
 

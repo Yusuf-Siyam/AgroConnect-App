@@ -10,6 +10,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().max(65535).default(4000),
   CORS_ORIGINS: z.string().default(''),
   FIREBASE_STORAGE_BUCKET: z.string().default(''),
+  FIREBASE_STORAGE_EMULATOR_HOST: z.string().default(''),
 });
 
 // Empty values in a copied .env.example should fall back to the schema defaults.
@@ -31,4 +32,5 @@ export const env = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   firebaseStorageBucket: parsed.data.FIREBASE_STORAGE_BUCKET,
+  firebaseStorageEmulatorHost: parsed.data.FIREBASE_STORAGE_EMULATOR_HOST,
 } as const;

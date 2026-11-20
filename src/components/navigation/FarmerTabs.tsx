@@ -1,0 +1,24 @@
+import { Tabs } from 'expo-router';
+
+import { useTranslation } from '@/i18n';
+import { theme } from '@/theme';
+
+/** Farmer-only bottom navigation: Dashboard, Products, Orders, More. */
+export function FarmerTabs() {
+  const { t } = useTranslation();
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.muted,
+      }}
+    >
+      <Tabs.Screen name="index" options={{ title: t('farmer.tab.dashboard') }} />
+      <Tabs.Screen name="products" options={{ title: t('farmer.tab.products') }} />
+      <Tabs.Screen name="orders" options={{ title: t('farmer.tab.orders') }} />
+      <Tabs.Screen name="more" options={{ title: t('farmer.tab.more') }} />
+    </Tabs>
+  );
+}

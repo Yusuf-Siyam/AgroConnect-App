@@ -18,9 +18,13 @@ service firebase.storage {
     }
 
     // Product photos are public because the marketplace lists them.
-    match /products/{sellerId}/{fileName} {
+    // Uploads must be under products/{sellerUid}/{productId}/..., are limited to
+    // 5 MB and may only contain JPEG, PNG or WebP images.
+    match /products/{sellerId}/{productId}/{fileName=**} {
       allow read: if true;
-      allow write: if isOwner(sellerId);
+      allow write: if isOwner(sellerId)
+                   && request.resource.size <= 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(jpeg|png|webp)');
     }
 
     // Profile images are public but only the owner may change them.
