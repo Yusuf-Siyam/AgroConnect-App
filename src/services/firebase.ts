@@ -2,12 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FirebaseError, getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import {
   browserLocalPersistence,
+  connectAuthEmulator,
   getAuth,
   getReactNativePersistence,
   initializeAuth,
   type Auth,
 } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { Platform } from 'react-native';
 
@@ -59,10 +60,19 @@ export function getFirebase(): FirebaseServices {
       }
     }
 
+    if (env.useEmulator) {
+      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    }
+
+    const firestore = getFirestore(app);
+    if (env.useEmulator) {
+      connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
+    }
+
     services = {
       app,
       auth,
-      firestore: getFirestore(app),
+      firestore,
       storage: getStorage(app),
     };
   }

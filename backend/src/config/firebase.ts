@@ -57,31 +57,53 @@ export function isFirebaseAdminConfigured(): boolean {
   return REQUIRED_KEYS.every((key) => Boolean(process.env[key]?.trim()));
 }
 
+/** The Admin SDK honors these host variables and bypasses real credentials. */
+export function isFirebaseEmulatorEnabled(): boolean {
+  return Boolean(
+    process.env.FIREBASE_AUTH_EMULATOR_HOST?.trim() || process.env.FIRESTORE_EMULATOR_HOST?.trim(),
+  );
+}
+
 /**
- * Lazily initializes the Admin SDK. Missing credentials never prevent the HTTP
- * server from starting (e.g. /api/health); they fail only when a service is used.
+ * Lazily initializes the Admin SDK. Emulator host variables use a credential-free
+ * app. Missing real credentials never prevent the HTTP server from starting
+ * (e.g. /api/health); they fail only when a service is used.
  */
 export function getFirebaseAdmin(): FirebaseAdminServices {
   if (!cached) {
-    const config = parseFirebaseAdminConfig({
-      FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
-      FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL,
-      FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY,
-      FIREBASE_STORAGE_BUCKET: env.firebaseStorageBucket,
-    });
+    let app: App;
 
-    const app =
-      getApps().length > 0
-        ? getApp()
-        : initializeApp({
-            credential: cert({
+    if (isFirebaseEmulatorEnabled()) {
+      const projectId =
+        process.env.FIREBASE_PROJECT_ID?.trim() || process.env.GCLOUD_PROJECT?.trim() || 'demo-agroconnect';
+      app =
+        getApps().length > 0
+          ? getApp()
+          : initializeApp({
+              projectId,
+              storageBucket: env.firebaseStorageBucket || `${projectId}.appspot.com`,
+            });
+    } else {
+      const config = parseFirebaseAdminConfig({
+        FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+        FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL,
+        FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY,
+        FIREBASE_STORAGE_BUCKET: env.firebaseStorageBucket,
+      });
+
+      app =
+        getApps().length > 0
+          ? getApp()
+          : initializeApp({
+              credential: cert({
+                projectId: config.projectId,
+                clientEmail: config.clientEmail,
+                privateKey: config.privateKey,
+              }),
               projectId: config.projectId,
-              clientEmail: config.clientEmail,
-              privateKey: config.privateKey,
-            }),
-            projectId: config.projectId,
-            storageBucket: config.storageBucket,
-          });
+              storageBucket: config.storageBucket,
+            });
+    }
 
     cached = {
       app,

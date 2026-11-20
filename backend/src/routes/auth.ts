@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireRole } from '../middleware/auth';
 import { HttpError } from '../middleware/error';
 import { createRateLimiter } from '../middleware/rateLimit';
 import { getOrCreateProfile, updateUserProfile } from '../services/userProfile';
@@ -20,6 +20,11 @@ export function createAuthRouter(): Router {
     } catch (error) {
       next(error);
     }
+  });
+
+  // Lightweight real role check; admins are identified only by trusted claims.
+  router.get('/admin-status', requireRole('admin'), (req, res) => {
+    res.json({ uid: req.auth!.uid, role: req.auth!.role });
   });
 
   router.patch('/profile', async (req, res, next) => {

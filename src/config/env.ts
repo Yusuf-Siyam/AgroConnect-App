@@ -14,9 +14,12 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? '',
 };
 
+const useEmulator = process.env.EXPO_PUBLIC_USE_EMULATOR === 'true';
+
 export const env = {
   apiBaseUrl,
   isApiConfigured: apiBaseUrl.length > 0,
+  useEmulator,
   firebaseConfig,
   isFirebaseConfigured: Object.values(firebaseConfig).every((value) => value.length > 0),
 } as const;

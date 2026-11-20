@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 
 import { useTranslation } from '@/i18n';
-import { ROLES, type Role } from '@/types/user';
+import { PUBLIC_REGISTER_ROLES, type Role } from '@/types/user';
 
 import { AppText } from './AppText';
 
@@ -14,11 +14,9 @@ const roleLabels = {
 
 export function RolePicker({ value, onChange }: { value: Role | null; onChange: (role: Role) => void }) {
   const { t } = useTranslation();
-  const publicRoles = ROLES.filter((role) => role !== 'admin');
-
   return (
     <View className="gap-2">
-      {publicRoles.map((role) => {
+      {PUBLIC_REGISTER_ROLES.map((role) => {
         const selected = value === role;
         return (
           <View

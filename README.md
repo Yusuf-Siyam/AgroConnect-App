@@ -357,7 +357,7 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 - [x] Backend token verification
 - [x] Protected routes
 
-**Result:** role-based authentication is implemented end to end; live sign-in and token verification require real Firebase credentials (see §14). Phone OTP is documented as unavailable on this Expo Go-compatible stack rather than simulated.
+**Result:** role-based authentication is implemented end to end and verified against the local Firebase Auth/Firestore emulators. Live sign-in against a real Firebase project still requires real credentials (see §14). Phone OTP is documented as unavailable on this Expo Go-compatible stack rather than simulated.
 
 ### Phase 04 - UI Foundation
 - [x] Global theme and reusable components
@@ -554,6 +554,8 @@ EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
 EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 EXPO_PUBLIC_FIREBASE_APP_ID=
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=       # restrict by app and API in Google Cloud
+# Development only: true connects the app to local Auth/Firestore emulators
+EXPO_PUBLIC_USE_EMULATOR=
 ```
 
 **Backend (`backend/.env`)**: secrets, server only.
@@ -567,6 +569,9 @@ FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
 # Optional: defaults to <FIREBASE_PROJECT_ID>.appspot.com
 FIREBASE_STORAGE_BUCKET=
+# Local emulators only; leave empty for a real project
+FIREBASE_AUTH_EMULATOR_HOST=
+FIRESTORE_EMULATOR_HOST=
 GEMINI_API_KEY=
 DISEASE_MODEL_ENDPOINT=
 DISEASE_MODEL_API_KEY=
@@ -634,7 +639,7 @@ Firebase initialization is lazy: the app and backend start without credentials, 
 6. Protected screens use Expo Router guards and role checks. Frontend guards improve UX only; the backend and Firestore Rules remain the real authorization boundary.
 7. **Phone OTP:** the installed Firebase JS SDK does not support native phone authentication in Expo Go. The OTP screen states this explicitly and no mock verification is performed. Native OTP would require `@react-native-firebase/auth`, `expo-dev-client`, configuration files, and a development build.
 
-Verification performed in this repository: mobile `npm run typecheck`, `npm run lint`, `npx expo-doctor`, and web/iOS/Android exports; backend `npm run typecheck`, `npm run build`, and 12 `npm test` assertions. Live email/password sign-in, token verification, and admin claim propagation are **UNVERIFIED** without real Firebase credentials.
+Verification performed in this repository: mobile `npm run typecheck`, `npm run lint`, `npx expo-doctor`, and web/iOS/Android exports; backend `npm run typecheck`, `npm run build`, and 12 `npm test` assertions. `npm run test:emulators` additionally verifies registration/login, valid/invalid tokens, protected-role responses, admin claim propagation, and Firestore Rules locally. Live email/password sign-in and token verification against a real Firebase project are **UNVERIFIED** without real Firebase credentials.
 
 ### Phase 04 setup (UI Foundation)
 
@@ -644,6 +649,62 @@ Verification performed in this repository: mobile `npm run typecheck`, `npm run 
 - Localization uses typed flat dictionaries in `src/locales/en.ts` and `src/locales/bn.ts`. Bangla is the default; a device locale of `en` selects English on first launch. A user's choice is persisted with Zustand and can be changed from Profile. `app.json` declares `bn` and `en` as supported locales and disables RTL (both languages are LTR). Web text receives the matching `lang` attribute.
 - Loading, error, and empty states use `StateView`; profile mutations show a real loading/error state with retry. No simulated data or mock success responses were added.
 - This phase needs no new credentials. Verification: mobile `npm run typecheck`, `npm run lint`, `npx expo-doctor` (20/20), and web/iOS/Android exports. Visual review on physical devices is **UNVERIFIED** in this environment.
+
+### Local Firebase emulator verification (Auth + Firestore)
+
+The Firebase CLI is a root dev dependency. Install Java 21+ (required by the current Firestore emulator), then install both dependency trees:
+
+```bash
+npm install
+cd backend && npm install && cd ..
+```
+
+Start the emulators for interactive use:
+
+```bash
+npm run emulators
+```
+
+This starts Auth on `127.0.0.1:9099`, Firestore on `127.0.0.1:8080`, and the Emulator Suite UI on <http://127.0.0.1:4004> (4004 avoids the backend's default port 4000). The project is `demo-agroconnect` from `.firebaserc`, and Firestore loads `firebase/firestore.rules` through `firebase.json`.
+
+Run the automated Phase 3 checks (emulators start and stop automatically):
+
+```bash
+npm run test:emulators
+```
+
+The suite uses real emulator tokens and real HTTP calls. It covers registration/login, a valid token returning 200 from `GET /api/auth/me`, 401 for missing/invalid tokens, 403 for a non-admin token on `GET /api/auth/admin-status`, trusted Admin SDK claim propagation, rejection of public admin creation, and Firestore rules denial for unauthorized reads/writes.
+
+For manual mobile/backend testing against the emulators, set `EXPO_PUBLIC_USE_EMULATOR=true` in the root `.env` and restart Expo. The client calls `connectAuthEmulator` and `connectFirestoreEmulator` **only** when this value is exactly `true`; real-project `.env` files must leave it empty or set it to `false`. Set these in `backend/.env` (no service account is needed in emulator mode):
+
+`backend/.env`:
+
+```text
+FIREBASE_PROJECT_ID=demo-agroconnect
+FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+```
+
+Root `.env`, when the mobile app also calls the local backend:
+
+```text
+EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:4000
+```
+
+Physical devices cannot reach `127.0.0.1` on the development machine; use an Android emulator, web, or a LAN-reachable host mapping.
+
+### Real Firebase project setup (after emulator verification)
+
+1. Leave `EXPO_PUBLIC_USE_EMULATOR` empty/false and remove both emulator host variables from `backend/.env`. Fill the real public Firebase values in root `.env` and service-account values in `backend/.env`; never commit either file.
+2. Authenticate and select the real project, then deploy the same rules used by the emulator:
+
+```bash
+npx firebase login
+npx firebase use --add <your-firebase-project-id>
+npx firebase deploy --only firestore:rules,storage
+```
+
+3. Enable Email/Password sign-in, add authorized domains, and provision admins only with `cd backend && npm run admin:provision -- <firebase-uid>`. Live Firebase behavior remains unverified until these real credentials and project settings are supplied.
 
 ---
 

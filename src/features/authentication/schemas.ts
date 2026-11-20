@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { ROLES } from '@/types/user';
+import { PUBLIC_REGISTER_ROLES } from '@/types/user';
 
 export const loginSchema = z.object({
   email: z.string().trim().min(1, 'required').email('invalidEmail'),
@@ -14,7 +14,7 @@ export const registerSchema = z
     phoneNumber: z.string().trim().regex(/^\+?[0-9]{7,15}$/, 'phoneInvalid').optional().or(z.literal('')),
     password: z.string().min(8, 'passwordMin'),
     confirmPassword: z.string().min(1, 'required'),
-    role: z.enum(ROLES, { error: 'roleRequired' }),
+    role: z.enum(PUBLIC_REGISTER_ROLES, { error: 'roleRequired' }),
     vehicleType: z.string().trim().optional(),
     registrationNumber: z.string().trim().optional(),
   })

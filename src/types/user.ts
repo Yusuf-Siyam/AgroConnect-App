@@ -1,5 +1,8 @@
 export const ROLES = ['farmer', 'buyer', 'transporter', 'admin'] as const;
 
+/** Roles a user may select during public registration. Admin is provisioned server-side. */
+export const PUBLIC_REGISTER_ROLES = ['farmer', 'buyer', 'transporter'] as const;
+
 export type Role = (typeof ROLES)[number];
 
 export type UserProfile = {
