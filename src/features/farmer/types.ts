@@ -6,6 +6,8 @@ export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
 export type LocalizedText = { bn: string; en: string };
 
+export type RatingSummary = { average: number; count: number };
+
 export type Product = {
   id: string;
   sellerId: string;
@@ -21,6 +23,7 @@ export type Product = {
   harvestInfo: { district: string; variety: string };
   images: string[];
   status: ProductStatus;
+  ratingSummary?: RatingSummary;
   deleted: boolean;
   createdAt: string;
   updatedAt: string;

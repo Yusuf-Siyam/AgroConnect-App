@@ -1,10 +1,10 @@
 import { RoleGuard } from '@/components/common/RoleGuard';
-import { RoleNavigator } from '@/components/navigation/RoleNavigator';
+import { BuyerTabs } from '@/components/navigation/BuyerTabs';
 
 export default function BuyerLayout() {
   return (
     <RoleGuard role="buyer">
-      <RoleNavigator />
+      <BuyerTabs />
     </RoleGuard>
   );
 }

@@ -4,6 +4,11 @@ export const PRODUCT_STATUSES = ['draft', 'active', 'out_of_stock'] as const;
 export type ProductUnit = (typeof PRODUCT_UNITS)[number];
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
+export type RatingSummary = {
+  average: number;
+  count: number;
+};
+
 export type LocalizedText = {
   bn: string;
   en: string;
@@ -34,6 +39,7 @@ export type Product = {
   harvestInfo: ProductHarvestInfo;
   images: string[];
   status: ProductStatus;
+  ratingSummary: RatingSummary;
   deleted: boolean;
   deletedAt?: string;
   createdAt: string;

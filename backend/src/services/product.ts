@@ -37,6 +37,9 @@ const storedProductSchema = z.object({
   harvestInfo: z.object({ district: z.string(), variety: z.string() }),
   images: z.array(z.string()).max(5).default([]),
   status: z.enum(['draft', 'active', 'out_of_stock']),
+  ratingSummary: z
+    .object({ average: z.number(), count: z.number().int().min(0) })
+    .default({ average: 0, count: 0 }),
   deleted: z.boolean().default(false),
   deletedAt: z.string().optional(),
   createdAt: z.unknown(),
@@ -52,7 +55,7 @@ function toIsoString(value: unknown): string {
   throw new Error('Product timestamp is missing or invalid');
 }
 
-function serializeProduct(data: unknown): Product {
+export function parseStoredProduct(data: unknown): Product {
   const raw = storedProductSchema.parse(data);
   return {
     ...raw,
@@ -130,7 +133,16 @@ function productsCollection() {
 export async function getProduct(productId: string): Promise<Product | null> {
   const snapshot = await productsCollection().doc(productId).get();
   if (!snapshot.exists || snapshot.get('deleted') === true) return null;
-  return serializeProduct(snapshot.data());
+  return parseStoredProduct(snapshot.data());
+}
+
+/** Buyer-facing product detail: drafts, deleted and hidden products never leak. */
+export async function requirePublicProduct(productId: string): Promise<Product> {
+  const product = await getProduct(productId);
+  if (!product || product.status !== 'active' || product.deleted) {
+    throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found.');
+  }
+  return product;
 }
 
 export async function requireOwnedProduct(sellerId: string, productId: string): Promise<Product> {
@@ -154,7 +166,7 @@ export async function listProducts(sellerId: string, query: ProductQuery): Promi
   const snapshot = await firestoreQuery.get();
   const needle = query.search?.toLocaleLowerCase();
   const products = snapshot.docs
-    .map((document) => serializeProduct(document.data()))
+    .map((document) => parseStoredProduct(document.data()))
     .filter((product) => {
       if (!needle) return true;
       return [product.name.bn, product.name.en, product.category, product.harvestInfo.variety]
@@ -176,7 +188,7 @@ export async function getProductStats(sellerId: string): Promise<ProductStatsRes
     .where('sellerId', '==', sellerId)
     .where('deleted', '==', false)
     .get();
-  const products = snapshot.docs.map((document) => serializeProduct(document.data()));
+  const products = snapshot.docs.map((document) => parseStoredProduct(document.data()));
 
   return {
     total: products.length,

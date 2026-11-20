@@ -59,8 +59,8 @@ Update this table at the end of every phase.
 | 02 | Firebase Integration | Complete |
 | 03 | Authentication | Complete |
 | 04 | UI Foundation | Complete |
-| 05 | Farmer Module | In progress |
-| 06 | Buyer Module | Not started |
+| 05 | Farmer Module | Complete |
+| 06 | Buyer Module | In progress |
 | 07 | Order and Payment | Not started |
 | 08 | Transporter Module | Not started |
 | 09 | AI Integration | Not started |
@@ -385,13 +385,13 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** Phase 05 complete. Part 5A delivered the farmer tabs, real-count dashboard, product CRUD, ownership checks and image uploads. Part 5B delivered transactional stock adjustments and history, pending-order accept/reject with stock re-checks, real order/payment analytics, an Open-Meteo weather proxy with caching and GPS/district fallback, and read-only `priceHistory` market screens with an explicit “no data yet” state. Order creation and all `paid`/`shipped`/`delivered` transitions remain Phase 07.
 
 ### Phase 06 - Buyer Module
-- [ ] Marketplace, categories, search and filters
-- [ ] Product details
-- [ ] Cart and wishlist
-- [ ] Checkout
-- [ ] Reviews
+- [x] Marketplace, categories, search and filters (Part 6A)
+- [x] Product details (Part 6A)
+- [ ] Cart and wishlist (Part 6B)
+- [ ] Checkout (Part 6B)
+- [ ] Reviews (Part 6B)
 
-**Result:** working Buyer shopping experience.
+**Result:** Part 6A delivered buyer tabs, a real marketplace with localized categories, search, filters, sorting and pagination, buyer-only product detail, and a privacy-safe public farmer profile. Cart/wishlist actions on product details remain disabled until the backend-managed Part 6B endpoints land.
 
 ### Phase 07 - Order and Payment
 - [ ] Order creation and stock validation
