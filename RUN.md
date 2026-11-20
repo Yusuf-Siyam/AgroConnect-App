@@ -38,11 +38,13 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 From the repository root:
 
 ```powershell
-npm ci
+npm ci --include=optional
 Push-Location backend
-npm ci
+npm ci --include=optional
 Pop-Location
 ```
+
+`lightningcss` uses platform-specific native binaries. If `node_modules` was created on another OS or copied from another machine, delete it before reinstalling so npm can select the correct binary for Windows. The root `postinstall` script also repairs a missing nested Windows binary automatically when you run `npm ci` or `npm install`.
 
 ## 3. Create `.env` files
 
@@ -168,7 +170,8 @@ Pop-Location
 | Symptom | Fix |
 |---|---|
 | `npm.ps1 cannot be loaded` | Run the process-scope `Set-ExecutionPolicy` command from section 1. |
-| `'tsx'`, `firebase`, or `expo` is not recognized | Run both `npm ci` commands from the repository root; check `Get-Location`. |
+| `Cannot find module '../lightningcss.win32-x64-msvc.node'` | The Windows NativeWind/lightningcss native binary is missing from `node_modules`. Close Expo, then run `Set-Location 'E:\13 Trimester\AgroApp'`, `npm install`, and `npx expo start -c`. The root `postinstall` script installs the exact nested binary when needed. To repair immediately without reinstalling everything, run `node scripts\ensure-lightningcss-windows.cjs` and retry `npx expo start -c`. |
+| `'tsx'`, `firebase`, or `expo` is not recognized | Run both `npm ci --include=optional` commands from the repository root; check `Get-Location`. |
 | `java is not recognized`, `JAVA_HOME is not defined correctly`, or `UnsupportedClassVersionError` | Install Java 21+, then run the `JAVA_HOME`/`PATH` commands from section 1 in that terminal. |
 | `EADDRINUSE` on 8080, 9099, 9199, 4004 or 4000 | Stop the duplicate emulator/backend process. Inspect with `Get-NetTCPConnection -LocalPort 8080,9099,9199,4004,4000 -State Listen`, then stop the identified PID. |
 | `curl` returns a PowerShell formatting error or wrong result | Use `curl.exe` exactly as shown. |

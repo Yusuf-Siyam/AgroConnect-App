@@ -49,6 +49,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
+    "postinstall": "node scripts/ensure-lightningcss-windows.cjs",
     "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-agroconnect",
     "test:emulators": "firebase emulators:exec --only auth,firestore,storage --project demo-agroconnect \"node scripts/run-emulator-tests.mjs\""
   },
