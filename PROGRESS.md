@@ -24,11 +24,13 @@
 - STEP 0 documentation split: README now separates Phase 07A (orders, stock, status management) from deferred Phase 07B (payments and transaction history), defines build order `06, 07A, 08, 09, 10, 11, 12, then 07B`, records that no order can become `paid` before 07B, and specifies emulator fixtures for Phase 08 delivery work.
 - STEP 1 backend: central canonical status/transition module; buyer-only idempotent checkout that reads the server cart, snapshots current product prices, creates one pending order per farmer with `deliveryFee: null`, and never reserves stock; buyer/farmer list/detail endpoints; farmer accept/reject and buyer/admin cancel transitions with status history; stock reduction only on accept and exactly-once restore on cancellation; backend-only Firestore rules for orders, checkout records and status history; buyer order indexes.
 - STEP 1 verification: root `tsc --noEmit`, backend `tsc --noEmit`, `expo lint`, backend 12/12 unit tests, `git diff --check`, and the full emulator suite passed (Phase 3 6/6, Phase 05A 5/5, Phase 05B 6/6, Phase 06A 4/4, Phase 06B 4/4, new Phase 07A 5/5). No payment, shipment or delivery transition is exposed.
+- STEP 2 mobile: real checkout submission with a stable `expo-crypto` UUID idempotency key, buyer Orders list/detail with status filters and cancellation, farmer accept/reject on the shared order model, shared client order schemas, and Bangla/English translations with Bangla default. No payment, delivery, notification or review-rule changes were added.
+- STEP 2 verification: root `tsc --noEmit`, `expo lint`, backend `tsc --noEmit`, backend 12/12 unit tests, Expo Doctor 20/20, `git diff --check`, full emulator suite (Phase 3 6/6, Phase 05A 5/5, Phase 05B 6/6, Phase 06A 4/4, Phase 06B 4/4, Phase 07A 5/5), and `npx expo export --platform web` all passed. README now marks Phase 07A Complete.
 
 ## In progress
 
-- STEP 2: Phase 07A mobile checkout, orders, status actions and translations.
+- None. Phase 07A is complete and the authorized scope is finished.
 
 ## Next step
 
-- Complete STEP 2, update the README progress tracker and this file, then commit.
+- None in this authorization. Do not start Phase 08 or deferred Phase 07B without a new instruction.

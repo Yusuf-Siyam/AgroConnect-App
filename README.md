@@ -61,7 +61,7 @@ Update this table at the end of every phase.
 | 04 | UI Foundation | Complete |
 | 05 | Farmer Module | Complete |
 | 06 | Buyer Module | Complete |
-| 07A | Orders and Stock | In progress |
+| 07A | Orders and Stock | Complete |
 | 08 | Transporter Module | Not started |
 | 09 | AI Integration | Not started |
 | 10 | Communication | Not started |
@@ -302,7 +302,7 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 
 **Phase 05A additions:** Farmer-only tabs live in `src/components/navigation/FarmerTabs.tsx` with screens under `src/app/farmer/`. Product forms, services and upload helpers live in `src/features/farmer/` and `src/components/product/`. The backend product API is in `backend/src/routes/products.ts` and `backend/src/services/product.ts`. Product writes are backend-only in Firestore rules; images must be uploaded to `products/{uid}/{productId}/...` and validated server-side. Composite indexes are declared in `firebase/firestore.indexes.json`.
 
-**Phase 07A additions:** Canonical order statuses and transitions live in `backend/src/services/orderStatus.ts`. Buyer checkout, buyer/farmer list/detail, cancellation and admin cancellation are handled by `backend/src/routes/orders.ts` and `backend/src/services/order.ts`. Idempotent checkout records live in `orderCheckouts/{hash}` and immutable transition events in `orders/{orderId}/statusHistory/{eventId}`; both are backend-only in Firestore rules.
+**Phase 07A additions:** Canonical order statuses and transitions live in `backend/src/services/orderStatus.ts`. Buyer checkout, buyer/farmer list/detail, cancellation and admin cancellation are handled by `backend/src/routes/orders.ts` and `backend/src/services/order.ts`. Idempotent checkout records live in `orderCheckouts/{hash}` and immutable transition events in `orders/{orderId}/statusHistory/{eventId}`; both are backend-only in Firestore rules. Mobile checkout uses `Crypto.randomUUID()` from `expo-crypto` as the idempotency key. Shared client parsing lives in `src/features/orders/`; buyer order screens are under `src/app/buyer/orders/`, and farmer accept/reject reuses the same canonical order model.
 
 ---
 
@@ -400,15 +400,16 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** Phase 06 complete. Part 6A delivered buyer tabs, a real marketplace with localized categories, search, filters, sorting and pagination, buyer-only product detail, and a privacy-safe public farmer profile. Part 6B delivered backend-managed cart and wishlist operations with live prices and stock/min-order checks, a React Hook Form + Zod checkout preview grouped by farmer, and transactionally aggregated reviews gated by a real delivered order containing the product. Order submission remains Phase 07A; all `paid`/`shipped`/`delivered` transitions remain Phase 07B/08.
 
 ### Phase 07A - Orders
-- [ ] Real buyer checkout that creates orders from the server-managed cart
-- [ ] Server-side price snapshots, stock checks and idempotent order creation
-- [ ] One order per farmer per checkout with a shared `checkoutId`
-- [ ] Central backend status module with allowed transitions and status history
-- [ ] Buyer and farmer order list/detail APIs, cancellation and admin cancellation
-- [ ] Transactional stock rules: pending does not reserve, accept reduces, accepted cancellation restores once
-- [ ] Firestore rules, indexes and emulator tests
+- [x] Real buyer checkout that creates orders from the server-managed cart
+- [x] Server-side price snapshots, stock checks and idempotent order creation
+- [x] One order per farmer per checkout with a shared `checkoutId`
+- [x] Central backend status module with allowed transitions and status history
+- [x] Buyer and farmer order list/detail APIs, cancellation and admin cancellation
+- [x] Transactional stock rules: pending does not reserve, accept reduces, accepted cancellation restores once
+- [x] Firestore rules, indexes and emulator tests
+- [x] Buyer Orders tab/detail/cancel and farmer accept/reject on the mobile app, with Bangla/English copy
 
-**Result:** real order placement and status management without payment. No order can become `paid` in Phase 07A.
+**Result:** Phase 07A complete. Buyers place real idempotent orders from the server-managed cart, follow status history and cancel eligible orders. Farmers accept or reject their own orders with transactional stock re-checks. No order can become `paid`, shipped or delivered in Phase 07A; delivery and payment work remains Phase 07B/08.
 
 ### Phase 08 - Transporter Module
 - [ ] Transporter profile and vehicle information

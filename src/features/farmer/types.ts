@@ -1,3 +1,5 @@
+import type { OrderStatus } from '../orders/types';
+
 export const PRODUCT_UNITS = ['kg', 'gram', 'mon', 'ton'] as const;
 export const PRODUCT_STATUSES = ['draft', 'active', 'out_of_stock'] as const;
 
@@ -47,47 +49,16 @@ export type ProductStats = {
 /** 1 mon (maund) = 40 kg. Flagged in README for product-owner confirmation. */
 export const MAUND_TO_KG = 40;
 
-export const ORDER_STATUSES = [
-  'pending',
-  'accepted',
-  'paid',
-  'shipment_accepted',
-  'collected',
-  'shipped',
-  'delivered',
-  'rejected',
-  'cancelled',
-] as const;
-
-export type OrderStatus = (typeof ORDER_STATUSES)[number];
-
-export type OrderItem = {
-  productId: string;
-  sellerId: string;
-  name: { bn?: string; en?: string };
-  quantity: number;
-  unitPrice: number;
-  unit: string;
-};
-
-export type Order = {
-  id: string;
-  buyerId: string;
-  sellerIds: string[];
-  items: OrderItem[];
-  status: OrderStatus;
-  totalAmount: number;
-  rejectionReason?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type OrderList = {
-  items: Order[];
-  total: number;
-  limit: number;
-  offset: number;
-};
+export { ORDER_STATUSES } from '../orders/types';
+export type {
+  DeliveryAddress,
+  Order,
+  OrderCheckout,
+  OrderItem,
+  OrderList,
+  OrderStatus,
+  OrderStatusEvent,
+} from '../orders/types';
 
 export type StockHistoryEntry = {
   id: string;

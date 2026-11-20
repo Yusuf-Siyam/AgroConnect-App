@@ -1,6 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Crypto from 'expo-crypto';
+import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import { BuyerPage } from '@/components/buyer/BuyerPage';
@@ -13,12 +16,15 @@ import { validationKey } from '@/features/authentication/errorMessages';
 import { getCart } from '@/features/buyer/cartService';
 import { buyerApiErrorKey } from '@/features/buyer/errorMessages';
 import { getFarmerProfile } from '@/features/buyer/marketplaceService';
+import { createOrderCheckout } from '@/features/buyer/orderService';
 import { checkoutSchema, type CheckoutValues } from '@/features/buyer/schemas';
 import { useTranslation } from '@/i18n';
 import { formatNumber } from '@/utils/units';
 
 export default function CheckoutScreen() {
   const { t, locale } = useTranslation();
+  const queryClient = useQueryClient();
+  const [checkoutId] = useState(Crypto.randomUUID);
   const cart = useQuery({ queryKey: ['buyer', 'cart'], queryFn: getCart });
   const items = cart.data?.items ?? [];
 
@@ -41,6 +47,17 @@ export default function CheckoutScreen() {
     defaultValues: { addressLine: '', district: '', phoneNumber: '' },
   });
 
+  const placeOrder = useMutation({
+    mutationFn: createOrderCheckout,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['buyer', 'cart'] }),
+        queryClient.invalidateQueries({ queryKey: ['buyer', 'orders'] }),
+      ]);
+      router.replace('/buyer/orders');
+    },
+  });
+
   const groups = sellerIds.map((sellerId) => {
     const groupItems = items.filter((item) => item.sellerId === sellerId);
     return {
@@ -50,6 +67,8 @@ export default function CheckoutScreen() {
     };
   });
   const total = items.reduce((sum, item) => sum + item.lineTotal, 0);
+  const hasUnavailableItem = items.some((item) => !item.available);
+  const cannotPlaceOrder = groups.length === 0 || hasUnavailableItem;
 
   if (cart.isPending) {
     return (
@@ -132,11 +151,20 @@ export default function CheckoutScreen() {
 
         <Button
           label={t('buyer.checkout.placeOrder')}
-          disabled
-          onPress={handleSubmit(() => undefined)}
+          loading={placeOrder.isPending}
+          disabled={cannotPlaceOrder}
+          onPress={handleSubmit((values) => {
+            placeOrder.mutate({ checkoutId, deliveryAddress: values });
+          })}
         />
-        <AppText variant="caption">{t('buyer.checkout.comingSoon')}</AppText>
-        <AppText variant="caption">{t('buyer.checkout.comingSoonDetail')}</AppText>
+        {placeOrder.isError ? (
+          <AppText variant="error">
+            {t(buyerApiErrorKey((placeOrder.error as { code?: string }).code))}
+          </AppText>
+        ) : null}
+        {hasUnavailableItem ? (
+          <AppText variant="caption">{t('buyer.checkout.unavailableHint')}</AppText>
+        ) : null}
       </View>
     </BuyerPage>
   );
