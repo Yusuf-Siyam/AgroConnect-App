@@ -171,6 +171,10 @@ pending -> accepted -> paid -> shipment_accepted -> collected -> shipped -> deli
 
 Also supported: `rejected`, `cancelled`.
 
+### Farmer transitions implemented in Phase 05B
+
+A product-owning farmer may move an order only from `pending` to `accepted` or `rejected`. Acceptance runs in a Firestore transaction, re-checks product ownership and available stock, decrements stock, and writes a stock-history entry. Rejection requires a 3–200 character reason. Farmers never set `paid`, `shipped` or `delivered`; those transitions remain Phase 07 system/transporter rules.
+
 ### Proposed Transition Rules (finalize in Phase 07)
 
 | From | To | Allowed actor |
@@ -373,12 +377,12 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 ### Phase 05 - Farmer Module
 - [x] Dashboard
 - [x] Product CRUD and image uploads (Part 5A)
-- [ ] Inventory
-- [ ] Order management
-- [ ] Sales analytics
-- [ ] Weather and market prices
+- [x] Inventory (Part 5B)
+- [x] Order management (Part 5B)
+- [x] Sales analytics (Part 5B)
+- [x] Weather and market prices (Part 5B)
 
-**Result:** Part 5A complete: farmer tabs, real product-count dashboard, Zod-validated product API, ownership checks, image uploads, and emulator-verified rules. Part 5B is next.
+**Result:** Phase 05 complete. Part 5A delivered the farmer tabs, real-count dashboard, product CRUD, ownership checks and image uploads. Part 5B delivered transactional stock adjustments and history, pending-order accept/reject with stock re-checks, real order/payment analytics, an Open-Meteo weather proxy with caching and GPS/district fallback, and read-only `priceHistory` market screens with an explicit “no data yet” state. Order creation and all `paid`/`shipped`/`delivered` transitions remain Phase 07.
 
 ### Phase 06 - Buyer Module
 - [ ] Marketplace, categories, search and filters
@@ -676,7 +680,7 @@ Run the automated Phase 3 checks (emulators start and stop automatically):
 npm run test:emulators
 ```
 
-The suite uses real emulator tokens and real HTTP calls. Phase 3 covers registration/login, a valid token returning 200 from `GET /api/auth/me`, 401 for missing/invalid tokens, 403 for a non-admin token on `GET /api/auth/admin-status`, trusted Admin SDK claim propagation, rejection of public admin creation, and Firestore rules denial for unauthorized reads/writes. Phase 05A additionally verifies buyer 403s, Zod validation, product ownership, image-URL ownership, pagination/search/status filtering/soft delete, signed-in active-product reads, backend-only Firestore writes, and owner-only Storage uploads.
+The suite uses real emulator tokens and real HTTP calls. Phase 3 covers registration/login, a valid token returning 200 from `GET /api/auth/me`, 401 for missing/invalid tokens, 403 for a non-admin token on `GET /api/auth/admin-status`, trusted Admin SDK claim propagation, rejection of public admin creation, and Firestore rules denial for unauthorized reads/writes. Phase 05A additionally verifies buyer 403s, Zod validation, product ownership, image-URL ownership, pagination/search/status filtering/soft delete, signed-in active-product reads, backend-only Firestore writes, and owner-only Storage uploads. Phase 05B verifies Zod validation on every new endpoint, product ownership, negative-stock rejection, stock-history entries, pending-only order transitions, stock re-checks, no payment/delivery fields written by accept/reject, analytics from real orders/payments, read-only market history, and weather caching/fallback against a local fake provider.
 
 For manual mobile/backend testing against the emulators, set `EXPO_PUBLIC_USE_EMULATOR=true` in the root `.env` and restart Expo. The client calls `connectAuthEmulator` and `connectFirestoreEmulator` **only** when this value is exactly `true`; real-project `.env` files must leave it empty or set it to `false`. Set these in `backend/.env` (no service account is needed in emulator mode):
 
@@ -704,6 +708,22 @@ Physical devices cannot reach `127.0.0.1` on the development machine; use an And
 3. Firestore product documents are written only through the backend. Signed-in users can read `active` products; owners and admins can also read their drafts. `GET /api/products` supports `search`, `status`, `limit` and `offset`.
 4. Deploy indexes with the rules: `npx firebase deploy --only firestore:rules,firestore:indexes,storage`.
 
+### Phase 05B setup (Orders, stock, analytics, weather, market)
+
+1. Farmer navigation exposes Inventory, Orders, Sales analytics, Weather and Market prices through the More tab. All screens call the authenticated backend; no app data is hard-coded or mocked.
+2. `PATCH /api/products/:id/stock` sets an absolute non-negative quantity in a transaction, automatically sets `out_of_stock` at zero, reactivates an `out_of_stock` product when stock is added, and appends to `products/{id}/stockHistory`. Accepting an order performs the same transactional stock update with a server-generated history reason.
+3. `GET /api/orders` supports `status`, `limit` and `offset`; `GET /api/orders/:id`, `POST /api/orders/:id/accept` and `POST /api/orders/:id/reject` are ownership-scoped. Only `pending` orders can be accepted or rejected, and rejected orders require a reason.
+4. `GET /api/analytics/farmer` derives counts from `orders` and revenue from completed `payments` that belong to a matching order. No analytics figures are cached or invented.
+5. `GET /api/weather` proxies Open-Meteo from the backend, so no provider key or URL is embedded in the app. It tries GPS coordinates first, then the profile `district` (editable in Profile), then a manually entered district. Requests time out after `WEATHER_REQUEST_TIMEOUT_MS` (default 7 s) and successful responses are cached in memory for `WEATHER_CACHE_TTL_MS` (default 10 min). Override `OPEN_METEO_FORECAST_URL` and `OPEN_METEO_GEOCODING_URL` in `backend/.env` only for a trusted proxy or tests.
+6. `GET /api/market` reads **only** real documents in `priceHistory`; it never seeds or invents prices. Until data is imported, the screen shows “No data yet”. Load verified observations from a trusted JSON file:
+
+```bash
+cd backend
+npm run market:import -- path/to/price-history.json
+```
+
+The file must be a non-empty array of `{ "crop", "district", "date" (YYYY-MM-DD), "price", "unit" (kg|mon|ton), "source" }`. These are observed historical prices, not forecasts. Deploy the added `priceHistory` indexes with the Firestore indexes.
+
 ### Real Firebase project setup (after emulator verification)
 
 1. Leave `EXPO_PUBLIC_USE_EMULATOR` empty/false and remove both emulator host variables from `backend/.env`. Fill the real public Firebase values in root `.env` and service-account values in `backend/.env`; never commit either file.
@@ -730,7 +750,7 @@ Resolve these early; record the outcome here.
 | 3 | Payment gateway access: bKash/Nagad merchant or sandbox credentials and callback URL hosting | Phase 07 | Pending |
 | 4 | Admin provisioning method (script vs custom claims) | Phase 03 | **Server-side CLI script** that sets the trusted `admin` / `role: admin` custom claim on an existing Firebase Auth user and updates its Firestore profile. There is no public admin registration route. |
 | 5 | Backend hosting and deployment target | Phase 12 | Pending |
-| 6 | Source of market price and price history data (price prediction requires sufficient history) | Phase 05 / 11 | Pending |
+| 6 | Source of market price and price history data (price prediction requires sufficient history) | Phase 05 / 11 | **Partially unblocked:** Phase 05B provides a real `priceHistory` schema, authenticated read API, importer for trusted observations and an explicit empty state. The trusted source itself remains to be selected; no sample prices are bundled. |
 | 7 | Commission rates and delivery pricing formula | Phase 07 / 08 | Pending |
 
 ---

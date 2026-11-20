@@ -15,6 +15,7 @@ export type UserProfileResponse = {
   email: string | null;
   displayName: string;
   phoneNumber?: string;
+  district?: string;
   role: Role;
   isVerified: boolean;
   preferredLanguage?: 'bn' | 'en';

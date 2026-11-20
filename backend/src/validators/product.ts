@@ -58,6 +58,10 @@ export const productQuerySchema = z
   })
   .strict();
 
+export const stockHistoryQuerySchema = z
+  .object({ limit: z.coerce.number().int().min(1).max(100).default(20) })
+  .strict();
+
 export const stockAdjustmentSchema = z
   .object({
     quantity: z.number().int().min(0),

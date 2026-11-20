@@ -47,6 +47,18 @@ export type ProductListResponse = {
   offset: number;
 };
 
+export type StockHistoryEntry = {
+  id: string;
+  productId: string;
+  sellerId: string;
+  actorId: string;
+  previousQuantity: number;
+  newQuantity: number;
+  reason: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProductStatsResponse = {
   total: number;
   draft: number;

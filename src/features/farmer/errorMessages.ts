@@ -26,6 +26,16 @@ const apiErrorKeys: Record<string, TranslationKey> = {
   PRODUCT_NOT_FOUND: 'error.productNotFound',
   FORBIDDEN: 'error.forbidden',
   UNAUTHORIZED: 'error.unauthorized',
+  INVALID_STOCK: 'error.invalidStock',
+  INSUFFICIENT_STOCK: 'error.insufficientStock',
+  PRODUCT_UNAVAILABLE: 'error.productUnavailable',
+  INVALID_ORDER_TRANSITION: 'error.invalidOrderTransition',
+  ORDER_NOT_FOUND: 'error.orderNotFound',
+  DISTRICT_NOT_FOUND: 'error.districtNotFound',
+  WEATHER_TIMEOUT: 'error.weatherTimeout',
+  WEATHER_PROVIDER_ERROR: 'error.weatherProvider',
+  LOCATION_REQUIRED: 'error.locationRequired',
+  INVALID_RESPONSE: 'error.invalidResponse',
 };
 
 export function farmerApiErrorKey(code: string | undefined): TranslationKey {

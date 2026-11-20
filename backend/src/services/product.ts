@@ -11,10 +11,12 @@ import type {
   ProductListResponse,
   ProductStatsResponse,
   ProductStatus,
+  StockHistoryEntry,
 } from '../types/product';
 import type {
   CreateProductInput,
   ProductQuery,
+  StockAdjustmentInput,
   UpdateProductInput,
 } from '../validators/product';
 
@@ -251,4 +253,83 @@ export async function softDeleteProduct(sellerId: string, productId: string): Pr
     },
     { merge: true },
   );
+}
+
+export async function adjustStock(
+  sellerId: string,
+  productId: string,
+  input: StockAdjustmentInput,
+): Promise<Product> {
+  const { firestore } = getFirebaseAdmin();
+  const productRef = productsCollection().doc(productId);
+
+  await firestore.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(productRef);
+    if (!snapshot.exists || snapshot.get('deleted') === true || snapshot.get('sellerId') !== sellerId) {
+      throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found.');
+    }
+
+    const previousQuantity = Number(snapshot.get('stock'));
+    if (input.quantity < 0) {
+      throw new HttpError(400, 'INVALID_STOCK', 'Stock cannot be negative.');
+    }
+
+    const currentStatus = snapshot.get('status') as ProductStatus;
+    const nextStatus: ProductStatus =
+      input.quantity === 0
+        ? 'out_of_stock'
+        : currentStatus === 'out_of_stock'
+          ? 'active'
+          : currentStatus;
+
+    transaction.update(productRef, {
+      stock: input.quantity,
+      status: nextStatus,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    const historyRef = productRef.collection('stockHistory').doc();
+    transaction.set(historyRef, {
+      id: historyRef.id,
+      productId,
+      sellerId,
+      actorId: sellerId,
+      previousQuantity,
+      newQuantity: input.quantity,
+      reason: input.reason,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+
+  return (await getProduct(productId))!;
+}
+
+export async function listStockHistory(
+  sellerId: string,
+  productId: string,
+  limit = 20,
+): Promise<StockHistoryEntry[]> {
+  await requireOwnedProduct(sellerId, productId);
+  const snapshot = await productsCollection()
+    .doc(productId)
+    .collection('stockHistory')
+    .orderBy('createdAt', 'desc')
+    .limit(limit)
+    .get();
+
+  return snapshot.docs.map((document) => {
+    const data = document.data();
+    return {
+      id: document.id,
+      productId: String(data.productId),
+      sellerId: String(data.sellerId),
+      actorId: String(data.actorId),
+      previousQuantity: Number(data.previousQuantity),
+      newQuantity: Number(data.newQuantity),
+      reason: String(data.reason),
+      createdAt: toIsoString(data.createdAt),
+      updatedAt: toIsoString(data.updatedAt),
+    };
+  });
 }

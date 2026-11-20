@@ -12,11 +12,22 @@ export default function FarmerMoreScreen() {
   return (
     <FarmerPage title={t('farmer.more.title')} subtitle={t('farmer.more.subtitle')}>
       <Card className="gap-3">
-        <Link href="/profile">
-          <AppText className="font-semibold text-primary">{t('farmer.more.profile')}</AppText>
+        <Link href="/farmer/inventory">
+          <AppText className="font-semibold text-primary">{t('farmer.more.inventory')}</AppText>
+        </Link>
+        <Link href="/farmer/analytics">
+          <AppText className="font-semibold text-primary">{t('farmer.more.analytics')}</AppText>
+        </Link>
+        <Link href="/farmer/weather">
+          <AppText className="font-semibold text-primary">{t('farmer.more.weather')}</AppText>
+        </Link>
+        <Link href="/farmer/market">
+          <AppText className="font-semibold text-primary">{t('farmer.more.market')}</AppText>
         </Link>
         <View className="border-t border-line pt-3">
-          <AppText variant="caption">{t('farmer.more.comingSoon')}</AppText>
+          <Link href="/profile">
+            <AppText className="font-semibold text-primary">{t('farmer.more.profile')}</AppText>
+          </Link>
         </View>
       </Card>
     </FarmerPage>

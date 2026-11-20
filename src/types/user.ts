@@ -10,6 +10,8 @@ export type UserProfile = {
   email: string | null;
   displayName: string;
   phoneNumber?: string;
+  /** Optional home district, used as the manual weather fallback. */
+  district?: string;
   role: Role;
   isVerified: boolean;
   preferredLanguage?: 'bn' | 'en';

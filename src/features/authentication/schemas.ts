@@ -38,6 +38,7 @@ export const forgotPasswordSchema = z.object({
 export const profileSchema = z.object({
   displayName: z.string().trim().min(2, 'nameMin'),
   phoneNumber: z.string().trim().regex(/^\+?[0-9]{7,15}$/, 'phoneInvalid').optional().or(z.literal('')),
+  district: z.string().trim().min(2, 'required').max(80, 'required').optional().or(z.literal('')),
 });
 
 export type LoginValues = z.infer<typeof loginSchema>;

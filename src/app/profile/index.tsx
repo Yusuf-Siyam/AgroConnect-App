@@ -34,6 +34,7 @@ export default function ProfileScreen() {
     values: {
       displayName: profile?.displayName ?? '',
       phoneNumber: profile?.phoneNumber ?? '',
+      district: profile?.district ?? '',
     },
   });
 
@@ -42,6 +43,7 @@ export default function ProfileScreen() {
       updateProfile({
         displayName: values.displayName.trim(),
         ...(values.phoneNumber ? { phoneNumber: values.phoneNumber.trim() } : {}),
+        ...(values.district ? { district: values.district.trim() } : {}),
       }),
   });
 
@@ -88,6 +90,19 @@ export default function ProfileScreen() {
               />
             )}
           />
+          <Controller
+            control={control}
+            name="district"
+            render={({ field, fieldState }) => (
+              <TextField
+                label={t('common.district')}
+                value={field.value ?? ''}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                error={fieldState.error ? t(validationKey(fieldState.error.message)) : undefined}
+              />
+            )}
+          />
           {mutation.isPending ? <StateView state="loading" title={t('common.saving')} /> : null}
           {mutation.isError ? (
             <StateView
@@ -109,6 +124,12 @@ export default function ProfileScreen() {
           <AppText variant="label">{t('profile.accountInfo')}</AppText>
           <AppText variant="caption">{t('common.email')}</AppText>
           <AppText>{profile?.email ?? t('common.notAvailable')}</AppText>
+          {profile?.district ? (
+            <>
+              <AppText variant="caption">{t('common.district')}</AppText>
+              <AppText>{profile.district}</AppText>
+            </>
+          ) : null}
           <AppText variant="caption">{t('dashboard.roleLabel')}</AppText>
           <AppText>{profile ? t(roleKeys[profile.role]) : t('common.notAvailable')}</AppText>
           <AppText variant="caption">

@@ -4,9 +4,11 @@ import { authenticate, requireRole } from '../middleware/auth';
 import { HttpError } from '../middleware/error';
 import { createRateLimiter } from '../middleware/rateLimit';
 import {
+  adjustStock,
   createProduct,
   getProductStats,
   listProducts,
+  listStockHistory,
   requireOwnedProduct,
   softDeleteProduct,
   updateProduct,
@@ -15,9 +17,11 @@ import {
   createProductSchema,
   productIdParamSchema,
   productQuerySchema,
+  stockAdjustmentSchema,
+  stockHistoryQuerySchema,
   updateProductSchema,
 } from '../validators/product';
-import { validationMessage } from '../validators/validation';
+import { emptyQuerySchema, validationMessage } from '../validators/validation';
 
 export function createProductsRouter(): Router {
   const router = Router();
@@ -41,6 +45,12 @@ export function createProductsRouter(): Router {
   });
 
   router.get('/stats', async (req, res, next) => {
+    const query = emptyQuerySchema.safeParse(req.query);
+    if (!query.success) {
+      next(new HttpError(400, 'VALIDATION_ERROR', validationMessage(query.error)));
+      return;
+    }
+
     try {
       res.json(await getProductStats(req.auth!.uid));
     } catch (error) {
@@ -71,6 +81,44 @@ export function createProductsRouter(): Router {
 
     try {
       res.json(await requireOwnedProduct(req.auth!.uid, parsed.data.productId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/:productId/stock-history', async (req, res, next) => {
+    const params = productIdParamSchema.safeParse(req.params);
+    const query = stockHistoryQuerySchema.safeParse(req.query);
+    if (!params.success) {
+      next(new HttpError(400, 'VALIDATION_ERROR', validationMessage(params.error)));
+      return;
+    }
+    if (!query.success) {
+      next(new HttpError(400, 'VALIDATION_ERROR', validationMessage(query.error)));
+      return;
+    }
+
+    try {
+      res.json(await listStockHistory(req.auth!.uid, params.data.productId, query.data.limit));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.patch('/:productId/stock', async (req, res, next) => {
+    const params = productIdParamSchema.safeParse(req.params);
+    const body = stockAdjustmentSchema.safeParse(req.body);
+    if (!params.success) {
+      next(new HttpError(400, 'VALIDATION_ERROR', validationMessage(params.error)));
+      return;
+    }
+    if (!body.success) {
+      next(new HttpError(400, 'VALIDATION_ERROR', validationMessage(body.error)));
+      return;
+    }
+
+    try {
+      res.json(await adjustStock(req.auth!.uid, params.data.productId, body.data));
     } catch (error) {
       next(error);
     }

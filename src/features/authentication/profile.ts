@@ -9,6 +9,7 @@ const profileSchema = z.object({
   email: z.string().nullable().default(null),
   displayName: z.string().default(''),
   phoneNumber: z.string().optional(),
+  district: z.string().optional(),
   role: roleSchema,
   isVerified: z.boolean().default(false),
   preferredLanguage: z.enum(['bn', 'en']).optional(),

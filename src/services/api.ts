@@ -37,6 +37,18 @@ export function toApiError(error: unknown): ApiError {
     };
   }
 
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return {
+      code: error.code,
+      message: 'message' in error && typeof error.message === 'string' ? error.message : error.code,
+    };
+  }
+
   return { code: 'UNKNOWN_ERROR', message: 'Unknown error' };
 }
 
@@ -55,6 +67,7 @@ export async function fetchMyProfile(): Promise<UserProfile> {
 export type ProfileUpdate = {
   displayName?: string;
   phoneNumber?: string;
+  district?: string;
   preferredLanguage?: 'bn' | 'en';
 };
 

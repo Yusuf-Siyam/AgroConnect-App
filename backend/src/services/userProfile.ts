@@ -11,6 +11,7 @@ const userProfileSchema = z.object({
   email: z.string().nullable().default(null),
   displayName: z.string().default(''),
   phoneNumber: z.string().optional(),
+  district: z.string().optional(),
   role: roleSchema,
   isVerified: z.boolean().default(false),
   preferredLanguage: z.enum(['bn', 'en']).optional(),
@@ -55,6 +56,7 @@ function serializeProfile(data: StoredProfile): UserProfileResponse {
     email: parsed.email,
     displayName: parsed.displayName,
     phoneNumber: parsed.phoneNumber,
+    district: parsed.district,
     role: parsed.role,
     isVerified: parsed.isVerified,
     preferredLanguage: parsed.preferredLanguage,
@@ -100,6 +102,7 @@ export async function getOrCreateProfile(
 export type ProfilePatch = {
   displayName?: string;
   phoneNumber?: string;
+  district?: string;
   preferredLanguage?: 'bn' | 'en';
 };
 

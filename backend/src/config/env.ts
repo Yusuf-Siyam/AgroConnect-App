@@ -11,6 +11,13 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().default(''),
   FIREBASE_STORAGE_BUCKET: z.string().default(''),
   FIREBASE_STORAGE_EMULATOR_HOST: z.string().default(''),
+  OPEN_METEO_FORECAST_URL: z.string().url().default('https://api.open-meteo.com/v1/forecast'),
+  OPEN_METEO_GEOCODING_URL: z
+    .string()
+    .url()
+    .default('https://geocoding-api.open-meteo.com/v1/search'),
+  WEATHER_CACHE_TTL_MS: z.coerce.number().int().min(0).default(600_000),
+  WEATHER_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).default(7_000),
 });
 
 // Empty values in a copied .env.example should fall back to the schema defaults.
@@ -33,4 +40,8 @@ export const env = {
     .filter(Boolean),
   firebaseStorageBucket: parsed.data.FIREBASE_STORAGE_BUCKET,
   firebaseStorageEmulatorHost: parsed.data.FIREBASE_STORAGE_EMULATOR_HOST,
+  openMeteoForecastUrl: parsed.data.OPEN_METEO_FORECAST_URL,
+  openMeteoGeocodingUrl: parsed.data.OPEN_METEO_GEOCODING_URL,
+  weatherCacheTtlMs: parsed.data.WEATHER_CACHE_TTL_MS,
+  weatherRequestTimeoutMs: parsed.data.WEATHER_REQUEST_TIMEOUT_MS,
 } as const;

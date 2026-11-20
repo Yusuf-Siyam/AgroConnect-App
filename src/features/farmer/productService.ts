@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { api, assertApiConfigured, toApiError } from '@/services/api';
 
-import type { Product, ProductList, ProductStats } from './types';
+import type { Product, ProductList, ProductStats, StockAdjustment, StockHistoryEntry } from './types';
 import type { ProductPayload } from './schemas';
 
 const productSchema = z.object({
@@ -30,6 +30,18 @@ const productListSchema = z.object({
   total: z.number().int(),
   limit: z.number().int(),
   offset: z.number().int(),
+});
+
+const stockHistoryEntrySchema = z.object({
+  id: z.string(),
+  productId: z.string(),
+  sellerId: z.string(),
+  actorId: z.string(),
+  previousQuantity: z.number().int(),
+  newQuantity: z.number().int(),
+  reason: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 const productStatsSchema = z.object({
@@ -107,6 +119,29 @@ export async function deleteProduct(productId: string): Promise<void> {
   assertApiConfigured();
   try {
     await api.delete(`/api/products/${productId}`);
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function adjustProductStock(
+  productId: string,
+  adjustment: StockAdjustment,
+): Promise<Product> {
+  assertApiConfigured();
+  try {
+    const response = await api.patch(`/api/products/${productId}/stock`, adjustment);
+    return parseOrThrow(productSchema, response.data);
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function listStockHistory(productId: string): Promise<StockHistoryEntry[]> {
+  assertApiConfigured();
+  try {
+    const response = await api.get(`/api/products/${productId}/stock-history`);
+    return parseOrThrow(z.array(stockHistoryEntrySchema), response.data);
   } catch (error) {
     throw toApiError(error);
   }
