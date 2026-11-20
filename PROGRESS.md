@@ -27,10 +27,31 @@
 - STEP 2 mobile: real checkout submission with a stable `expo-crypto` UUID idempotency key, buyer Orders list/detail with status filters and cancellation, farmer accept/reject on the shared order model, shared client order schemas, and Bangla/English translations with Bangla default. No payment, delivery, notification or review-rule changes were added.
 - STEP 2 verification: root `tsc --noEmit`, `expo lint`, backend `tsc --noEmit`, backend 12/12 unit tests, Expo Doctor 20/20, `git diff --check`, full emulator suite (Phase 3 6/6, Phase 05A 5/5, Phase 05B 6/6, Phase 06A 4/4, Phase 06B 4/4, Phase 07A 5/5), and `npx expo export --platform web` all passed. README now marks Phase 07A Complete.
 
+- Phase 08 prerequisite gate: root `npx tsc --noEmit` and full `PATH=/tmp/opencode/jdk/bin:$PATH npm run test:emulators` both passed (Phase 3 6/6, 05A 5/5, 05B 6/6, 06A 4/4, 06B 4/4, 07A 5/5). Pending Windows dependency repair was committed first as `9d33a0e`.
+
+## Phase 08 STEP 0 - plan check (docs only)
+
+Already present:
+
+- Phase 3/04: `transporter` is a public registration role; registration collects vehicle type and registration number; `UserProfile.vehicle` and backend `users/{uid}.vehicle` exist; runtime role home is `/transporter`.
+- 07A: `backend/src/services/orderStatus.ts` defines all statuses including `paid -> shipment_accepted -> collected -> shipped -> delivered` and already declares transporter transitions. Its API-mutable guard still allows only `accepted|rejected|cancelled`, so Phase 08 delivery transitions must go through the central transition helper, not a generic status PATCH.
+- Firestore rules already declare `transporters/{transporterId}` (public read, self-create with `isVerified: false`, backend-only verification/admin changes) and `deliveryJobs/{jobId}` (participant read, backend-only writes). Rules also anticipate `orders.transporterId`.
+- Mobile has only a placeholder `/transporter` dashboard using `RoleNavigator` plus empty `src/features/transporter/` and `src/features/logistics/` directories.
+- No `/api/delivery` router, transporter profile service, delivery-job service, earnings, location endpoint, indexes, or emulator suite exists yet.
+
+README conflicts / stale documentation to resolve in this phase:
+
+1. README documents `/api/delivery`, `transporters/` and `deliveryJobs/` as planned API/collections, but no code existed before Phase 08. This is documentation ahead of implementation, not a behavioral conflict.
+2. README says no order can become `paid` before deferred Phase 07B, while Phase 08 transitions start from `paid`. Resolution: Phase 08 must add no payment route; paid orders may be created only by emulator fixtures and the dev-only seed script for tests/manual QA.
+3. README lists delivery commission/pricing as an owner decision. Phase 08 will implement the explicitly supplied placeholders (base 40 BDT, 10 BDT/km, 2 BDT/kg, 10% commission) as env-overridable placeholders clearly marked "owner must confirm"; Phase 07B must call the pricing function before payment so buyers see the full amount.
+4. Registration currently stores vehicle fields in `users/{uid}`, while rules already reserve `transporters/{uid}`. Phase 08 will make `transporters/{uid}` the canonical transporter profile written only through the backend; registration fields remain intake data and are not treated as verified profile data.
+5. `orderStatus.ts` has a stale "Phase 06" comment and `RUN.md` still says checkout is a preview. Both will be corrected in the implementation steps.
+6. Firestore rules anticipate delivery fields not yet present in `Order`/services. Phase 08 will define the concrete job/location/earnings schemas consistently with those rules.
+
 ## In progress
 
-- None. Phase 07A is complete and the authorized scope is finished.
+- Phase 08 STEP 1: backend profile, delivery jobs, transitions, GPS, earnings, rules, seed script and emulator tests.
 
 ## Next step
 
-- None in this authorization. Do not start Phase 08 or deferred Phase 07B without a new instruction.
+- Finish STEP 1, verify, commit, then proceed to STEP 2 mobile. Do not start Phase 07B, Phase 09 or any later phase.
