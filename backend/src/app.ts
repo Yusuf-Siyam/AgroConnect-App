@@ -8,6 +8,7 @@ import { createAnalyticsRouter } from './routes/analytics';
 import { createAuthRouter } from './routes/auth';
 import { createCartRouter } from './routes/cart';
 import { createCategoriesRouter } from './routes/categories';
+import { createChatRouter } from './routes/chat';
 import { createFarmerProfileRouter } from './routes/farmers';
 import { createBuyerMarketplaceRouter } from './routes/marketplace';
 import { createMarketRouter } from './routes/market';
@@ -43,6 +44,7 @@ export function createApp(options: AppOptions = {}) {
   app.use('/api/reviews', createReviewsRouter());
   app.use('/api/orders', createOrdersRouter());
   app.use('/api/delivery', createDeliveryRouter());
+  app.use('/api/chat', createChatRouter());
   app.use('/api/ai', createAiRouter(options.aiTextProvider, options.cropDiseaseClassifier));
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/weather', createWeatherRouter());

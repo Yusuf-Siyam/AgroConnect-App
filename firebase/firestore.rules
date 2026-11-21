@@ -153,23 +153,29 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ---------- Chat ----------
+    // ---------- Chat (backend-owned writes, participant realtime reads) ----------
+    // Admins may read/reply only support threads, never buyer/farmer/delivery chats.
     match /chats/{chatId} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid in resource.data.participants);
-      allow create: if signedIn()
-                    && hasTimestamps()
-                    && request.auth.uid in request.resource.data.participants;
-      allow update, delete: if isAdmin();
+      allow read: if (isAdmin() && resource.data.type == 'support')
+                  || (signedIn() && request.auth.uid in resource.data.participants);
+      allow write: if false;
 
       match /messages/{messageId} {
-        allow read: if isAdmin() || (signedIn() &&
-                      request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
-        allow create: if signedIn()
-                      && hasTimestamps()
-                      && request.resource.data.senderId == request.auth.uid
-                      && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-        allow update, delete: if false;
+        allow read: if (isAdmin() && get(/databases/$(database)/documents/chats/$(chatId)).data.type == 'support')
+                    || (signedIn() &&
+                        request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
+        allow write: if false;
       }
+    }
+
+    // Per-user communication quotas are backend-only.
+    match /chatUsage/{uid} {
+      allow read, write: if isAdmin();
+    }
+
+    // Native push tokens are backend-only; the client registers them via REST.
+    match /users/{uid}/devices/{deviceId} {
+      allow read, write: if false;
     }
 
     // ---------- Reviews ----------

@@ -173,10 +173,23 @@ Phase 10 scope and data model:
 
 STEP sequence remains: 1 backend chat API and tests, 2 notifications/device tokens and tests, 3 mobile chat and tests, 4 mobile notification wiring, docs and final verification. Phase 07B, Phase 11 and Phase 12 remain untouched.
 
+## Phase 10 STEP 1 - backend chat API (complete)
+
+Implemented `/api/chat` with authenticated access for all four roles:
+
+- Deterministic `bf_{buyerId}_{farmerId}`, `bt_{orderId}` and `support_{userId}` chat IDs. Buyer-farmer creation validates the other party's role from `users/{uid}`; buyer-transporter creation reads the real order and `deliveryJobs` assignment; support chats are self-owned and admin-reply-only.
+- `participantInfo` stores only `displayName` and `role`, never phone/email. No message content is copied into the chat document; the chat holds only unread counts and the last message timestamp.
+- Messages are text only, trimmed, non-empty and capped at 1000 characters. Writes happen in Firestore transactions; client writes to chats/messages/quota records are denied by Security Rules.
+- Per-user transaction quotas enforce 30 messages/minute, 20 new conversations/day and 10 support messages/hour (all env-overridable). Errors are distinct `CHAT_*` 429 codes.
+- Unread counts increment for recipients and reset through `POST /api/chat/conversations/:chatId/read`. Admins can list/get/reply to `type == 'support'` chats only; their replies use the pseudonym `support`.
+- Added Firestore rules (participant realtime reads, admin support-only reads, backend-only writes), three composite indexes and the Phase 10A emulator suite (6 tests) covering role checks, deterministic IDs, order/job authorization, support access, limits, unread state and rules.
+
+Verification: root and backend `npx tsc --noEmit`, backend unit tests 18/18, `git diff --check`, and the full emulator suite all passed (Phase 10A 6/6). No notification or push write was added in this step; that is STEP 2. No real FCM request was made.
+
 ## In progress
 
-- Phase 10 STEP 0 is complete; STEP 1 (backend `/api/chat`) is the next step.
+- Phase 10 STEP 1 is complete; STEP 2 (notifications and device tokens) is the next step.
 
 ## Next step
 
-- Complete Phase 10 STEP 1, verify/commit, then continue STEP 2 → 4 in order. Do not start Phase 07B, Phase 11 or Phase 12.
+- Complete Phase 10 STEP 2, verify/commit, then continue STEP 3 → 4 in order. Do not start Phase 07B, Phase 11 or Phase 12.

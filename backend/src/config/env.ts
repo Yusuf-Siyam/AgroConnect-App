@@ -34,6 +34,9 @@ const envSchema = z.object({
   DISEASE_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(15_000),
   DISEASE_UNCERTAIN_MAX: z.coerce.number().min(0).max(1).default(0.5),
   DISEASE_POSSIBLE_MAX: z.coerce.number().min(0).max(1).default(0.8),
+  CHAT_MESSAGES_PER_MINUTE: z.coerce.number().int().positive().max(1_000).default(30),
+  CHAT_CONVERSATIONS_PER_DAY: z.coerce.number().int().positive().max(1_000).default(20),
+  CHAT_SUPPORT_MESSAGES_PER_HOUR: z.coerce.number().int().positive().max(1_000).default(10),
 }).refine((data) => data.DISEASE_POSSIBLE_MAX >= data.DISEASE_UNCERTAIN_MAX, {
   message: 'DISEASE_POSSIBLE_MAX must be greater than or equal to DISEASE_UNCERTAIN_MAX',
   path: ['DISEASE_POSSIBLE_MAX'],
@@ -79,4 +82,7 @@ export const env = {
   diseaseRequestTimeoutMs: parsed.data.DISEASE_REQUEST_TIMEOUT_MS,
   diseaseUncertainMax: parsed.data.DISEASE_UNCERTAIN_MAX,
   diseasePossibleMax: parsed.data.DISEASE_POSSIBLE_MAX,
+  chatMessagesPerMinute: parsed.data.CHAT_MESSAGES_PER_MINUTE,
+  chatConversationsPerDay: parsed.data.CHAT_CONVERSATIONS_PER_DAY,
+  chatSupportMessagesPerHour: parsed.data.CHAT_SUPPORT_MESSAGES_PER_HOUR,
 } as const;
