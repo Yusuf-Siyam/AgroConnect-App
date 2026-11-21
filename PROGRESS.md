@@ -62,10 +62,34 @@ A small backend correction was included in this step: the delivery code is gener
 
 Verification: root `npx tsc --noEmit`, `npx expo lint --max-warnings 0`, backend typecheck, backend unit tests 18/18, and full emulator suite (6/6 Phase 08) all passed after these changes. Real-device GPS/camera/location permission behavior is not automatable here and remains UNVERIFIED.
 
+## Phase 09 prerequisite gate (2026-11-21)
+
+- Read `README.md`, `PROGRESS.md`, `RUN.md`, the recent git log and the existing backend/mobile code before starting Phase 09.
+- Baseline `npx tsc --noEmit` passed.
+- Baseline `PATH=/tmp/opencode/jdk/bin:$PATH npm run test:emulators` passed in full (Phase 3 6/6, 05A 5/5, 05B 6/6, 06A 4/4, 06B 4/4, 07A 5/5, 08 6/6). Java 21 is supplied locally at `/tmp/opencode/jdk` because the environment has no Java on `PATH`.
+- Working tree was clean at the prerequisite gate.
+
+## Phase 09 STEP 0 - plan check (docs/config only)
+
+Official Gemini documentation checked on 2026-11-21:
+
+- `https://ai.google.dev/gemini-api/docs/models`: the model catalog changes; example model codes are documented, but no project-specific model has been selected or approved here. `GEMINI_MODEL` will be read from backend env and is now listed in `backend/.env.example`; no model name is hardcoded in source.
+- `https://ai.google.dev/gemini-api/docs/text-generation`: current REST shape uses `POST https://generativelanguage.googleapis.com/v1beta/interactions` with header `x-goog-api-key`, `Api-Revision: 2026-05-20`, `model`, `system_instruction`, `input`, and optional `generation_config.max_output_tokens`. Stateless multi-turn requests can pass prior steps explicitly with `store: false`.
+- `https://ai.google.dev/gemini-api/docs/image-understanding`: image input can be a URL/File API URI or inline base64; supported MIME types include `image/png`, `image/jpeg`, `image/webp`, `image/heic` and `image/heif`. Inline images count toward a 20 MB total request limit, requests allow at most 3,600 images, and larger images are tiled at 258 tokens per tile (images with both dimensions <= 384 px cost 258 tokens). Phase 09 only uploads permitted app images to Storage and validates file type/size before calling a separately configured classifier endpoint; it does not invent a Gemini vision model.
+- `https://ai.google.dev/gemini-api/docs/rate-limits`: Gemini quotas are per project (RPM, input TPM, RPD; RPD resets at midnight Pacific). The app adds its own per-user daily limits so the API key is not exposed and abuse is bounded.
+- `https://ai.google.dev/gemini-api/docs/api-key`: keys must stay server-side; mobile clients must call the backend. Missing key or model returns an explicit `AI_NOT_CONFIGURED` error, never generated content.
+
+Already present in the repository:
+
+- `backend/.env.example` already had `GEMINI_API_KEY`, `DISEASE_MODEL_ENDPOINT` and `DISEASE_MODEL_API_KEY`; `GEMINI_MODEL` was added in this step.
+- Firestore rules already declare `cropDiagnoses/{diagnosisId}` and `farmingConversations/{conversationId}` with owner read and backend/admin-only writes. Storage rules only allow product/profile paths and a legacy `diagnoses/{uid}/{fileName}` path; they do not yet allow `cropDiagnoses/{uid}/{diagnosisId}/...`.
+- No `/api/ai` router, AI provider, diagnosis service, farming-conversation service, AI tests or mobile AI screens exist yet.
+- README lists "Verified image classification model" under External Services but Open Decision #2 (which verified model/service, supported crops and licensing) is still `Pending`. **No model is chosen or invented in Phase 09 STEP 0.** The classifier remains unconfigured until the owner supplies `DISEASE_MODEL_ENDPOINT` and `DISEASE_MODEL_API_KEY`; `GEMINI_MODEL` likewise has no default.
+
 ## In progress
 
-- None. Phase 08 is complete.
+- Phase 09 STEP 1 is the next step (Gemini farming assistant backend and tests).
 
 ## Next step
 
-- STOP. Phase 07B, Phase 09 and later phases remain untouched.
+- Complete STEP 1, verify, commit, then continue only to STEP 2. Phase 07B, Phase 10 and later phases remain untouched.
