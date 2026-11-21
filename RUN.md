@@ -155,6 +155,22 @@ npm start
 
 Press `w` in the Expo terminal to open the web app. Keep all three terminals open; use `Ctrl+C` to stop the mobile app, backend, then emulators.
 
+### Persistent emulator data (optional)
+
+In **Terminal 1**, use this instead of `npm run emulators` when you want users/products/orders/chats to survive an emulator restart:
+
+```powershell
+npm run emulators:persist
+```
+
+This runs `firebase emulators:start` with both `--import ./emulator-data` and `--export-on-exit ./emulator-data`. The command is a single plain `npm run` call — no Unix-only `&&`/`mkdir -p` chaining — so it works in Windows PowerShell. On the first run the `.\emulator-data` folder does not exist; the Firebase CLI skips the import with a warning and starts normally, then creates the folder during a clean exit. Do **not** pre-create the folder manually, because the CLI renames a temporary export directory into place. Every later start imports the saved data and exports it again on clean exit.
+
+> **Important:** stop the emulators with `Ctrl+C` in that terminal. `Ctrl+C` is a clean signal (SIGINT) and triggers `--export-on-exit`. Closing the terminal window abruptly, killing the process, or a crash may lose data created since the last clean stop.
+
+`emulator-data/` contains real local user data and is git-ignored — never commit, upload or share it. To start from an empty database, stop the emulators first, then delete the `emulator-data` folder and run `npm run emulators:persist` again.
+
+`npm run test:emulators` deliberately starts fresh emulator instances without this folder; stop the persistent emulator before running the test suite to avoid port conflicts.
+
 ## 5. Confirm the backend and 401 response
 
 In a fourth terminal:
@@ -255,7 +271,7 @@ All steps below use the local emulators. Chat/message/notification writes are pe
 | `Cannot find module '../lightningcss.win32-x64-msvc.node'` | The Windows NativeWind/lightningcss native binary is missing from `node_modules`. Close Expo, then run `Set-Location 'E:\13 Trimester\AgroApp'`, `npm install`, and `npx expo start -c`. The root `postinstall` script installs the exact nested binary when needed. To repair immediately without reinstalling everything, run `node scripts\ensure-lightningcss-windows.cjs` and retry `npx expo start -c`. |
 | `'tsx'`, `firebase`, or `expo` is not recognized | Run both `npm ci --include=optional` commands from the repository root; check `Get-Location`. |
 | `java is not recognized`, `JAVA_HOME is not defined correctly`, or `UnsupportedClassVersionError` | Install Java 21+, then run the `JAVA_HOME`/`PATH` commands from section 1 in that terminal. |
-| `EADDRINUSE` on 8080, 9099, 9199, 4004 or 4000 | Stop the duplicate emulator/backend process. Inspect with `Get-NetTCPConnection -LocalPort 8080,9099,9199,4004,4000 -State Listen`, then stop the identified PID. |
+| `EADDRINUSE` on 8080, 9099, 9199, 4004 or 4000 | Stop the duplicate emulator/backend process (including a persistent `npm run emulators:persist` session before `npm run test:emulators`). Inspect with `Get-NetTCPConnection -LocalPort 8080,9099,9199,4004,4000 -State Listen`, then stop the identified PID. |
 | `curl` returns a PowerShell formatting error or wrong result | Use `curl.exe` exactly as shown. |
 | Web shows `Network request failed` or a CORS error | Confirm the backend is running, `EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:4000`, and `CORS_ORIGINS` includes the Expo web origin printed by `npm start`. Reload the web app. |
 | Android emulator cannot reach the API | Set `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4000` and restart Expo. Do not use `127.0.0.1` from inside the Android emulator. Firebase emulator hosts are selected automatically. |

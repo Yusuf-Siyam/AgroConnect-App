@@ -27,6 +27,9 @@ coverage/
 *.lcov
 junit.xml
 
+# Local Firebase emulator export (contains user data; never commit)
+emulator-data/
+
 # Environment variables, credentials and service accounts
 .env
 .env.*
