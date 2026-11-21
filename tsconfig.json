@@ -14,5 +14,5 @@
     "nativewind-env.d.ts",
     "global.d.ts"
   ],
-  "exclude": ["node_modules", "backend", "dist"]
+  "exclude": ["node_modules", "backend", "dist", "src/**/*.test.ts"]
 }

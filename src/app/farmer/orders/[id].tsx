@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
+import { StartChatButton } from '@/components/chat/StartChatButton';
 import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
@@ -127,6 +128,13 @@ export default function OrderDetailScreen() {
           />
           <AppText variant="caption">{t('farmer.orders.decisionHint')}</AppText>
         </Card>
+      ) : null}
+
+      {data.buyerId ? (
+        <StartChatButton
+          input={{ type: 'buyer_farmer', buyerId: data.buyerId }}
+          labelKey="chat.startBuyer"
+        />
       ) : null}
     </FarmerPage>
   );

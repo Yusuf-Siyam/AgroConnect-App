@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { BuyerDeliveryCard } from '@/components/buyer/BuyerDeliveryCard';
 import { BuyerPage } from '@/components/buyer/BuyerPage';
+import { StartChatButton } from '@/components/chat/StartChatButton';
 import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
@@ -92,6 +93,10 @@ export default function BuyerOrderDetailScreen() {
       </Card>
 
       <BuyerDeliveryCard orderId={data.id} items={data.items} />
+
+      {['paid', 'shipment_accepted', 'collected', 'shipped', 'delivered'].includes(data.status) ? (
+        <StartChatButton input={{ type: 'buyer_transporter', orderId: data.id }} labelKey="chat.startTransporter" />
+      ) : null}
 
       <AppText variant="subtitle">{t('farmer.orders.itemsTitle')}</AppText>
       {data.items.map((item) => (

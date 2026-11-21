@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
+import { StartChatButton } from '@/components/chat/StartChatButton';
 import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
@@ -112,6 +113,13 @@ export default function TransporterJobDetailScreen() {
           {t('transporter.job.net')}: {formatNumber(data.netAmount, locale)} BDT
         </AppText>
       </Card>
+
+      {data.transporterId ? (
+        <StartChatButton
+          input={{ type: 'buyer_transporter', orderId: data.orderId }}
+          labelKey="chat.startBuyer"
+        />
+      ) : null}
 
       {data.orderStatus === 'shipment_accepted' ? (
         <Card className="gap-3">

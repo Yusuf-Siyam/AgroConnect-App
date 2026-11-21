@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { TouchableOpacity, View } from 'react-native';
 
 import { AppText } from '@/components/common/AppText';
@@ -23,13 +23,22 @@ export function DashboardHeader() {
             {profile.displayName}
           </AppText>
         </View>
-        <TouchableOpacity
-          accessibilityRole="link"
-          onPress={() => router.push('/profile')}
-          className="rounded-xl px-3 py-2"
-        >
-          <AppText className="font-semibold text-primary">{t('profile.title')}</AppText>
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-1">
+          <TouchableOpacity
+            accessibilityRole="link"
+            onPress={() => router.push('/chat' as Href)}
+            className="rounded-xl px-3 py-2"
+          >
+            <AppText className="font-semibold text-primary">{t('chat.messages')}</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="link"
+            onPress={() => router.push('/profile')}
+            className="rounded-xl px-3 py-2"
+          >
+            <AppText className="font-semibold text-primary">{t('profile.title')}</AppText>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View className="mt-3 flex-row items-center gap-3">

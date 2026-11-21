@@ -199,10 +199,22 @@ Implemented the central notification layer and wired it into chat:
 
 Verification: root and backend `npx tsc --noEmit`, backend unit tests 21/21 (3 new template tests), `git diff --check`, and the full emulator suite all passed (Phase 10A 6/6, Phase 10B 6/6). Phase 10B covers content-free type+params storage, bn/en push text, push failure isolation, hashed/rotatable device tokens, owner-only mark-read, client-write denial and support notification types. Real FCM delivery remains UNVERIFIED.
 
+## Phase 10 STEP 3 - mobile chat UI (complete)
+
+Added the authenticated `/chat` stack and a text-only communication UI for all four roles:
+
+- `src/features/chat/` holds pure helpers (deterministic id helpers, message validation, notification text mirror, backend-error mapping), the REST client (`createChat`, `sendChatMessage`, `markChatRead`, `markNotificationRead`) and realtime Firestore READ hooks (`useChats`, `useChat`, `useMessages`, `useNotifications`). The hooks use `onSnapshot` only; every write still goes through the backend.
+- Chat list and thread screens show participant name/role only, unread badges, live messages and a 1000-character trimmed text composer. Opening a thread and each new message mark it read through the backend. Support threads are started from the list; admins see only support threads and reply under the `AgroConnect Support` name.
+- A notification list on the chat screen renders stored `type` + `params` in bn/en from the mobile mirror and routes taps to validated `/chat/...` targets while marking them read via REST.
+- "Messages" was added to the shared `DashboardHeader`, reaching buyer, farmer, transporter and admin. Contextual entry points start buyer↔farmer chats from the farmer profile and farmer order, and buyer↔transporter chats from paid buyer orders and assigned transporter deliveries.
+- Added `chat.*` bilingual copy to `en.ts`/`bn.ts` and a `test:mobile` script with 8 pure helper tests. Test files are excluded from the app `tsconfig` because Node test types are not part of the Expo app project.
+
+Verification: root `npx tsc --noEmit`, `npx expo lint --max-warnings 0`, `npm run test:mobile` 8/8, and the full emulator suite all passed. No real FCM or physical-device behavior was exercised in this step.
+
 ## In progress
 
-- Phase 10 STEP 2 is complete; STEP 3 (mobile chat UI) is the next step.
+- Phase 10 STEP 3 is complete; STEP 4 (notification wiring, docs and final verification) is the next step.
 
 ## Next step
 
-- Complete Phase 10 STEP 3, verify/commit, then continue STEP 4 in order. Do not start Phase 07B, Phase 11 or Phase 12.
+- Complete Phase 10 STEP 4, verify/commit, then deliver the final report. Do not start Phase 07B, Phase 11 or Phase 12.

@@ -31,6 +31,7 @@ function AppNavigator() {
         <Stack.Screen name="buyer" />
         <Stack.Screen name="transporter" />
         <Stack.Screen name="admin" />
+        <Stack.Screen name="chat" />
         <Stack.Screen name="profile" />
       </Stack.Protected>
 

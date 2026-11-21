@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Image } from 'react-native';
 
 import { BuyerPage } from '@/components/buyer/BuyerPage';
+import { StartChatButton } from '@/components/chat/StartChatButton';
 import { AppText } from '@/components/common/AppText';
 import { Card } from '@/components/common/Card';
 import { StateView } from '@/components/common/StateView';
@@ -65,6 +66,7 @@ export default function FarmerProfileScreen() {
           {t('buyer.farmer.productCount', { count: farmer.productCount })}
         </AppText>
       </Card>
+      <StartChatButton input={{ type: 'buyer_farmer', farmerId }} labelKey="chat.startFarmer" />
     </BuyerPage>
   );
 }
