@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { NotificationBridge } from '@/components/chat/NotificationBridge';
 import { SplashScreen } from '@/components/common/SplashScreen';
 import { AppLocaleProvider } from '@/providers/AppLocaleProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
@@ -45,7 +46,12 @@ function RootContent() {
 
   if (status === 'loading') return <SplashScreen />;
 
-  return <AppNavigator />;
+  return (
+    <>
+      <NotificationBridge />
+      <AppNavigator />
+    </>
+  );
 }
 
 export default function RootLayout() {

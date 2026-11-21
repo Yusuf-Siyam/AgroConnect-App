@@ -211,10 +211,21 @@ Added the authenticated `/chat` stack and a text-only communication UI for all f
 
 Verification: root `npx tsc --noEmit`, `npx expo lint --max-warnings 0`, `npm run test:mobile` 8/8, and the full emulator suite all passed. No real FCM or physical-device behavior was exercised in this step.
 
+## Phase 10 STEP 4 - notification wiring and documentation (complete)
+
+- Wired `configureNotificationHandler()` into the root layout through a `NotificationBridge`, so foreground notification presentation is configured before any push arrives.
+- On authenticated sessions, a `useDevicePushRegistration` effect requests permission via `registerForPushNotificationsAsync()` and uploads only the native FCM/APNs token to `POST /api/notifications/devices`. `addPushTokenListener` handles rotation. Web, Expo Go without native push and denied permission simply skip registration; in-app notifications keep working. No token, key or secret is stored in the mobile bundle.
+- Tap routing reads the push `data` payload, accepts only validated `/chat/{chatId}` deep links, opens that thread and marks the notification read through the backend. Any other payload is ignored.
+- Added pure `notificationRouting` helpers plus 3 tests (11 mobile helper tests total) covering valid/invalid deep links, bounded notification IDs and trimmed native-device payloads.
+- README Section 7 now declares `chats/{chatId}/messages/{messageId}` canonical (no top-level `messages/`), documents notification/device-token paths and privacy-safe participant data. Section 8 documents `/api/chat`, `/api/notifications`, the 1000-character text limit, 30/20/10 quotas, and the three allowed notification types. The tracker marks Phase 10 complete, the Phase 10 checklist/result is filled in, and Open Decision #1 records the native-token/FCM outcome with real push UNVERIFIED.
+- RUN.md adds two-user buyer/farmer and buyer/transporter chat testing, admin support provisioning via the existing `npm run admin:provision -- <uid>` script, real FCM/APNs development-build setup, and an explicit UNVERIFIED statement for real push delivery. Added `npm run test:mobile` to the documented check sequence.
+
+Verification: root `npx tsc --noEmit --pretty false`, `npx expo lint --max-warnings 0`, `npm run test:mobile` 11/11, backend `npm run typecheck` and `npm test` 21/21, `git diff --check`, and the full `PATH=/tmp/opencode/jdk/bin:$PATH npm run test:emulators` suite all passed (Phase 10A 6/6, Phase 10B 6/6). Real FCM/APNs delivery, physical-device behavior and Windows/PowerShell execution remain UNVERIFIED.
+
 ## In progress
 
-- Phase 10 STEP 3 is complete; STEP 4 (notification wiring, docs and final verification) is the next step.
+- Phase 10 is complete. No Phase 07B, Phase 11 or Phase 12 work was started.
 
 ## Next step
 
-- Complete Phase 10 STEP 4, verify/commit, then deliver the final report. Do not start Phase 07B, Phase 11 or Phase 12.
+- Deliver the final report with commit hashes, assumptions, verification and the scenario-to-test mapping, then stop and wait for the owner.

@@ -64,7 +64,7 @@ Update this table at the end of every phase.
 | 07A | Orders and Stock | Complete |
 | 08 | Transporter Module | Complete |
 | 09 | AI Integration | Complete |
-| 10 | Communication | Not started |
+| 10 | Communication | Complete |
 | 11 | Advanced Features | Not started |
 | 12 | Admin and Deployment | Not started |
 | 07B | Payments and Transaction History | Deferred |
@@ -209,11 +209,29 @@ Cloud Firestore collections:
 users/                  products/              orders/
 carts/                  wishlists/             transporters/
 deliveryJobs/           payments/              chats/
-messages/               notifications/         reviews/
-cropDiagnoses/          farmingConversations/  priceHistory/
-groupPurchases/         harvestRecords/        productBatches/
-reports/
+notifications/          reviews/               cropDiagnoses/
+farmingConversations/   priceHistory/          groupPurchases/
+harvestRecords/         productBatches/        reports/
 ```
+
+**Phase 10 canonical communication paths.** Messages are a subcollection of the chat; there is no top-level `messages/` collection. Chat/message/notification/device-token documents are written **only by the backend**; the mobile app uses realtime Firestore READ listeners for chats, messages and notifications.
+
+```text
+chats/{chatId}
+  { type, participants[], participantInfo{uid:{displayName,role}}, buyerId?, farmerId?,
+    transporterId?, orderId?, lastMessageAt, unreadCounts{}, createdAt, updatedAt }
+
+chats/{chatId}/messages/{messageId}
+  { chatId, senderId, text, createdAt, readBy[] }
+
+notifications/{notificationId}
+  { userId, type, params{chatId,senderName}, target{chatId,url}, readAt, createdAt, updatedAt }
+
+users/{uid}/devices/{sha256(token)}
+  { tokenHash, platform, createdAt, updatedAt }
+```
+
+Deterministic chat IDs are `bf_{buyerId}_{farmerId}`, `bt_{orderId}` and `support_{userId}`. `participantInfo` contains only `displayName` and `role` — never phone or email. Stored notifications use `type` + `params` only; rendered text is built from the bn/en templates in the backend and the mobile mirror. Chat text is never included in notification documents or push payloads.
 
 ### Data Rules
 - Use document IDs consistently.
@@ -246,6 +264,33 @@ Required middleware and practices:
 - Rate limiting.
 - Secure environment variables.
 - Server-side verification of payment callbacks.
+
+**Phase 10 endpoints** (all require a Firebase ID token; every write is server-side):
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/chat/conversations` | Create/get a deterministic buyer↔farmer, buyer↔transporter or support chat |
+| `GET` | `/api/chat/conversations` | List the caller's chats (admins: support threads only) |
+| `GET` | `/api/chat/conversations/:chatId` | Participant-scoped chat detail |
+| `POST` | `/api/chat/conversations/:chatId/messages` | Send trimmed text (max 1000 chars) |
+| `POST` | `/api/chat/conversations/:chatId/read` | Mark the chat read for the caller |
+| `POST` | `/api/notifications/devices` | Register/rotate a native FCM/APNs token |
+| `DELETE` | `/api/notifications/devices` | Remove a device token |
+| `POST` | `/api/notifications/:notificationId/read` | Mark one in-app notification read |
+
+Chat creation is authorized by role and, for delivery chats, by an assigned delivery job. Admins can read/reply to `type == 'support'` threads only. The notification endpoints never accept device tokens from other users or message content.
+
+**Phase 10 communication defaults** (backend-enforced, overridable only in `backend/.env`):
+
+| Setting | Default | Environment variable |
+|---------|---------|----------------------|
+| Message text | trimmed, non-empty, text only, max 1000 chars | — (Zod validator) |
+| Messages per user | 30 / minute | `CHAT_MESSAGES_PER_MINUTE` |
+| New conversations per user | 20 / day | `CHAT_CONVERSATIONS_PER_DAY` |
+| Support messages per user | 10 / hour | `CHAT_SUPPORT_MESSAGES_PER_HOUR` |
+| Notification types | `chat_message`, `support_message`, `support_reply` only | — (central `notifyUser` registry) |
+
+Payment, group-buying and price-alert notifications are intentionally **not** registered. Future phases should add their events through `notifyUser` with a newly registered type.
 
 ---
 
@@ -437,12 +482,14 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** Phase 09 complete. All AI calls go through the backend; no model or key is bundled in the mobile app. Real Gemini/classifier responses remain UNVERIFIED until the owner supplies credentials. See `RUN.md` for configuration and no-key testing.
 
 ### Phase 10 - Communication
-- [ ] Realtime chat and message history
-- [ ] Unread indicators
-- [ ] Push notifications
-- [ ] Admin support
+- [x] Backend-owned deterministic chats, realtime message history and text-only validation
+- [x] Buyer↔farmer, buyer↔transporter and admin support threads with role/order authorization
+- [x] Unread indicators and backend mark-read for chats and in-app notifications
+- [x] Central `notifyUser` with localized bn/en templates, in-app write first and best-effort FCM push
+- [x] Backend-only native device-token registration/rotation and validated push tap routing
+- [x] Authenticated mobile chat list/thread/support UI, bilingual copy and emulator/pure tests
 
-**Result:** working communication system.
+**Result:** Phase 10 complete. Buyers, farmers and transporters can chat from contextual entry points or the shared Messages screen; users can contact support and admins can read/reply only to support threads. Chat, message, notification and device-token writes go exclusively through the backend; mobile reads Firestore via realtime listeners. In-app notifications are verified against the emulators. Real FCM/APNs delivery remains UNVERIFIED without a development build and real push credentials (see `RUN.md`). No payment, group-buying or price-alert notifications were added.
 
 ### Phase 11 - Advanced Features
 Implement individually:
@@ -773,7 +820,7 @@ Resolve these early; record the outcome here.
 
 | # | Decision | Needed by | Outcome |
 |--:|----------|-----------|---------|
-| 1 | Firebase client library: Firebase JS SDK vs React Native Firebase (affects Expo Go vs development builds, FCM, phone OTP) | Phase 02 | **Firebase JS SDK v13** for Auth/Firestore/Storage (Expo Go compatible) + `expo-notifications` for FCM/APNs tokens. React Native Firebase is not used. Native phone OTP is not supported by this JS-SDK path on mobile, so Phase 03 ships email/password + recovery and provides an explicit informational OTP screen; revisit if phone OTP/Crashlytics become mandatory. |
+| 1 | Firebase client library: Firebase JS SDK vs React Native Firebase (affects Expo Go vs development builds, FCM, phone OTP) | Phase 02 / resolved in Phase 10 | **Firebase JS SDK v13** for Auth/Firestore/Storage (Expo Go compatible) + `expo-notifications` for FCM/APNs tokens. React Native Firebase is not used. Native phone OTP is not supported by this JS-SDK path on mobile, so Phase 03 ships email/password + recovery and provides an explicit informational OTP screen. **Phase 10 push outcome:** the app requests notification permission and uploads the native device token (FCM on Android, APNs token on iOS) to the backend-only `users/{uid}/devices/{tokenHash}` collection; the backend sends via Firebase Admin Messaging. An Expo push token is obtained only when an EAS project ID exists and is **not** uploaded or used for delivery, so there is no second push vendor. Rotation is handled by `addPushTokenListener`. Push is best effort and never blocks chat. Remote push is unavailable in Expo Go on Android (SDK 53+) and real device delivery is UNVERIFIED until a development build plus FCM/APNs credentials are supplied. |
 | 2 | Disease classification model: which verified model or hosted service, supported crops, and licensing | Phase 09 | Pending |
 | 3 | Payment gateway access: bKash/Nagad merchant or sandbox credentials and callback URL hosting | Phase 07B | Pending |
 | 4 | Admin provisioning method (script vs custom claims) | Phase 03 | **Server-side CLI script** that sets the trusted `admin` / `role: admin` custom claim on an existing Firebase Auth user and updates its Firestore profile. There is no public admin registration route. |

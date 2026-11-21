@@ -174,6 +174,7 @@ Stop the interactive emulators and backend first; `npm run test:emulators` start
 Set-Location 'E:\13 Trimester\AgroApp'
 npx tsc --noEmit
 npm run lint
+npm run test:mobile
 npm run test:emulators
 Push-Location backend
 npm run typecheck
@@ -181,7 +182,7 @@ npm test
 Pop-Location
 ```
 
-`npm run test:emulators` starts Auth/Firestore/Storage, runs all TypeScript suites (including Phase 08) sequentially through a Node runner, and stops the emulators afterwards. It does not rely on Linux `&&` chaining.
+`npm run test:mobile` runs the pure Phase 10 chat helper tests (deterministic IDs, validation, notification templates and push routing). `npm run test:emulators` starts Auth/Firestore/Storage, runs all TypeScript suites (including Phase 10A/10B) sequentially through a Node runner, and stops the emulators afterwards. It does not rely on Linux `&&` chaining. Emulator suites inject a push-provider test double; they never contact a real push service.
 
 ## 7. Manual buyer/farmer smoke test
 
@@ -209,7 +210,44 @@ The script refuses to run unless `FIRESTORE_EMULATOR_HOST` is set and `NODE_ENV`
 5. The transporter confirms delivery with the code; the buyer then sees the review prompt linking to each purchased product. Earnings appear on the transporter dashboard and profile.
 6. Location sharing is foreground-only for about 15 seconds and uses `expo-location`; no background location permission is requested. Real-device GPS behavior must be checked manually on a phone or simulator.
 
-## 8. Troubleshooting
+## 8. Phase 10 communication smoke test
+
+All steps below use the local emulators. Chat/message/notification writes are performed by the backend; the app only listens to Firestore. No sample message text is seeded by any script.
+
+### 8.1 Two-user chat (buyer ↔ farmer, then buyer ↔ transporter)
+
+1. Start emulators, backend and Expo as in section 4. Use two browser profiles or two devices so both accounts stay signed in.
+2. Register a **farmer** in the first profile and a **buyer** in the second. As the farmer, publish at least one active product with stock.
+3. As the buyer, open the marketplace, tap that product's farmer profile, then tap **Message farmer**. The thread opens with the farmer's display name only (no phone/email).
+4. Send a short text. The farmer's **Messages** screen shows the thread and an unread badge; opening it shows the same message via the realtime listener and clears the unread count. Replies from either side appear live in both sessions.
+5. For delivery chat, run `npm run seed:dev-paid-order -- --verify-transporter` (section 7) and sign in as the seeded buyer and verified transporter. The buyer opens the paid order detail and taps **Message transporter**; the transporter opens the assigned delivery detail and taps **Message buyer**. Exchange a text both ways to confirm the deterministic `bt_{orderId}` thread.
+6. Try an empty or >1000-character draft: **Send** stays disabled. Only text is accepted; there are no attachment controls.
+
+### 8.2 Admin support seed and thread
+
+1. Sign in as a normal user (any role) in one profile. Open **Messages → Contact support** and send a support message. This creates the deterministic `support_{userId}` thread.
+2. In the Auth emulator UI (<http://127.0.0.1:4004>), note the UID of an account to promote, or read your own `uid` from `GET /api/auth/me` with its bearer token. With the emulators running and `backend\.env` configured, provision that real user as an admin (no new seed script):
+
+   ```powershell
+   Push-Location backend
+   npm run admin:provision -- <firebase-uid>
+   Pop-Location
+   ```
+
+   The script grants the `admin`/`role: admin` custom claim, updates the Firestore profile and revokes refresh tokens. Sign out and sign in again so the new claim is in the ID token.
+3. As the admin, open **Messages**. Only support threads are listed; the unread badge comes from the `support` pseudonym. Open the thread and reply — messages are sent as `AgroConnect Support`, not the admin's personal identity.
+4. The originating user sees the reply live and a `support_reply` notification on **Messages**. Confirm an admin cannot open a non-support chat by URL or API (403/permission-denied) and that a non-admin cannot reply as support.
+
+### 8.3 Real FCM/APNs setup (not part of emulator mode)
+
+1. Configure an actual Firebase project and add its EAS project ID (`extra.eas.projectId` in `app.json`, normally via `eas init`). Put real service-account values in `backend\.env`; never put keys or tokens in the mobile `.env`.
+2. Enable Cloud Messaging for the project. Android needs a development/production build with Firebase credentials; iOS needs APNs credentials configured. Expo Go cannot receive remote push on Android from SDK 53 onward (`expo-notifications` still works for local notifications).
+3. Build a development client: `npx expo run:android` / `npx expo run:ios`, or `eas build --profile development`. Install it on a physical device, sign in, and allow notification permission. The app uploads only the native device token to `users/{uid}/devices/{tokenHash}`; the backend sends via Firebase Admin Messaging. An Expo push token, when available, is not uploaded or used for delivery.
+4. Send a chat message from a second account and observe the system notification on the recipient's device; tapping it opens the correct `/chat/...` thread and marks the notification read. Notification text comes from `type` + `params` templates and never contains message content.
+
+**Real push delivery is UNVERIFIED.** The automated suite uses a push-provider test double and the emulator has no FCM/APNs connection. No physical-device delivery has been observed in this repository.
+
+## 9. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -225,7 +263,10 @@ The script refuses to run unless `FIRESTORE_EMULATOR_HOST` is set and `NODE_ENV`
 | Firebase `auth/configuration-not-found` or invalid API key | Use the exact demo values in section 3 and `EXPO_PUBLIC_USE_EMULATOR=true`; the Firebase emulator accepts the fake API key. |
 | Stale API/emulator settings in the app | Run `npx expo start --clear` and perform a full reload. |
 | `Invalid backend environment configuration` | Verify `backend\.env` exists, contains no quotes around values, and `PORT` is numeric. |
+| Chat list stays empty or shows a load error | Confirm `EXPO_PUBLIC_USE_EMULATOR=true`, both accounts are signed in, and the backend is running. All chat/message writes are backend-only; the client cannot create them directly. |
+| Admin cannot see a support thread | Sign out and back in after `npm run admin:provision -- <uid>` so the refreshed admin claim is in the ID token. Admins see only `type == 'support'` threads. |
+| No system notification on a device | Emulator mode cannot deliver remote push. Use a development build with real FCM/APNs credentials (section 8.3); in-app notifications still appear on the Messages screen. |
 
-## 9. Scope limits
+## 10. Scope limits
 
-Windows/PowerShell execution and physical-device access are not verified in this repository; they require a Windows machine and a device. Real Firebase projects, EAS builds and payment credentials are outside this local-emulator guide.
+Windows/PowerShell execution and physical-device access are not verified in this repository; they require a Windows machine and a device. Real Firebase projects, EAS builds, payment credentials and real FCM/APNs delivery are outside this local-emulator guide; Phase 10 real push is explicitly UNVERIFIED.
