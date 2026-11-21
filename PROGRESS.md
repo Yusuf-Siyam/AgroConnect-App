@@ -130,10 +130,53 @@ Verification: root `npx tsc --noEmit`, `npx expo lint --max-warnings 0`, backend
 
 **Phase 09 is complete.** Phase 07B remains untouched.
 
+## Phase 10 prerequisite gate (2026-11-21)
+
+- Read `README.md`, `PROGRESS.md`, `RUN.md`, the recent git log, and the existing auth/role, order-status, delivery, Firestore-rule, localization and route/tab code before starting Phase 10.
+- Baseline root `npx tsc --noEmit` passed.
+- Baseline full `PATH=/tmp/opencode/jdk/bin:$PATH npm run test:emulators` passed (Phase 3 6/6, 05A 5/5, 05B 6/6, 06A 4/4, 06B 4/4, 07A 5/5, 08 6/6, 09A 7/7, 09B 8/8). Java 21 is supplied locally at `/tmp/opencode/jdk`.
+- Working tree was clean at the Phase 09 STEP 3 commit `ef89c82` before this gate.
+
+## Phase 10 STEP 0 - plan check (docs only)
+
+Official Expo SDK 58 references consulted earlier for this stack remain valid for Phase 10: Firebase JS SDK for Auth/Firestore/Storage, `expo-notifications` for native FCM/APNs tokens, and remote push unavailable in Expo Go on Android from SDK 53. No new dependency will be installed; Firebase Admin already includes Cloud Messaging support.
+
+Already present in the repository:
+
+- `backend/src/middleware/auth.ts` verifies Firebase ID tokens, resolves role from trusted claims first and the user profile second, and `requireRole(...)` is the authorization boundary. `authenticate` must guard every new route.
+- `backend/src/services/orderStatus.ts` is the only canonical order-status module; delivery statuses are `paid → shipment_accepted → collected → shipped → delivered`. Phase 10 will only READ orders and `deliveryJobs` to authorize buyer-transporter chats; it will not add any status transition or payment path.
+- `deliveryJobs/{jobId}` carries `orderId`, `buyerId`, `farmerId`, nullable `transporterId` and `orderStatus`. The assigned transporter is the only transporter allowed into `bt_{orderId}`.
+- `firebase/firestore.rules` already reserves `chats/{chatId}/messages/{messageId}` and `notifications/{notificationId}` with read-only client access, but it still allows client chat/message creation and allows admins to read every chat. These rules must be tightened: participants read only their chats; admins read/reply only `type == 'support'`; all writes are backend/Admin-SDK only.
+- `src/services/notifications.ts` already has `configureNotificationHandler()`, `registerForPushNotificationsAsync()`, native and Expo token capture, token rotation handling and the `default` Android channel. None of it is wired yet.
+- `src/app/_layout.tsx` guards only the role groups and `profile`; `src/app/chat/` is an empty placeholder. The authenticated guard must add a `chat` stack.
+- Buyer, farmer and transporter bottom tabs exist; admin uses a stack with the shared `DashboardHeader`. A "Messages" action in the shared header will make `/chat` reachable for every role without duplicating chat routes under each tab group.
+- `users/{uid}.preferredLanguage` exists on both client and backend, but the locale store is independent. Phase 10 will use `preferredLanguage` only as the server's notification-language hint; it will not change the existing UI locale behavior.
+- Admins are provisioned by the existing server-side CLI `npm run admin:provision -- <firebase-uid>` (trusted custom claims). Decision: reuse that method for real and emulator administration; no new seed script is needed. Emulator tests grant the same claims through the Admin SDK, as existing suites do.
+
+Conflicts and resolutions:
+
+1. README Section 7 lists a top-level `messages/` collection, while the actual rules use `chats/{chatId}/messages/{messageId}`. Resolution: the required nested collection is canonical; README Section 7 will be corrected in STEP 4.
+2. README Section 8 lists `/api/chat` but not the notification/device endpoints. Resolution: STEP 4 will document `/api/chat` and `/api/notifications` together.
+3. Existing chat rules allow participant client creation. Resolution: all chat/message/notification/device-token writes move to Express; mobile uses Firestore realtime listeners for READs only, and a backend endpoint for marking a notification read.
+4. Existing admin rules allow reading all chats. Resolution: admins are limited to `type == 'support'` chats both in rules and in the backend.
+5. Open Decision #1 records Firebase JS SDK + `expo-notifications` for FCM/APNs. Resolution/outcome: upload the native device token to backend-only `users/{uid}/devices/{tokenHash}`; the backend uses Firebase Admin Messaging for best-effort push. Expo push tokens may be captured by the existing helper but are not required for delivery; no second push vendor is introduced. Real device delivery remains UNVERIFIED without FCM/APNs credentials and a development build.
+
+Phase 10 scope and data model:
+
+- Deterministic IDs: `bf_{buyerId}_{farmerId}` (buyer ↔ farmer), `bt_{orderId}` (buyer ↔ assigned transporter), `support_{userId}` (user ↔ admin support). A chat stores only `participants`, privacy-safe `participantInfo` (`displayName` + `role` only; never phone/email), optional `orderId`, `type`, `lastMessageAt`, `unreadCounts`, `createdAt`, `updatedAt`.
+- Messages are text only: trimmed non-empty, max 1000 characters, `senderId`, `text`, `createdAt`, `readBy`. No attachments, images, voice, typing, presence, groups, edit/delete, block/report.
+- Limits enforced per user in backend-only `chatUsage/{uid}` transactions: 30 messages/minute, 20 new conversations/day, 10 support messages/hour. New-conversation rate limiting applies to support chats too.
+- One central `notifyUser(userId, type, params, target)` writes the in-app `notifications/{notificationId}` document first, then calls a best-effort `PushProvider`; notification or push failure never breaks chat/message actions. Stored notifications contain `type`, `params`, `target`, read state and timestamps, never rendered text or message content.
+- Bn/en templates live in one backend registry and are mirrored for mobile rendering. Push text never includes message content; chat pushes include only the sender name plus a notification/chat id. No payment, group-buying or price-alert notification type is added; Phase 07B gets a documented hook through the same `notifyUser` function.
+- Mobile screens: authenticated `/chat` list, thread and support entry; list/thread/notifications use Firestore `onSnapshot` READ listeners only. Header entry points plus existing order/farmer screens can start the permitted conversation types. Root layout wires notification handler, device-token registration/rotation and tap routing.
+- Tests: separate `phase10A` chat/authorization/rate-limit/rules suite and `phase10B` notification/device-token/push-failure/template suite added to the emulator runner, plus backend unit tests for pure validators/templates. No real FCM request is made; an injected `PushProvider` double is used.
+
+STEP sequence remains: 1 backend chat API and tests, 2 notifications/device tokens and tests, 3 mobile chat and tests, 4 mobile notification wiring, docs and final verification. Phase 07B, Phase 11 and Phase 12 remain untouched.
+
 ## In progress
 
-- User-requested Phase 10 STEP 0 (plan check; no code) is the next step.
+- Phase 10 STEP 0 is complete; STEP 1 (backend `/api/chat`) is the next step.
 
 ## Next step
 
-- Complete Phase 10 STEP 0, verify/commit, then continue STEP 1 → 4 in order. Do not start Phase 07B, Phase 11 or Phase 12.
+- Complete Phase 10 STEP 1, verify/commit, then continue STEP 2 → 4 in order. Do not start Phase 07B, Phase 11 or Phase 12.
