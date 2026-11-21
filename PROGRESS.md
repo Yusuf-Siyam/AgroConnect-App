@@ -116,10 +116,24 @@ Assumptions recorded: the owner-supplied classifier accepts the documented JSON 
 
 Verification: root and backend `npx tsc --noEmit`, backend unit tests 18/18 and full `npm run test:emulators` passed (Phase 3 6/6, 05A 5/5, 05B 6/6, 06A 4/4, 06B 4/4, 07A 5/5, 08 6/6, Phase 09A 7/7, new Phase 09B 8/8). Real classifier/Gemini endpoints remain UNVERIFIED because no credentials were supplied.
 
+## Phase 09 STEP 3 - Farmer AI mobile tab (complete)
+
+Added the farmer-only **AI** bottom tab (`src/app/farmer/ai/index.tsx`) with two sections:
+
+- **Disease check:** camera/gallery pickers with explicit permission handling and a denial explanation, JPEG/PNG/WebP validation, 1600 px/0.8 JPEG compression, resumable Storage upload with a visible percentage, then `POST /api/ai/diagnose`. Displays the confidence band, localized advisory notice, label/alternatives when available, guidance, clearer-photo tips when uncertain, and saved history with view/delete.
+- **Assistant:** chat input with 1000-character limit, sending/sent/failed+retry states, conversation history with open/delete, Bangla default from the locale store, and clear messages for not-configured, daily limit, rate limit, timeout and provider errors.
+- Added `src/features/ai/` service, types and upload helper. All AI writes still go through the backend; the mobile app only uploads the image to its owner-scoped Storage path.
+- Added `farmer.tab.ai` and all AI copy to both locale files (compile-time key parity retained), an `expo-image-picker` config plugin with permission strings, and a link from **More**.
+- Updated `README.md` (Phase 09 tracker/result) and `RUN.md` (all AI env keys, no invented model, no-key “not configured” testing).
+
+Verification: root `npx tsc --noEmit`, `npx expo lint --max-warnings 0`, backend typecheck/unit tests and full `npm run test:emulators` passed (Phase 09A 7/7, 09B 8/8). Real camera/gallery/permission behavior and real provider responses remain UNVERIFIED without a physical device and credentials.
+
+**Phase 09 is complete.** Phase 07B remains untouched.
+
 ## In progress
 
-- Phase 09 STEP 3 is the next step (farmer AI mobile tab, localization and docs).
+- User-requested Phase 10 STEP 0 (plan check; no code) is the next step.
 
 ## Next step
 
-- Complete STEP 3, verify, commit, then continue only to user-requested Phase 10. Phase 07B remains untouched.
+- Complete Phase 10 STEP 0, verify/commit, then continue STEP 1 → 4 in order. Do not start Phase 07B, Phase 11 or Phase 12.

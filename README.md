@@ -63,7 +63,7 @@ Update this table at the end of every phase.
 | 06 | Buyer Module | Complete |
 | 07A | Orders and Stock | Complete |
 | 08 | Transporter Module | Complete |
-| 09 | AI Integration | Not started |
+| 09 | AI Integration | Complete |
 | 10 | Communication | Not started |
 | 11 | Advanced Features | Not started |
 | 12 | Admin and Deployment | Not started |
@@ -426,13 +426,15 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** Phase 08 complete. Transporters manage a verified profile, accept/reject real paid jobs, collect/ship/deliver with a buyer-visible code, share location for about 15 seconds in the foreground only, and see earnings. Buyers see the code, latest location and a review prompt after delivery. No payment, notification, chat or admin screen was added.
 
 ### Phase 09 - AI Integration
-- [ ] Crop image upload
-- [ ] Disease classification
-- [ ] Gemini farming assistant with Bangla responses
-- [ ] Diagnosis history
-- [ ] Confidence handling
+- [x] Isolated Gemini REST provider and farming-only assistant (`POST /api/ai/chat`) with Bangla default, bounded history, one retry and clear not-configured errors
+- [x] Owner-only conversation history with pagination and per-user daily/per-minute chat quotas
+- [x] Crop photo camera/gallery capture, compression, owner-only Storage upload with progress (`cropDiagnoses/{uid}/{diagnosisId}/...`)
+- [x] Configurable disease classifier endpoint with strict type/size/path checks and separate daily quota
+- [x] Confidence bands (uncertain/possible/likely), clearer-photo guidance for uncertain results and a fixed advisory disclaimer on every result
+- [x] Diagnosis history with delete (including image removal), Firestore/Storage rules, indexes and emulator tests with provider doubles
+- [x] Farmer AI tab with disease check + assistant, loading/error/limit states and Bangla/English copy
 
-**Result:** working AI farming features.
+**Result:** Phase 09 complete. All AI calls go through the backend; no model or key is bundled in the mobile app. Real Gemini/classifier responses remain UNVERIFIED until the owner supplies credentials. See `RUN.md` for configuration and no-key testing.
 
 ### Phase 10 - Communication
 - [ ] Realtime chat and message history

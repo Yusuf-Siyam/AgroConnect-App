@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, type Href } from 'expo-router';
 import { View } from 'react-native';
 
 import { AppText } from '@/components/common/AppText';
@@ -23,6 +23,9 @@ export default function FarmerMoreScreen() {
         </Link>
         <Link href="/farmer/market">
           <AppText className="font-semibold text-primary">{t('farmer.more.market')}</AppText>
+        </Link>
+        <Link href={'/farmer/ai' as Href}>
+          <AppText className="font-semibold text-primary">{t('farmer.more.ai')}</AppText>
         </Link>
         <View className="border-t border-line pt-3">
           <Link href="/profile">

@@ -89,7 +89,32 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
 FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
 ```
 
-Leave all other backend values empty. Service-account credentials are not required in emulator mode.
+Leave the AI values empty for emulator-only testing. Service-account credentials are not required in emulator mode.
+
+### AI configuration (Phase 09)
+
+Add these to `backend\.env` only when the owner has real credentials. Never put a key in `.env` for the mobile app (`EXPO_PUBLIC_*`) or commit either `.env` file:
+
+```text
+GEMINI_API_KEY=
+GEMINI_MODEL=
+GEMINI_REQUEST_TIMEOUT_MS=
+GEMINI_RETRIES=
+AI_DAILY_MESSAGE_LIMIT=
+AI_MESSAGES_PER_MINUTE=
+AI_HISTORY_LIMIT=
+AI_PROMPT_MAX_CHARS=
+AI_MAX_OUTPUT_TOKENS=
+DISEASE_MODEL_ENDPOINT=
+DISEASE_MODEL_API_KEY=
+DISEASE_REQUEST_TIMEOUT_MS=
+AI_DAILY_DIAGNOSIS_LIMIT=
+AI_DIAGNOSES_PER_MINUTE=
+```
+
+`GEMINI_MODEL` is the exact model code chosen by the owner; the repository does not pick one. `DISEASE_MODEL_ENDPOINT` must be an http(s) URL that accepts `POST { image: { data: base64, mimeType }, cropName }` and returns `{ label, confidence, alternatives: [] }`. No API key or model code is shipped in the mobile build.
+
+**Testing with no keys:** leave `GEMINI_API_KEY`/`GEMINI_MODEL` and `DISEASE_MODEL_ENDPOINT`/`DISEASE_MODEL_API_KEY` empty, sign in as a farmer, open the **AI** tab and send a question or submit a crop photo. The app shows “AI is not configured on the server yet…” and the backend returns `503 AI_NOT_CONFIGURED`. Emulator tests never contact a real provider: they inject test doubles.
 
 ### Host by target
 

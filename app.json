@@ -43,6 +43,14 @@
         {
           "locationWhenInUsePermission": "Allow AgroConnect to use your location for local weather forecasts and to share delivery progress."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow AgroConnect to take crop photos for AI disease checks.",
+          "photosPermission": "Allow AgroConnect to choose crop photos for AI disease checks.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {
