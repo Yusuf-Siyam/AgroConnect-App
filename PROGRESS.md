@@ -231,10 +231,24 @@ Verification: root `npx tsc --noEmit --pretty false`, `npx expo lint --max-warni
 
 Verification: `npx tsc --noEmit --pretty false` and `git diff --check` passed. A direct Firebase CLI start with a missing `./emulator-data` folder started all emulators without an import failure. Windows PowerShell execution is UNVERIFIED (this environment is Linux). Clean-exit export was attempted but could not be fully verified here because the local mounted filesystem/timing caused the CLI export step to fail; the documented flags remain in place.
 
+## Phase 10 gap fix - STEP 0 read-only check (complete)
+
+Baseline before any change: read `README.md`, `PROGRESS.md`, `RUN.md` and `git log` (HEAD `2970072`). `npx tsc --noEmit --pretty false` passed and `PATH=/tmp/opencode/jdk/bin:$PATH npm run test:emulators` passed all suites. No code was changed in this step.
+
+Read-only result (EXISTS / MISSING, with evidence files):
+
+- **a) Notifications for order events — MISSING.** `backend/src/types/notification.ts` registers only `chat_message`, `support_message`, `support_reply`; `backend/src/services/notificationTemplates.ts` defines only those bn/en templates. `backend/src/services/order.ts`, `backend/src/services/delivery.ts`, `backend/src/routes/orders.ts` and `backend/src/routes/delivery.ts` contain no `notifyUser` call or order/delivery event type; a repository-wide search found no `order_placed`, `order_accepted`, `order_rejected`, `order_cancelled`, `job_accepted`, `order_collected`, `order_shipped` or `order_delivered`.
+- **b) GET notifications list (pagination, unread filter), unread count, mark all read — MISSING.** `backend/src/routes/notifications.ts` exposes only `POST /devices`, `DELETE /devices` and `POST /:notificationId/read`; `backend/src/services/notifications.ts` exposes only `markNotificationRead` for read state; `backend/src/validators/notification.ts` has no list/unread-count/read-all schema.
+- **c) Mobile notification center screen and bell icon with unread badge — MISSING.** `src/components/chat/NotificationList.tsx` is only a five-item chat notification preview mounted inside `src/app/chat/index.tsx`. There is no notifications route/screen, no bell control and no notification unread badge in `src/components/navigation/DashboardHeader.tsx` (shared by buyer/farmer/transporter/admin through `src/components/navigation/RoleNavigator.tsx`).
+- **d) Chat test: sending blocked after delivery is delivered, reading still works — MISSING.** `backend/tests/phase10A.emulator.test.ts` contains no such test. The current `resolveConversation()` in `backend/src/services/chat.ts` checks that a delivery job exists and is assigned, but does not check the order/job status, so the behavior is also absent.
+- **e) Chat test: same `clientMessageId` does not create a duplicate — MISSING.** `backend/tests/phase10A.emulator.test.ts` contains no idempotency test. `backend/src/validators/chat.ts` `messageSchema` accepts only `text`, and `sendMessage()` in `backend/src/services/chat.ts` always generates a new `randomUUID()` message ID.
+- **f) Chat test: two simultaneous messages both increase the unread count — MISSING.** `backend/tests/phase10A.emulator.test.ts` has only one sequential unread-count test. The unread update in `sendMessage()` (`backend/src/services/chat.ts`) has no concurrent-send test.
+- **g) Chat test: cursor pagination (right order, no duplicates, no gaps) — MISSING.** `backend/tests/phase10A.emulator.test.ts` has no cursor test. `backend/src/validators/chat.ts` `chatPaginationSchema` and `listChats()` in `backend/src/services/chat.ts` are offset-based; `backend/src/routes/chat.ts` has no cursor-based message-history endpoint.
+
 ## In progress
 
-- No phase work is active. Phase 07B, Phase 11 and Phase 12 remain untouched.
+- Phase 10 gap fix STEP 1 (backend) is the next step. Phase 07B, Phase 11 and Phase 12 remain untouched.
 
 ## Next step
 
-- None. Stop and wait for the owner.
+- Implement only the MISSING backend items and chat gap tests, verify, and commit STEP 1.
