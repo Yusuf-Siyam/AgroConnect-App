@@ -18,6 +18,17 @@ const envSchema = z.object({
     .default('https://geocoding-api.open-meteo.com/v1/search'),
   WEATHER_CACHE_TTL_MS: z.coerce.number().int().min(0).default(600_000),
   WEATHER_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).default(7_000),
+  GEMINI_API_KEY: z.string().default(''),
+  GEMINI_MODEL: z.string().default(''),
+  GEMINI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(15_000),
+  GEMINI_RETRIES: z.coerce.number().int().min(0).max(1).default(1),
+  AI_DAILY_MESSAGE_LIMIT: z.coerce.number().int().positive().max(10_000).default(50),
+  AI_MESSAGES_PER_MINUTE: z.coerce.number().int().positive().max(100).default(10),
+  AI_DAILY_DIAGNOSIS_LIMIT: z.coerce.number().int().positive().max(10_000).default(20),
+  AI_DIAGNOSES_PER_MINUTE: z.coerce.number().int().positive().max(100).default(5),
+  AI_HISTORY_LIMIT: z.coerce.number().int().min(1).max(20).default(8),
+  AI_PROMPT_MAX_CHARS: z.coerce.number().int().min(500).max(50_000).default(6_000),
+  AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(50).max(4_000).default(600),
 });
 
 // Empty values in a copied .env.example should fall back to the schema defaults.
@@ -44,4 +55,15 @@ export const env = {
   openMeteoGeocodingUrl: parsed.data.OPEN_METEO_GEOCODING_URL,
   weatherCacheTtlMs: parsed.data.WEATHER_CACHE_TTL_MS,
   weatherRequestTimeoutMs: parsed.data.WEATHER_REQUEST_TIMEOUT_MS,
+  geminiApiKey: parsed.data.GEMINI_API_KEY,
+  geminiModel: parsed.data.GEMINI_MODEL,
+  geminiRequestTimeoutMs: parsed.data.GEMINI_REQUEST_TIMEOUT_MS,
+  geminiRetries: parsed.data.GEMINI_RETRIES,
+  aiDailyMessageLimit: parsed.data.AI_DAILY_MESSAGE_LIMIT,
+  aiMessagesPerMinute: parsed.data.AI_MESSAGES_PER_MINUTE,
+  aiDiagnosisDailyLimit: parsed.data.AI_DAILY_DIAGNOSIS_LIMIT,
+  aiDiagnosesPerMinute: parsed.data.AI_DIAGNOSES_PER_MINUTE,
+  aiHistoryLimit: parsed.data.AI_HISTORY_LIMIT,
+  aiPromptMaxChars: parsed.data.AI_PROMPT_MAX_CHARS,
+  aiMaxOutputTokens: parsed.data.AI_MAX_OUTPUT_TOKENS,
 } as const;

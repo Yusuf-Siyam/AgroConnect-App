@@ -181,21 +181,20 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ---------- AI history ----------
+    // ---------- AI history (all writes go through the backend) ----------
     match /cropDiagnoses/{diagnosisId} {
       allow read: if isAdmin() || ownsField('userId');
-      allow create: if signedIn()
-                    && hasTimestamps()
-                    && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
     match /farmingConversations/{conversationId} {
       allow read: if isAdmin() || ownsField('userId');
-      allow create: if signedIn()
-                    && hasTimestamps()
-                    && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Per-user AI quota counters are backend-only.
+    match /aiUsage/{uid} {
+      allow read, write: if isAdmin();
     }
 
     // ---------- Farmer data and market information ----------

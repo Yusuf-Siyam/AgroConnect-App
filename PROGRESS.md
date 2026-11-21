@@ -86,10 +86,25 @@ Already present in the repository:
 - No `/api/ai` router, AI provider, diagnosis service, farming-conversation service, AI tests or mobile AI screens exist yet.
 - README lists "Verified image classification model" under External Services but Open Decision #2 (which verified model/service, supported crops and licensing) is still `Pending`. **No model is chosen or invented in Phase 09 STEP 0.** The classifier remains unconfigured until the owner supplies `DISEASE_MODEL_ENDPOINT` and `DISEASE_MODEL_API_KEY`; `GEMINI_MODEL` likewise has no default.
 
+## Phase 09 STEP 1 - Gemini farming assistant (complete)
+
+Implemented the backend-only Gemini assistant:
+
+- `AiTextProvider` lives in `backend/src/types/ai.ts`; the Gemini REST call exists only in `backend/src/providers/gemini.ts`. It reads `GEMINI_API_KEY` and `GEMINI_MODEL` at call time, uses the official `v1beta/interactions` REST shape with the documented API revision, applies a configurable timeout and exactly one retry for transient timeout/network/5xx failures, and never logs or returns the key.
+- `POST /api/ai/chat` is farmer-only, Zod-validated (1–2000 characters, `bn`/`en`, optional existing conversation), and uses an advisory system prompt that restricts replies to farming, disclaims guaranteed diagnoses, requires label/extension-officer guidance for chemicals, and refuses unsafe/unrelated requests. The reply language follows Bengali script in the message, otherwise the requested locale, otherwise English script, with Bangla as the final default.
+- Conversation context is capped by `AI_HISTORY_LIMIT` messages and `AI_PROMPT_MAX_CHARS`; output is capped by `AI_MAX_OUTPUT_TOKENS`. Messages are stored in `farmingConversations/{id}` with `userId`, `messages`, `language`, `createdAt` and `updatedAt`.
+- `GET /api/ai/conversations`, `GET /api/ai/conversations/:id` and `DELETE /api/ai/conversations/:id` support pagination and owner-only reads/deletes. Client writes are denied by Firestore rules; the Admin SDK writes through the backend.
+- Per-user chat quota is checked atomically in `aiUsage/{uid}` with an env-configurable daily limit (default 50) and per-minute window. Missing key/model returns `503 AI_NOT_CONFIGURED` with “not configured” in the message; provider timeout/error returns a clear `502` instead of invented content.
+- Added a composite Firestore index for `farmingConversations(userId, updatedAt desc)` and added the new Phase 09A emulator suite to `npm run test:emulators`. Tests inject a provider double through `createApp`; the real adapter is used only for the not-configured check. No real Gemini request was made during tests.
+
+Assumptions recorded: “Bangla by default” means Bengali script wins, then the explicit locale, then English script, then Bangla for ambiguous input; a consumed quota is not refunded when a provider call fails because it still counts as an attempted paid API call.
+
+Verification: root `npx tsc --noEmit`, backend `npx tsc --noEmit`, backend unit tests 18/18 and full `npm run test:emulators` passed (Phase 3 6/6, 05A 5/5, 05B 6/6, 06A 4/4, 06B 4/4, 07A 5/5, 08 6/6, new Phase 09A 7/7). Real Gemini credentials/responses remain UNVERIFIED because no key was supplied.
+
 ## In progress
 
-- Phase 09 STEP 1 is the next step (Gemini farming assistant backend and tests).
+- Phase 09 STEP 2 is the next step (disease detection backend and tests).
 
 ## Next step
 
-- Complete STEP 1, verify, commit, then continue only to STEP 2. Phase 07B, Phase 10 and later phases remain untouched.
+- Complete STEP 2, verify, commit, then continue only to STEP 3. Phase 07B, Phase 10 and later phases remain untouched.

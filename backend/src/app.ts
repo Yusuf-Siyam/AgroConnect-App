@@ -3,6 +3,7 @@ import express from 'express';
 
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error';
+import { createAiRouter } from './routes/ai';
 import { createAnalyticsRouter } from './routes/analytics';
 import { createAuthRouter } from './routes/auth';
 import { createCartRouter } from './routes/cart';
@@ -18,7 +19,12 @@ import { createWeatherRouter } from './routes/weather';
 import { createWishlistRouter } from './routes/wishlist';
 import { healthRouter } from './routes/health';
 
-export function createApp() {
+/** Providers are injected only by tests; production always uses the real adapter. */
+export type AppOptions = {
+  aiTextProvider?: Parameters<typeof createAiRouter>[0];
+};
+
+export function createApp(options: AppOptions = {}) {
   const app = express();
 
   app.disable('x-powered-by');
@@ -36,6 +42,7 @@ export function createApp() {
   app.use('/api/reviews', createReviewsRouter());
   app.use('/api/orders', createOrdersRouter());
   app.use('/api/delivery', createDeliveryRouter());
+  app.use('/api/ai', createAiRouter(options.aiTextProvider));
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/weather', createWeatherRouter());
   app.use('/api/market', createMarketRouter());
