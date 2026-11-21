@@ -22,6 +22,7 @@ import { healthRouter } from './routes/health';
 /** Providers are injected only by tests; production always uses the real adapter. */
 export type AppOptions = {
   aiTextProvider?: Parameters<typeof createAiRouter>[0];
+  cropDiseaseClassifier?: Parameters<typeof createAiRouter>[1];
 };
 
 export function createApp(options: AppOptions = {}) {
@@ -42,7 +43,7 @@ export function createApp(options: AppOptions = {}) {
   app.use('/api/reviews', createReviewsRouter());
   app.use('/api/orders', createOrdersRouter());
   app.use('/api/delivery', createDeliveryRouter());
-  app.use('/api/ai', createAiRouter(options.aiTextProvider));
+  app.use('/api/ai', createAiRouter(options.aiTextProvider, options.cropDiseaseClassifier));
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/weather', createWeatherRouter());
   app.use('/api/market', createMarketRouter());

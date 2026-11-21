@@ -40,3 +40,45 @@ export type ChatResult = {
   reply: ChatMessage;
   language: AiLanguage;
 };
+
+export type CropDiseaseResult = {
+  label: string;
+  confidence: number;
+  alternatives: string[];
+};
+
+export type CropDiseaseInput = {
+  imagePath: string;
+  imageData: Buffer;
+  mimeType: string;
+  cropName?: string;
+};
+
+/** Injected only by tests; the real adapter reads its endpoint/key from env. */
+export interface CropDiseaseClassifier {
+  classify(input: CropDiseaseInput): Promise<CropDiseaseResult>;
+}
+
+export type DiagnosisStatus = 'uncertain' | 'possible' | 'likely';
+
+export type Diagnosis = {
+  id: string;
+  userId: string;
+  imagePath: string;
+  cropName?: string;
+  confidence: number;
+  status: DiagnosisStatus;
+  result: CropDiseaseResult;
+  advisoryNotice: string;
+  guidance?: string;
+  language: AiLanguage;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DiagnosisList = {
+  items: Diagnosis[];
+  total: number;
+  limit: number;
+  offset: number;
+};

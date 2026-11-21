@@ -21,5 +21,18 @@ export const conversationIdParamSchema = z
   .object({ conversationId: z.string().trim().min(1).max(128) })
   .strict();
 
+export const diagnoseSchema = z
+  .object({
+    imagePath: z.string().trim().min(1).max(500),
+    cropName: z.string().trim().min(1).max(100).optional(),
+    language: aiLanguageSchema.optional(),
+  })
+  .strict();
+
+export const diagnosisIdParamSchema = z
+  .object({ diagnosisId: z.string().trim().min(1).max(128) })
+  .strict();
+
 export type ChatInput = z.infer<typeof chatSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type DiagnoseInput = z.infer<typeof diagnoseSchema>;

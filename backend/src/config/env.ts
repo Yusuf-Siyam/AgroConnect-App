@@ -29,6 +29,14 @@ const envSchema = z.object({
   AI_HISTORY_LIMIT: z.coerce.number().int().min(1).max(20).default(8),
   AI_PROMPT_MAX_CHARS: z.coerce.number().int().min(500).max(50_000).default(6_000),
   AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(50).max(4_000).default(600),
+  DISEASE_MODEL_ENDPOINT: z.string().default(''),
+  DISEASE_MODEL_API_KEY: z.string().default(''),
+  DISEASE_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(15_000),
+  DISEASE_UNCERTAIN_MAX: z.coerce.number().min(0).max(1).default(0.5),
+  DISEASE_POSSIBLE_MAX: z.coerce.number().min(0).max(1).default(0.8),
+}).refine((data) => data.DISEASE_POSSIBLE_MAX >= data.DISEASE_UNCERTAIN_MAX, {
+  message: 'DISEASE_POSSIBLE_MAX must be greater than or equal to DISEASE_UNCERTAIN_MAX',
+  path: ['DISEASE_POSSIBLE_MAX'],
 });
 
 // Empty values in a copied .env.example should fall back to the schema defaults.
@@ -66,4 +74,9 @@ export const env = {
   aiHistoryLimit: parsed.data.AI_HISTORY_LIMIT,
   aiPromptMaxChars: parsed.data.AI_PROMPT_MAX_CHARS,
   aiMaxOutputTokens: parsed.data.AI_MAX_OUTPUT_TOKENS,
+  diseaseModelEndpoint: parsed.data.DISEASE_MODEL_ENDPOINT,
+  diseaseModelApiKey: parsed.data.DISEASE_MODEL_API_KEY,
+  diseaseRequestTimeoutMs: parsed.data.DISEASE_REQUEST_TIMEOUT_MS,
+  diseaseUncertainMax: parsed.data.DISEASE_UNCERTAIN_MAX,
+  diseasePossibleMax: parsed.data.DISEASE_POSSIBLE_MAX,
 } as const;

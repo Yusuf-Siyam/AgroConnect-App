@@ -33,7 +33,18 @@ service firebase.storage {
       allow write: if isOwner(uid);
     }
 
-    // Crop/diagnosis images contain personal farm data.
+    // Crop/diagnosis images contain personal farm data. Phase 09 uses the
+    // cropDiagnoses/{uid}/{diagnosisId}/{fileName} path; writes are owner-only,
+    // limited to 5 MB and restricted to the same formats accepted by the backend.
+    match /cropDiagnoses/{uid}/{diagnosisId}/{fileName} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid)
+                   && request.resource != null
+                   && request.resource.size <= 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    // Legacy path kept for existing data; new uploads must use cropDiagnoses/.
     match /diagnoses/{uid}/{fileName} {
       allow read: if isOwner(uid) || isAdmin();
       allow write: if isOwner(uid);

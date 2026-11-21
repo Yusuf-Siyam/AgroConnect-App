@@ -101,10 +101,25 @@ Assumptions recorded: “Bangla by default” means Bengali script wins, then th
 
 Verification: root `npx tsc --noEmit`, backend `npx tsc --noEmit`, backend unit tests 18/18 and full `npm run test:emulators` passed (Phase 3 6/6, 05A 5/5, 05B 6/6, 06A 4/4, 06B 4/4, 07A 5/5, 08 6/6, new Phase 09A 7/7). Real Gemini credentials/responses remain UNVERIFIED because no key was supplied.
 
+## Phase 09 STEP 2 - Crop disease detection (complete)
+
+Implemented the backend-only disease-classification flow:
+
+- `CropDiseaseClassifier` lives in `backend/src/types/ai.ts`; the only real adapter is `backend/src/providers/diseaseClassifier.ts`. No model is chosen: `DISEASE_MODEL_ENDPOINT` and `DISEASE_MODEL_API_KEY` are owner-supplied, read at call time, validated as an http(s) URL, and never logged. The adapter posts inline base64 image bytes + MIME type + optional crop name, applies a 15s configurable timeout and exactly one retry for transient failures, and strictly validates `{ label, confidence, alternatives[] }`.
+- `POST /api/ai/diagnose` is farmer-only and Zod-validated. It requires the client-uploaded path `cropDiagnoses/{uid}/{diagnosisId}/{fileName}`, checks path ownership, checks the stored object exists, is `image/jpeg`, `image/png` or `image/webp`, and is at most 5 MB before any provider call. Missing classifier configuration returns `503 AI_NOT_CONFIGURED`; classifier timeout/error returns a clear `502` and never invents a result.
+- Confidence bands are `< 0.5 uncertain`, `0.5..0.8 possible`, `> 0.8 likely` (env-overridable). An uncertain result hides the model label, returns no alternatives and asks for a clearer photo. Every response includes the fixed advisory notice “This is advisory, not a guaranteed diagnosis.”
+- Optional Gemini guidance is used only when Gemini is configured; its failure never invalidates a classifier result. Guidance asks for symptoms, prevention, fertilizer and irrigation tips, repeats the advisory disclaimer and requires label/extension-officer guidance for chemicals. Language defaults to Bangla unless explicitly requested.
+- History endpoints `GET /api/ai/diagnoses`, `GET /api/ai/diagnoses/:id` and `DELETE /api/ai/diagnoses/:id` are owner-only with pagination. Deleting a diagnosis also deletes every file under its Storage prefix. Client Firestore writes are denied; Storage writes are owner-only with MIME/size checks. Added the `cropDiagnoses(userId, createdAt desc)` index.
+- A separate per-user daily diagnosis quota (default 20, plus a per-minute window) is stored in `aiUsage/{uid}` and checked with the shared transaction helper. Added the Phase 09B emulator suite with a classifier test double; no real classifier or Gemini request was made.
+
+Assumptions recorded: the owner-supplied classifier accepts the documented JSON contract and returns a plain result object or `{ result }`; a failed diagnosis does not refund quota because the external call was still attempted; diagnosis language defaults to Bangla because a crop name is an identifier rather than prose.
+
+Verification: root and backend `npx tsc --noEmit`, backend unit tests 18/18 and full `npm run test:emulators` passed (Phase 3 6/6, 05A 5/5, 05B 6/6, 06A 4/4, 06B 4/4, 07A 5/5, 08 6/6, Phase 09A 7/7, new Phase 09B 8/8). Real classifier/Gemini endpoints remain UNVERIFIED because no credentials were supplied.
+
 ## In progress
 
-- Phase 09 STEP 2 is the next step (disease detection backend and tests).
+- Phase 09 STEP 3 is the next step (farmer AI mobile tab, localization and docs).
 
 ## Next step
 
-- Complete STEP 2, verify, commit, then continue only to STEP 3. Phase 07B, Phase 10 and later phases remain untouched.
+- Complete STEP 3, verify, commit, then continue only to user-requested Phase 10. Phase 07B remains untouched.
