@@ -198,7 +198,7 @@ npm test
 Pop-Location
 ```
 
-`npm run test:mobile` runs the pure Phase 10 chat helper tests (deterministic IDs, validation, notification templates and push routing). `npm run test:emulators` starts Auth/Firestore/Storage, runs all TypeScript suites (including Phase 10A/10B) sequentially through a Node runner, and stops the emulators afterwards. It does not rely on Linux `&&` chaining. Emulator suites inject a push-provider test double; they never contact a real push service.
+`npm run test:mobile` runs the pure Phase 10 chat helper tests (deterministic IDs, validation, notification templates and role-aware push routing). `npm run test:emulators` starts Auth/Firestore/Storage, runs all TypeScript suites (including Phase 10A/10B and the Phase 10 gap suite) sequentially through a Node runner, and stops the emulators afterwards. It does not rely on Linux `&&` chaining. Emulator suites inject a push-provider test double; they never contact a real push service.
 
 ## 7. Manual buyer/farmer smoke test
 
@@ -254,12 +254,19 @@ All steps below use the local emulators. Chat/message/notification writes are pe
 3. As the admin, open **Messages**. Only support threads are listed; the unread badge comes from the `support` pseudonym. Open the thread and reply — messages are sent as `AgroConnect Support`, not the admin's personal identity.
 4. The originating user sees the reply live and a `support_reply` notification on **Messages**. Confirm an admin cannot open a non-support chat by URL or API (403/permission-denied) and that a non-admin cannot reply as support.
 
-### 8.3 Real FCM/APNs setup (not part of emulator mode)
+### 8.3 Notification center and order events
+
+1. In any role dashboard, tap the **bell** in the header. The unread badge comes from the owner's realtime notification listener; the notification center itself uses the owner-only REST list/count endpoints with Previous/Next pagination.
+2. Trigger real order/delivery actions with the seeded demo accounts from section 7: placing an order notifies the farmer; accept/reject/cancel notifies the buyer/farmer recipient; transporter accept, collect, ship and deliver notify the buyer/farmer recipients. The collected notification says only that the delivery code is ready — check the order detail screen for the actual code.
+3. Tap an unread notification to mark it read and open its role-allowed target: buyers open `/buyer/orders/{id}`, farmers open `/farmer/orders/{id}`, and admins may open only `/chat/support_{userId}` threads. A wrong-role target is not opened and shows a localized message.
+4. Use **Mark all as read** to clear the caller's unread count; another signed-in user's notifications are unaffected. An empty account shows the localized empty state.
+
+### 8.4 Real FCM/APNs setup (not part of emulator mode)
 
 1. Configure an actual Firebase project and add its EAS project ID (`extra.eas.projectId` in `app.json`, normally via `eas init`). Put real service-account values in `backend\.env`; never put keys or tokens in the mobile `.env`.
 2. Enable Cloud Messaging for the project. Android needs a development/production build with Firebase credentials; iOS needs APNs credentials configured. Expo Go cannot receive remote push on Android from SDK 53 onward (`expo-notifications` still works for local notifications).
 3. Build a development client: `npx expo run:android` / `npx expo run:ios`, or `eas build --profile development`. Install it on a physical device, sign in, and allow notification permission. The app uploads only the native device token to `users/{uid}/devices/{tokenHash}`; the backend sends via Firebase Admin Messaging. An Expo push token, when available, is not uploaded or used for delivery.
-4. Send a chat message from a second account and observe the system notification on the recipient's device; tapping it opens the correct `/chat/...` thread and marks the notification read. Notification text comes from `type` + `params` templates and never contains message content.
+4. Send a chat message from a second account and observe the system notification on the recipient's device; tapping it opens the role-allowed `/chat/...` thread or order detail and marks the notification read. Notification text comes from `type` + `params` templates and never contains message content or a delivery code.
 
 **Real push delivery is UNVERIFIED.** The automated suite uses a push-provider test double and the emulator has no FCM/APNs connection. No physical-device delivery has been observed in this repository.
 

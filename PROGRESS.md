@@ -257,10 +257,13 @@ Read-only result (EXISTS / MISSING, with evidence files):
 
 Verification: `npx tsc --noEmit --pretty false`, `npx tsc -p backend/tsconfig.json --noEmit --pretty false`, `npx expo lint`, `cd backend && npm test` (23/23) and `PATH=/tmp/opencode/jdk/bin:$PATH npm run test:emulators` (all suites, including 17/17 new) passed. Local-only commit; no push, review or merge.
 
-## In progress
+## Phase 10 gap fix - STEP 2 mobile (complete)
 
-- Phase 10 gap fix STEP 2 (mobile notification center, bell badge, localization) is the next step. Phase 07B, Phase 11 and Phase 12 remain untouched.
+- Added the owner-only notification center at `/chat/notifications` via `src/app/chat/notifications.tsx` and `src/components/chat/NotificationCenter.tsx`. It uses `useNotificationCenter` with `GET /api/notifications` (limit/offset pagination), `GET /api/notifications/unread-count`, `POST /api/notifications/:id/read` and `POST /api/notifications/read-all`; no notification write is made directly to Firestore.
+- The center shows unread dots, an unread count, localized empty/loading/error states, Previous/Next paging, mark-one and mark-all actions, and role-aware targets. `notificationHref` allows buyer order links only for buyers, farmer order links only for farmers, and support chat links only for admins; wrong-role or malformed targets are not opened.
+- Added a bell control with a realtime unread badge to `src/components/navigation/DashboardHeader.tsx`, which is the shared header for buyer, farmer, transporter and admin dashboards. The embedded five-item preview in `NotificationList.tsx` now renders every registered type, shows unread dots, links to the center and uses the same role-aware routing.
+- `NotificationBridge` now applies the same role-aware target validation to native push taps and still marks the notification read through the backend. The mobile `src/features/chat/` type and template mirrors cover all 11 registered notification types, with no message text or delivery code in notifications.
+- Added bn/en copy for every bell/center string in `src/locales/en.ts` and `src/locales/bn.ts`; Bangla remains the default for non-English locales and no center text is hardcoded. `npm run test:mobile` now runs 23 pure helper tests including role-aware routing and full-template/code-safety coverage.
+- Updated `README.md` communication schema/endpoints/tracker and `RUN.md` Phase 10 smoke docs. No Phase 07B, Phase 11, Phase 12 or later work was started.
 
-## Next step
-
-- Implement only the MISSING mobile items, update README tracker/docs, verify, and commit STEP 2.
+Verification: `npx tsc --noEmit --pretty false`, `npx tsc -p backend/tsconfig.json --noEmit --pretty false`, `npx expo lint --max-warnings 0`, `npm run test:mobile` (23/23), `cd backend && npm test` (23/23), `PATH=/tmp/opencode/jdk/bin:$PATH npm run test:emulators` (all suites, including 17/17 Phase 10 gap tests) and `git diff --check` passed. Real FCM/APNs delivery, physical-device UI behavior and Windows/PowerShell execution remain UNVERIFIED. Local-only commit; no push, review or merge.

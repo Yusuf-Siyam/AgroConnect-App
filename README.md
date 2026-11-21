@@ -225,13 +225,13 @@ chats/{chatId}/messages/{messageId}
   { chatId, senderId, text, createdAt, readBy[] }
 
 notifications/{notificationId}
-  { userId, type, params{chatId,senderName}, target{chatId,url}, readAt, createdAt, updatedAt }
+  { userId, type, params{chatId,senderName,orderId}, target{chatId,orderId,url}, readAt, createdAt, updatedAt }
 
 users/{uid}/devices/{sha256(token)}
   { tokenHash, platform, createdAt, updatedAt }
 ```
 
-Deterministic chat IDs are `bf_{buyerId}_{farmerId}`, `bt_{orderId}` and `support_{userId}`. `participantInfo` contains only `displayName` and `role` — never phone or email. Stored notifications use `type` + `params` only; rendered text is built from the bn/en templates in the backend and the mobile mirror. Chat text is never included in notification documents or push payloads.
+Deterministic chat IDs are `bf_{buyerId}_{farmerId}`, `bt_{orderId}` and `support_{userId}`. `participantInfo` contains only `displayName` and `role` — never phone or email. Stored notifications use `type` + `params` only; rendered text is built from the bn/en templates in the backend and the mobile mirror. Chat text is never included in notification documents or push payloads, and a collected-order notification says only that the delivery code is ready — never the code itself. Buyer–transporter chats become read-only after the order is delivered.
 
 ### Data Rules
 - Use document IDs consistently.
@@ -272,8 +272,12 @@ Required middleware and practices:
 | `POST` | `/api/chat/conversations` | Create/get a deterministic buyer↔farmer, buyer↔transporter or support chat |
 | `GET` | `/api/chat/conversations` | List the caller's chats (admins: support threads only) |
 | `GET` | `/api/chat/conversations/:chatId` | Participant-scoped chat detail |
-| `POST` | `/api/chat/conversations/:chatId/messages` | Send trimmed text (max 1000 chars) |
+| `POST` | `/api/chat/conversations/:chatId/messages` | Send trimmed text (max 1000 chars); optional `clientMessageId` makes retries idempotent |
+| `GET` | `/api/chat/conversations/:chatId/messages?limit=&cursor=` | Cursor-paginated message history with `nextCursor` |
 | `POST` | `/api/chat/conversations/:chatId/read` | Mark the chat read for the caller |
+| `GET` | `/api/notifications?limit=&offset=&unread=` | Owner-only notification list with pagination and unread filter |
+| `GET` | `/api/notifications/unread-count` | Owner-only unread count |
+| `POST` | `/api/notifications/read-all` | Mark all of the caller's notifications read |
 | `POST` | `/api/notifications/devices` | Register/rotate a native FCM/APNs token |
 | `DELETE` | `/api/notifications/devices` | Remove a device token |
 | `POST` | `/api/notifications/:notificationId/read` | Mark one in-app notification read |
@@ -288,7 +292,7 @@ Chat creation is authorized by role and, for delivery chats, by an assigned deli
 | Messages per user | 30 / minute | `CHAT_MESSAGES_PER_MINUTE` |
 | New conversations per user | 20 / day | `CHAT_CONVERSATIONS_PER_DAY` |
 | Support messages per user | 10 / hour | `CHAT_SUPPORT_MESSAGES_PER_HOUR` |
-| Notification types | `chat_message`, `support_message`, `support_reply` only | — (central `notifyUser` registry) |
+| Notification types | `chat_message`, `support_message`, `support_reply`, `order_placed`, `order_accepted`, `order_rejected`, `order_cancelled`, `job_accepted`, `order_collected`, `order_shipped`, `order_delivered` | — (central `notifyUser` registry) |
 
 Payment, group-buying and price-alert notifications are intentionally **not** registered. Future phases should add their events through `notifyUser` with a newly registered type.
 
@@ -486,10 +490,13 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 - [x] Buyer↔farmer, buyer↔transporter and admin support threads with role/order authorization
 - [x] Unread indicators and backend mark-read for chats and in-app notifications
 - [x] Central `notifyUser` with localized bn/en templates, in-app write first and best-effort FCM push
-- [x] Backend-only native device-token registration/rotation and validated push tap routing
+- [x] Backend-only native device-token registration/rotation and role-aware push tap routing
 - [x] Authenticated mobile chat list/thread/support UI, bilingual copy and emulator/pure tests
+- [x] Order/delivery notifications for placed, accepted, rejected, cancelled, job accepted, collected, shipped and delivered, with code-safe collected text
+- [x] Owner-only notification list/count/read-all endpoints and a paginated mobile notification center with bell/unread badge
+- [x] Chat delivery closure, `clientMessageId` idempotency, simultaneous unread counts and cursor pagination covered by emulator tests
 
-**Result:** Phase 10 complete. Buyers, farmers and transporters can chat from contextual entry points or the shared Messages screen; users can contact support and admins can read/reply only to support threads. Chat, message, notification and device-token writes go exclusively through the backend; mobile reads Firestore via realtime listeners. In-app notifications are verified against the emulators. Real FCM/APNs delivery remains UNVERIFIED without a development build and real push credentials (see `RUN.md`). No payment, group-buying or price-alert notifications were added.
+**Result:** Phase 10 complete, including the scoped communication-gap fixes. Buyers, farmers and transporters can chat from contextual entry points or the shared Messages screen; users can contact support and admins can read/reply only to support threads. Every role header opens a notification center that paginates owner-only REST results, marks one/all notifications read, shows unread dots and routes by role. Chat, message, notification and device-token writes go exclusively through the backend; mobile reads Firestore via realtime listeners. In-app notifications are verified against the emulators. Real FCM/APNs delivery remains UNVERIFIED without a development build and real push credentials (see `RUN.md`). No payment, group-buying or price-alert notifications were added.
 
 ### Phase 11 - Advanced Features
 Implement individually:

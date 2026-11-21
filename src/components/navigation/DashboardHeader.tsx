@@ -4,13 +4,19 @@ import { TouchableOpacity, View } from 'react-native';
 import { AppText } from '@/components/common/AppText';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { RoleBadge } from '@/components/common/RoleBadge';
+import { useNotifications } from '@/features/chat/useChat';
 import { useTranslation } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
+
+/** Symbol only; all visible wording and accessibility labels come from locales. */
+const BELL_GLYPH = '\u{1F514}';
 
 export function DashboardHeader() {
   const { t } = useTranslation();
   const { profile } = useAuth();
   const router = useRouter();
+  const notifications = useNotifications(profile?.uid ?? '');
+  const unreadCount = notifications.items.filter((item) => !item.readAt).length;
 
   if (!profile) return null;
 
@@ -30,6 +36,19 @@ export function DashboardHeader() {
             className="rounded-xl px-3 py-2"
           >
             <AppText className="font-semibold text-primary">{t('chat.messages')}</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="link"
+            accessibilityLabel={t('chat.notifications.bell')}
+            onPress={() => router.push('/chat/notifications' as Href)}
+            className="relative rounded-xl px-3 py-2"
+          >
+            <AppText className="text-xl text-primary">{BELL_GLYPH}</AppText>
+            {unreadCount > 0 ? (
+              <View className="absolute -right-1 -top-1 min-w-5 items-center justify-center rounded-full bg-danger px-1">
+                <AppText className="text-xs font-semibold text-white">{unreadCount}</AppText>
+              </View>
+            ) : null}
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityRole="link"

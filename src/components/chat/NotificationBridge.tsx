@@ -5,8 +5,9 @@ import { useEffect } from 'react';
 
 import { markNotificationRead } from '@/features/chat/chatService';
 import {
-  chatUrlFromData,
+  notificationHref,
   notificationIdFromData,
+  notificationUrlFromData,
   type PushData,
 } from '@/features/chat/notificationRouting';
 import { useDevicePushRegistration } from '@/features/chat/useDevicePush';
@@ -16,10 +17,11 @@ import { configureNotificationHandler } from '@/services/notifications';
 // Must be installed before any notification is received.
 configureNotificationHandler();
 
-/** Connects native push tokens and notification taps to the authenticated app. */
+/** Connects native push tokens and role-aware notification taps to the app. */
 export function NotificationBridge() {
-  const { status, firebaseUser } = useAuth();
+  const { status, firebaseUser, profile } = useAuth();
   const router = useRouter();
+  const role = profile?.role;
   const authenticated = status === 'authenticated';
 
   useDevicePushRegistration(authenticated ? (firebaseUser?.uid ?? null) : null, authenticated);
@@ -29,16 +31,16 @@ export function NotificationBridge() {
 
     const subscription = Notifications.addNotificationResponseReceivedListener(({ notification }) => {
       const data = notification.request.content.data as PushData;
-      const url = chatUrlFromData(data);
-      if (!url) return;
+      const href = role ? notificationHref(role, notificationUrlFromData(data)) : null;
+      if (!href) return;
 
-      router.push(url as Href);
+      router.push(href as Href);
       const notificationId = notificationIdFromData(data);
       if (notificationId) void markNotificationRead(notificationId).catch(() => {});
     });
 
     return () => subscription.remove();
-  }, [router]);
+  }, [router, role]);
 
   return null;
 }
