@@ -186,10 +186,23 @@ Implemented `/api/chat` with authenticated access for all four roles:
 
 Verification: root and backend `npx tsc --noEmit`, backend unit tests 18/18, `git diff --check`, and the full emulator suite all passed (Phase 10A 6/6). No notification or push write was added in this step; that is STEP 2. No real FCM request was made.
 
+## Phase 10 STEP 2 - notifications and device tokens (complete)
+
+Implemented the central notification layer and wired it into chat:
+
+- `notifyUser(userId, type, params, target)` writes the in-app `notifications/{notificationId}` document through the Admin SDK first, then performs a best-effort push. Both the in-app write and push catch and log their own failures, so a notification or push failure never breaks the committed chat/message action.
+- Stored notifications contain only `type`, `params` (`chatId`, `senderName`), `target`, read state and timestamps; message text is never persisted or rendered into push text. Bn/en templates live in one backend registry; push uses sender name only.
+- Registered types are `chat_message`, `support_message` and `support_reply` only. No payment, group-buying or price-alert type was added; `notifyUser` is documented as the hook for future Phase 07B events.
+- User support messages notify real admin users (`users` where `role == 'admin'`), not the `support` pseudonym; admin replies notify the originating user with `support_reply` and the `AgroConnect Support` display name.
+- Added `POST/DELETE /api/notifications/devices` backed by backend-only `users/{uid}/devices/{tokenHash}` (sha256 id, raw token hidden, rotation supported) and `POST /api/notifications/:notificationId/read` for backend-only mark-read. Firestore rules deny all client writes to these collections while allowing owner realtime reads.
+- Production push uses Firebase Admin Messaging with no extra SDK or key; tests inject a `PushProvider` double through `createApp({ pushProvider })` and make no real FCM request.
+
+Verification: root and backend `npx tsc --noEmit`, backend unit tests 21/21 (3 new template tests), `git diff --check`, and the full emulator suite all passed (Phase 10A 6/6, Phase 10B 6/6). Phase 10B covers content-free type+params storage, bn/en push text, push failure isolation, hashed/rotatable device tokens, owner-only mark-read, client-write denial and support notification types. Real FCM delivery remains UNVERIFIED.
+
 ## In progress
 
-- Phase 10 STEP 1 is complete; STEP 2 (notifications and device tokens) is the next step.
+- Phase 10 STEP 2 is complete; STEP 3 (mobile chat UI) is the next step.
 
 ## Next step
 
-- Complete Phase 10 STEP 2, verify/commit, then continue STEP 3 → 4 in order. Do not start Phase 07B, Phase 11 or Phase 12.
+- Complete Phase 10 STEP 3, verify/commit, then continue STEP 4 in order. Do not start Phase 07B, Phase 11 or Phase 12.

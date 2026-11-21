@@ -3,12 +3,15 @@ import express from 'express';
 
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error';
+import { setPushProvider } from './services/notifications';
+import type { PushProvider } from './types/notification';
 import { createAiRouter } from './routes/ai';
 import { createAnalyticsRouter } from './routes/analytics';
 import { createAuthRouter } from './routes/auth';
 import { createCartRouter } from './routes/cart';
 import { createCategoriesRouter } from './routes/categories';
 import { createChatRouter } from './routes/chat';
+import { createNotificationsRouter } from './routes/notifications';
 import { createFarmerProfileRouter } from './routes/farmers';
 import { createBuyerMarketplaceRouter } from './routes/marketplace';
 import { createMarketRouter } from './routes/market';
@@ -24,9 +27,13 @@ import { healthRouter } from './routes/health';
 export type AppOptions = {
   aiTextProvider?: Parameters<typeof createAiRouter>[0];
   cropDiseaseClassifier?: Parameters<typeof createAiRouter>[1];
+  /** Push provider is injected only by tests; production uses FCM. */
+  pushProvider?: PushProvider;
 };
 
 export function createApp(options: AppOptions = {}) {
+  if (options.pushProvider) setPushProvider(options.pushProvider);
+
   const app = express();
 
   app.disable('x-powered-by');
@@ -45,6 +52,7 @@ export function createApp(options: AppOptions = {}) {
   app.use('/api/orders', createOrdersRouter());
   app.use('/api/delivery', createDeliveryRouter());
   app.use('/api/chat', createChatRouter());
+  app.use('/api/notifications', createNotificationsRouter());
   app.use('/api/ai', createAiRouter(options.aiTextProvider, options.cropDiseaseClassifier));
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/weather', createWeatherRouter());

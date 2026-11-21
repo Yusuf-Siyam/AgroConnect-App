@@ -8,9 +8,11 @@ import { HttpError } from '../middleware/error';
 import { parseRole } from '../services/userProfile';
 import type { Role } from '../types/auth';
 import type { Chat, ChatList, ChatMessage, ChatType, ParticipantInfo } from '../types/chat';
+import type { NotificationType } from '../types/notification';
 import type { CreateConversationInput, ChatPaginationInput } from '../validators/chat';
 
 import { consumeChatQuota } from './chatQuota';
+import { notifyUser } from './notifications';
 
 const SUPPORT_PARTICIPANT = 'support';
 const SUPPORT_PROFILE: ParticipantInfo = { displayName: 'AgroConnect Support', role: 'support' };
@@ -72,6 +74,13 @@ function serializeMessage(id: string, data: DocumentData): ChatMessage {
 function dataOf(snapshot: { exists: boolean; data: () => DocumentData | undefined }): DocumentData {
   if (!snapshot.exists) throw new HttpError(404, 'CHAT_NOT_FOUND', 'Conversation not found.');
   return snapshot.data() ?? {};
+}
+
+/** A user's support message must notify real admins, not the 'support' pseudonym. */
+async function adminUserIds(): Promise<string[]> {
+  const { firestore } = getFirebaseAdmin();
+  const snapshot = await firestore.collection('users').where('role', '==', 'admin').get();
+  return snapshot.docs.map((entry) => entry.id);
 }
 
 function assertCanAccess(chat: Chat, uid: string, role: Role): void {
@@ -277,6 +286,10 @@ export async function sendMessage(
   const messageId = randomUUID();
   const messageRef = chatRef.collection('messages').doc(messageId);
 
+  let pendingNotification:
+    | { type: NotificationType; senderName: string; recipients: string[] }
+    | undefined;
+
   await firestore.runTransaction(async (transaction) => {
     const chat = serializeChat(chatId, dataOf(await transaction.get(chatRef)));
     assertCanAccess(chat, actorId, role);
@@ -310,7 +323,40 @@ export async function sendMessage(
       updatedAt: FieldValue.serverTimestamp(),
       unreadCounts,
     });
+
+    pendingNotification = {
+      type:
+        chat.type === 'support'
+          ? senderId === SUPPORT_PARTICIPANT
+            ? 'support_reply'
+            : 'support_message'
+          : 'chat_message',
+      senderName:
+        chat.participantInfo[senderId]?.displayName ??
+        (senderId === SUPPORT_PARTICIPANT ? SUPPORT_PROFILE.displayName : role),
+      recipients: recipients.filter((recipient): recipient is string => Boolean(recipient)),
+    };
   });
+
+  // Notifications are best effort and never fail the already-committed message.
+  if (pendingNotification) {
+    try {
+      const recipients =
+        pendingNotification.type === 'support_message'
+          ? await adminUserIds()
+          : pendingNotification.recipients;
+      for (const recipient of recipients) {
+        await notifyUser(
+          recipient,
+          pendingNotification.type,
+          { chatId, senderName: pendingNotification.senderName },
+          { chatId, url: `/chat/${chatId}` },
+        );
+      }
+    } catch (error) {
+      console.error('[sendMessage] notification hook failed (non-fatal)', error);
+    }
+  }
 
   return serializeMessage(messageId, dataOf(await messageRef.get()));
 }
