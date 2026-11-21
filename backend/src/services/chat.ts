@@ -1,21 +1,36 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import type { DocumentData, Transaction } from 'firebase-admin/firestore';
 
 import { getFirebaseAdmin } from '../config/firebase';
 import { HttpError } from '../middleware/error';
 import { parseRole } from '../services/userProfile';
 import type { Role } from '../types/auth';
-import type { Chat, ChatList, ChatMessage, ChatType, ParticipantInfo } from '../types/chat';
+import type {
+  Chat,
+  ChatList,
+  ChatMessage,
+  ChatType,
+  MessageList,
+  ParticipantInfo,
+} from '../types/chat';
 import type { NotificationType } from '../types/notification';
-import type { CreateConversationInput, ChatPaginationInput } from '../validators/chat';
+import type {
+  CreateConversationInput,
+  ChatPaginationInput,
+  MessagePaginationInput,
+} from '../validators/chat';
 
 import { consumeChatQuota } from './chatQuota';
 import { notifyUser } from './notifications';
 
 const SUPPORT_PARTICIPANT = 'support';
 const SUPPORT_PROFILE: ParticipantInfo = { displayName: 'AgroConnect Support', role: 'support' };
+
+function clientMessageDocId(chatId: string, clientMessageId: string): string {
+  return createHash('sha256').update(`${chatId}:${clientMessageId}`).digest('hex');
+}
 
 function toIsoString(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -68,6 +83,9 @@ function serializeMessage(id: string, data: DocumentData): ChatMessage {
     text: String(data.text),
     createdAt: toIsoString(data.createdAt),
     readBy: toStringArray(data.readBy),
+    ...(typeof data.clientMessageId === 'string'
+      ? { clientMessageId: String(data.clientMessageId) }
+      : {}),
   };
 }
 
@@ -275,17 +293,23 @@ export async function createConversation(
   return chat;
 }
 
+export type SendMessageResult = { message: ChatMessage; duplicate: boolean };
+
 export async function sendMessage(
   actorId: string,
   role: Role,
   chatId: string,
   text: string,
-): Promise<ChatMessage> {
+  clientMessageId?: string,
+): Promise<SendMessageResult> {
   const { firestore } = getFirebaseAdmin();
   const chatRef = firestore.collection('chats').doc(chatId);
-  const messageId = randomUUID();
+  const messageId = clientMessageId
+    ? clientMessageDocId(chatId, clientMessageId)
+    : randomUUID();
   const messageRef = chatRef.collection('messages').doc(messageId);
 
+  let duplicate = false;
   let pendingNotification:
     | { type: NotificationType; senderName: string; recipients: string[] }
     | undefined;
@@ -293,6 +317,20 @@ export async function sendMessage(
   await firestore.runTransaction(async (transaction) => {
     const chat = serializeChat(chatId, dataOf(await transaction.get(chatRef)));
     assertCanAccess(chat, actorId, role);
+
+    // Delivery chats close when the order is delivered; reading remains available.
+    if (chat.type === 'buyer_transporter' && chat.orderId) {
+      const orderSnapshot = await transaction.get(firestore.collection('orders').doc(chat.orderId));
+      if (orderSnapshot.exists && orderSnapshot.data()?.status === 'delivered') {
+        throw new HttpError(409, 'CHAT_CLOSED', 'Delivery chats close after delivery.');
+      }
+    }
+
+    if (clientMessageId && (await transaction.get(messageRef)).exists) {
+      duplicate = true;
+      return;
+    }
+
     const senderId = role === 'admin' && chat.type === 'support' ? SUPPORT_PARTICIPANT : actorId;
     const recipients =
       chat.type === 'support'
@@ -316,6 +354,7 @@ export async function sendMessage(
       senderId,
       text,
       readBy: [senderId],
+      ...(clientMessageId ? { clientMessageId } : {}),
       createdAt: FieldValue.serverTimestamp(),
     });
     transaction.update(chatRef, {
@@ -338,6 +377,9 @@ export async function sendMessage(
     };
   });
 
+  const message = serializeMessage(messageId, dataOf(await messageRef.get()));
+  if (duplicate) return { message, duplicate: true };
+
   // Notifications are best effort and never fail the already-committed message.
   if (pendingNotification) {
     try {
@@ -358,7 +400,7 @@ export async function sendMessage(
     }
   }
 
-  return serializeMessage(messageId, dataOf(await messageRef.get()));
+  return { message, duplicate: false };
 }
 
 export async function listChats(
@@ -399,6 +441,37 @@ export async function getChat(actorId: string, role: Role, chatId: string): Prom
   const chat = serializeChat(chatId, dataOf(await firestore.collection('chats').doc(chatId).get()));
   assertCanAccess(chat, actorId, role);
   return chat;
+}
+
+export async function listMessages(
+  actorId: string,
+  role: Role,
+  chatId: string,
+  query: MessagePaginationInput,
+): Promise<MessageList> {
+  const { firestore } = getFirebaseAdmin();
+  await getChat(actorId, role, chatId);
+
+  const base = firestore.collection('chats').doc(chatId).collection('messages');
+  let messageQuery = base
+    .orderBy('createdAt', 'asc')
+    .orderBy(FieldPath.documentId(), 'asc')
+    .limit(query.limit + 1);
+
+  if (query.cursor) {
+    const cursor = await base.doc(query.cursor).get();
+    if (!cursor.exists) throw new HttpError(400, 'INVALID_CURSOR', 'Message cursor is invalid.');
+    messageQuery = messageQuery.startAfter(cursor);
+  }
+
+  const snapshot = await messageQuery.get();
+  const hasMore = snapshot.size > query.limit;
+  const docs = hasMore ? snapshot.docs.slice(0, query.limit) : snapshot.docs;
+  return {
+    items: docs.map((document) => serializeMessage(document.id, document.data())),
+    nextCursor: hasMore && docs.length > 0 ? docs[docs.length - 1]!.id : null,
+    limit: query.limit,
+  };
 }
 
 export async function markChatRead(actorId: string, role: Role, chatId: string): Promise<void> {

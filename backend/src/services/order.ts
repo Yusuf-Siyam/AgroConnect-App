@@ -9,6 +9,7 @@ import { parseStoredProduct } from './product';
 import {
   assertAllowedOrderTransition,
   assertApiMutableOrderStatus,
+  notifyOrderTransition,
   ORDER_STATUSES,
   type OrderStatus,
 } from './orderStatus';
@@ -156,6 +157,15 @@ function serializeOrder(data: unknown): Order {
 function ordersCollection() {
   const { firestore } = getFirebaseAdmin();
   return firestore.collection('orders');
+}
+
+/** Notification hooks run only after a committed transaction and are non-fatal. */
+async function safeNotifyOrder(order: Order, status: OrderStatus, role: ActorRole): Promise<void> {
+  try {
+    await notifyOrderTransition(order, status, role);
+  } catch (error) {
+    console.error('[order] notification hook failed (non-fatal)', error);
+  }
 }
 
 export { createStatusEvent, ordersCollection, serializeOrder };
@@ -325,7 +335,8 @@ export async function createOrderCheckout(
   const existing = await checkoutRef.get();
   if (existing.exists) return checkoutResponseFrom(existing.data()!, buyerId);
 
-  return firestore.runTransaction(async (transaction) => {
+  let placedOrders: Order[] = [];
+  const checkout = await firestore.runTransaction(async (transaction) => {
     const checkoutSnapshot = await transaction.get(checkoutRef);
     if (checkoutSnapshot.exists) return checkoutResponseFrom(checkoutSnapshot.data()!, buyerId);
 
@@ -438,6 +449,7 @@ export async function createOrderCheckout(
       updatedAt: now,
     });
     transaction.delete(cartRef);
+    placedOrders = createdOrders;
 
     return {
       checkoutId: input.checkoutId,
@@ -449,6 +461,11 @@ export async function createOrderCheckout(
       deliveryFee: null,
     };
   });
+
+  for (const order of placedOrders) {
+    await safeNotifyOrder(order, 'pending', 'buyer');
+  }
+  return checkout;
 }
 
 export async function acceptFarmerOrder(sellerId: string, orderId: string): Promise<Order> {
@@ -536,7 +553,9 @@ export async function acceptFarmerOrder(sellerId: string, orderId: string): Prom
     transaction.set(orderRef.collection('statusHistory').doc(event.id), event);
   });
 
-  return (await getOrder(orderId))!;
+  const accepted = (await getOrder(orderId))!;
+  await safeNotifyOrder(accepted, 'accepted', 'farmer');
+  return accepted;
 }
 
 export async function rejectFarmerOrder(
@@ -576,7 +595,9 @@ export async function rejectFarmerOrder(
     transaction.set(orderRef.collection('statusHistory').doc(event.id), event);
   });
 
-  return (await getOrder(orderId))!;
+  const rejected = (await getOrder(orderId))!;
+  await safeNotifyOrder(rejected, 'rejected', 'farmer');
+  return rejected;
 }
 
 export async function cancelOrder(
@@ -671,5 +692,7 @@ export async function cancelOrder(
     transaction.set(orderRef.collection('statusHistory').doc(event.id), event);
   });
 
-  return (await getOrder(orderId))!;
+  const cancelled = (await getOrder(orderId))!;
+  await safeNotifyOrder(cancelled, 'cancelled', role);
+  return cancelled;
 }

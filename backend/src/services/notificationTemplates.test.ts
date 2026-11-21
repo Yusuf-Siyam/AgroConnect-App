@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { NOTIFICATION_TYPES } from '../types/notification';
+
 import { NOTIFICATION_TEMPLATES, renderNotification } from './notificationTemplates';
 
 describe('notification templates', () => {
@@ -17,11 +19,31 @@ describe('notification templates', () => {
   });
 
   it('does not define payment, group-buying or price-alert notification types', () => {
-    assert.deepEqual(Object.keys(NOTIFICATION_TEMPLATES).sort(), [
-      'chat_message',
-      'support_message',
-      'support_reply',
-    ]);
+    assert.deepEqual(Object.keys(NOTIFICATION_TEMPLATES).sort(), [...NOTIFICATION_TYPES].sort());
+    for (const forbidden of ['payment', 'group_buy', 'price_alert']) {
+      assert.equal(NOTIFICATION_TYPES.some((type) => type.includes(forbidden)), false);
+    }
+  });
+
+  it('renders both locales for every registered notification type', () => {
+    const chatTypes = ['chat_message', 'support_message', 'support_reply'] as const;
+    for (const type of NOTIFICATION_TYPES) {
+      for (const locale of ['bn', 'en'] as const) {
+        const params = chatTypes.includes(type as (typeof chatTypes)[number])
+          ? { chatId: 'c1', senderName: 'Sender' }
+          : { orderId: 'o1' };
+        const text = renderNotification(locale, type, params);
+        assert.ok(text.title.length > 0, `${type}/${locale} title`);
+        assert.ok(text.body.length > 0, `${type}/${locale} body`);
+      }
+    }
+  });
+
+  it('renders order collected text without a delivery code', () => {
+    const text = renderNotification('en', 'order_collected', { orderId: 'order-1' });
+    assert.match(text.body, /delivery code is ready/i);
+    assert.ok(!text.body.includes('order-1'));
+    assert.ok(!text.body.includes('{{'));
   });
 
   it('renders every support variant without message content', () => {

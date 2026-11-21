@@ -9,8 +9,8 @@ import {
 } from '../config/deliveryPricing';
 import { getFirebaseAdmin } from '../config/firebase';
 import { HttpError } from '../middleware/error';
-import { assertAllowedOrderTransition } from '../services/orderStatus';
-import { createStatusEvent, ordersCollection, serializeOrder } from '../services/order';
+import { assertAllowedOrderTransition, notifyOrderTransition } from '../services/orderStatus';
+import { createStatusEvent, getOrder, ordersCollection, serializeOrder } from '../services/order';
 import type {
   BuyerDelivery,
   DeliveryJob,
@@ -56,6 +56,19 @@ function jobsCollection() {
 function earningsCollection() {
   const { firestore } = getFirebaseAdmin();
   return firestore.collection('earnings');
+}
+
+/** Notification hooks run only after a committed delivery transaction. */
+async function safeNotifyDeliveryStatus(
+  orderId: string,
+  to: 'shipment_accepted' | 'collected' | 'shipped' | 'delivered',
+): Promise<void> {
+  try {
+    const order = await getOrder(orderId);
+    if (order) await notifyOrderTransition(order, to, 'transporter');
+  } catch (error) {
+    console.error('[delivery] notification hook failed (non-fatal)', error);
+  }
 }
 
 function toIsoString(value: unknown): string {
@@ -270,7 +283,7 @@ export async function acceptDeliveryJob(
   const { firestore } = getFirebaseAdmin();
   const jobRef = jobsCollection().doc(jobId);
 
-  return firestore.runTransaction(async (transaction) => {
+  const accepted = await firestore.runTransaction(async (transaction) => {
     const jobSnapshot = await transaction.get(jobRef);
     if (!jobSnapshot.exists) throw new HttpError(404, 'JOB_NOT_FOUND', 'Delivery job not found.');
     const job = serializeJob(jobId, jobSnapshot.data()!);
@@ -314,9 +327,12 @@ export async function acceptDeliveryJob(
     return {
       ...job,
       transporterId,
-      orderStatus: 'shipment_accepted',
+      orderStatus: 'shipment_accepted' as const,
     };
   });
+
+  await safeNotifyDeliveryStatus(accepted.orderId, 'shipment_accepted');
+  return accepted;
 }
 
 export async function rejectDeliveryJob(
@@ -354,7 +370,7 @@ async function updateJobAndOrderStatus(
   const { firestore } = getFirebaseAdmin();
   const jobRef = jobsCollection().doc(jobId);
 
-  return firestore.runTransaction(async (transaction) => {
+  const updated = await firestore.runTransaction(async (transaction) => {
     const jobSnapshot = await transaction.get(jobRef);
     if (!jobSnapshot.exists) throw new HttpError(404, 'JOB_NOT_FOUND', 'Delivery job not found.');
     const job = serializeJob(jobId, jobSnapshot.data()!);
@@ -415,6 +431,9 @@ async function updateJobAndOrderStatus(
       ...extraJobUpdates,
     } as DeliveryJob;
   });
+
+  await safeNotifyDeliveryStatus(updated.orderId, to);
+  return updated;
 }
 
 export function confirmPickup(transporterId: string, jobId: string): Promise<DeliveryJob> {

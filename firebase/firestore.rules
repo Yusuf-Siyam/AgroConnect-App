@@ -148,8 +148,9 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Notifications are strictly owner-readable, including from admins.
     match /notifications/{notificationId} {
-      allow read: if isAdmin() || ownsField('userId');
+      allow read: if ownsField('userId');
       allow write: if false;
     }
 

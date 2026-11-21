@@ -5,6 +5,9 @@ import { authenticate } from '../middleware/auth';
 import { HttpError } from '../middleware/error';
 import { createRateLimiter } from '../middleware/rateLimit';
 import {
+  getUnreadNotificationCount,
+  listNotifications,
+  markAllNotificationsRead,
   markNotificationRead,
   registerDeviceToken,
   removeDeviceToken,
@@ -12,6 +15,7 @@ import {
 import {
   deviceTokenSchema,
   notificationIdParamSchema,
+  notificationListSchema,
   removeDeviceTokenSchema,
 } from '../validators/notification';
 import { validationMessage } from '../validators/validation';
@@ -55,6 +59,28 @@ export function createNotificationsRouter(): Router {
       const input = parseOrThrow(removeDeviceTokenSchema, req.body);
       await removeDeviceToken(req.auth!.uid, input.token);
       res.status(204).end();
+    }),
+  );
+
+  router.get(
+    '/',
+    asyncRoute(async (req, res) => {
+      const query = parseOrThrow(notificationListSchema, req.query);
+      res.json(await listNotifications(req.auth!.uid, query));
+    }),
+  );
+
+  router.get(
+    '/unread-count',
+    asyncRoute(async (req, res) => {
+      res.json(await getUnreadNotificationCount(req.auth!.uid));
+    }),
+  );
+
+  router.post(
+    '/read-all',
+    asyncRoute(async (req, res) => {
+      res.json(await markAllNotificationsRead(req.auth!.uid));
     }),
   );
 

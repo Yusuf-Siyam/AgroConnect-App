@@ -28,6 +28,7 @@ export const createConversationSchema = z
 export const messageSchema = z
   .object({
     text: z.string().trim().min(1).max(1000),
+    clientMessageId: z.string().trim().min(1).max(128).optional(),
   })
   .strict();
 
@@ -42,6 +43,14 @@ export const chatPaginationSchema = z
   })
   .strict();
 
+export const messagePaginationSchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().trim().min(1).max(180).optional(),
+  })
+  .strict();
+
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type MessageInput = z.infer<typeof messageSchema>;
 export type ChatPaginationInput = z.infer<typeof chatPaginationSchema>;
+export type MessagePaginationInput = z.infer<typeof messagePaginationSchema>;

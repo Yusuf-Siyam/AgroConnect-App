@@ -245,10 +245,22 @@ Read-only result (EXISTS / MISSING, with evidence files):
 - **f) Chat test: two simultaneous messages both increase the unread count — MISSING.** `backend/tests/phase10A.emulator.test.ts` has only one sequential unread-count test. The unread update in `sendMessage()` (`backend/src/services/chat.ts`) has no concurrent-send test.
 - **g) Chat test: cursor pagination (right order, no duplicates, no gaps) — MISSING.** `backend/tests/phase10A.emulator.test.ts` has no cursor test. `backend/src/validators/chat.ts` `chatPaginationSchema` and `listChats()` in `backend/src/services/chat.ts` are offset-based; `backend/src/routes/chat.ts` has no cursor-based message-history endpoint.
 
+## Phase 10 gap fix - STEP 1 backend (complete)
+
+- Registered eight order/delivery notification types with bn/en templates in `backend/src/types/notification.ts` and `backend/src/services/notificationTemplates.ts`: `order_placed`, `order_accepted`, `order_rejected`, `order_cancelled`, `job_accepted`, `order_collected`, `order_shipped`, `order_delivered`. `order_collected` says "your delivery code is ready" / "আপনার ডেলিভারি কোড প্রস্তুত" and never stores the code.
+- Central `notifyUser` in `backend/src/services/notifications.ts` now supports chat and order params/targets. Push data carries only notification id, target ids and url — never message text or a delivery code.
+- Hooked every existing transition after its main transaction commits: checkout/accept/reject/cancel in `backend/src/services/order.ts`, and job accept/collect/ship/deliver in `backend/src/services/delivery.ts`. Recipients are shared in `orderNotificationRecipients()` in `backend/src/services/orderStatus.ts`. Every hook is wrapped in `try/catch`; a notification failure cannot fail the order or delivery action. `phase07BNotificationHook()` is an explicit no-op extension point; no payment/group-buy/price-alert type was added.
+- Added owner-only `GET /api/notifications` (limit/offset, `unread=true` filter), `GET /api/notifications/unread-count` and `POST /api/notifications/read-all` in `backend/src/routes/notifications.ts`, backed by list/count/read-all helpers and validated by `backend/src/validators/notification.ts`.
+- `firebase/firestore.rules` now makes `notifications` strictly owner-readable (admin override removed); `firebase/firestore.indexes.json` adds `userId + readAt + createdAt`.
+- Chat gaps: `messageSchema` accepts optional `clientMessageId`; `sendMessage()` derives a deterministic message id so retries are idempotent, and blocks sending in a `buyer_transporter` chat once the order is `delivered` while reads continue. Added `GET /api/chat/conversations/:chatId/messages` with deterministic cursor pagination (`createdAt` + document id tiebreaker) and `nextCursor`.
+- Added `backend/tests/phase10G.emulator.test.ts` with 17 single-scenario tests (registered in `scripts/run-emulator-tests.mjs`) covering every order/delivery notification, collection text/code safety, list/pagination/count/read-all/owner-only behavior, chat closure after delivery, `clientMessageId` idempotency, two simultaneous messages, cursor pagination and notification-failure isolation.
+
+Verification: `npx tsc --noEmit --pretty false`, `npx tsc -p backend/tsconfig.json --noEmit --pretty false`, `npx expo lint`, `cd backend && npm test` (23/23) and `PATH=/tmp/opencode/jdk/bin:$PATH npm run test:emulators` (all suites, including 17/17 new) passed. Local-only commit; no push, review or merge.
+
 ## In progress
 
-- Phase 10 gap fix STEP 1 (backend) is the next step. Phase 07B, Phase 11 and Phase 12 remain untouched.
+- Phase 10 gap fix STEP 2 (mobile notification center, bell badge, localization) is the next step. Phase 07B, Phase 11 and Phase 12 remain untouched.
 
 ## Next step
 
-- Implement only the MISSING backend items and chat gap tests, verify, and commit STEP 1.
+- Implement only the MISSING mobile items, update README tracker/docs, verify, and commit STEP 2.

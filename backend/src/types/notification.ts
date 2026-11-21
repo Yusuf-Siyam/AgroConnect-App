@@ -1,19 +1,29 @@
-export const NOTIFICATION_TYPES = ['chat_message', 'support_message', 'support_reply'] as const;
+export const NOTIFICATION_TYPES = [
+  'chat_message',
+  'support_message',
+  'support_reply',
+  'order_placed',
+  'order_accepted',
+  'order_rejected',
+  'order_cancelled',
+  'job_accepted',
+  'order_collected',
+  'order_shipped',
+  'order_delivered',
+] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 export const NOTIFICATION_PLATFORMS = ['ios', 'android', 'web'] as const;
 export type NotificationPlatform = (typeof NOTIFICATION_PLATFORMS)[number];
 
-/** Stored params never include chat message content. */
-export type NotificationParams = {
-  chatId: string;
-  senderName: string;
-};
+/** Stored params never include chat message text or a delivery code. */
+export type ChatNotificationParams = { chatId: string; senderName: string };
+export type OrderNotificationParams = { orderId: string };
+export type NotificationParams = ChatNotificationParams | OrderNotificationParams;
 
-export type NotificationTarget = {
-  chatId: string;
-  url: string;
-};
+export type ChatNotificationTarget = { chatId: string; url: string };
+export type OrderNotificationTarget = { orderId: string; url: string };
+export type NotificationTarget = ChatNotificationTarget | OrderNotificationTarget;
 
 export type Notification = {
   id: string;
@@ -25,6 +35,15 @@ export type Notification = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type NotificationList = {
+  items: Notification[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type NotificationUnreadCount = { count: number };
 
 export type LocalizedNotificationText = {
   title: string;

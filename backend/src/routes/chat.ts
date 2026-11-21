@@ -8,6 +8,7 @@ import {
   createConversation,
   getChat,
   listChats,
+  listMessages,
   markChatRead,
   sendMessage,
 } from '../services/chat';
@@ -16,6 +17,7 @@ import {
   chatIdParamSchema,
   chatPaginationSchema,
   createConversationSchema,
+  messagePaginationSchema,
   messageSchema,
 } from '../validators/chat';
 
@@ -62,14 +64,28 @@ export function createChatRouter(): Router {
     }),
   );
 
+  router.get(
+    '/conversations/:chatId/messages',
+    asyncRoute(async (req, res) => {
+      const params = parseOrThrow(chatIdParamSchema, req.params);
+      const query = parseOrThrow(messagePaginationSchema, req.query);
+      res.json(await listMessages(req.auth!.uid, req.auth!.role, params.chatId, query));
+    }),
+  );
+
   router.post(
     '/conversations/:chatId/messages',
     asyncRoute(async (req, res) => {
       const params = parseOrThrow(chatIdParamSchema, req.params);
       const input = parseOrThrow(messageSchema, req.body);
-      res.status(201).json(
-        await sendMessage(req.auth!.uid, req.auth!.role, params.chatId, input.text),
+      const result = await sendMessage(
+        req.auth!.uid,
+        req.auth!.role,
+        params.chatId,
+        input.text,
+        input.clientMessageId,
       );
+      res.status(result.duplicate ? 200 : 201).json(result.message);
     }),
   );
 

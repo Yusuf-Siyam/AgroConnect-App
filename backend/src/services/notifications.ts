@@ -1,16 +1,19 @@
 import { createHash, randomUUID } from 'node:crypto';
 
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentData } from 'firebase-admin/firestore';
 
 import { getFirebaseAdmin } from '../config/firebase';
 import { HttpError } from '../middleware/error';
 import { createFcmPushProvider } from '../providers/push';
 import type {
+  Notification,
   NotificationDelivery,
+  NotificationList,
   NotificationParams,
   NotificationPlatform,
   NotificationTarget,
   NotificationType,
+  NotificationUnreadCount,
   PushProvider,
 } from '../types/notification';
 
@@ -85,14 +88,57 @@ async function resolveLocale(userId: string): Promise<'bn' | 'en'> {
   }
 }
 
+function toIsoString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value instanceof Date) return value.toISOString();
+  if (value && typeof value === 'object' && 'toDate' in value) {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function serializeNotification(id: string, data: DocumentData): Notification {
+  const rawParams = (data.params ?? {}) as Record<string, unknown>;
+  const rawTarget = (data.target ?? {}) as Record<string, unknown>;
+
+  const params: NotificationParams =
+    typeof rawParams.chatId === 'string' && typeof rawParams.senderName === 'string'
+      ? { chatId: rawParams.chatId, senderName: rawParams.senderName }
+      : { orderId: String(rawParams.orderId ?? '') };
+
+  const url = String(rawTarget.url ?? '');
+  const target: NotificationTarget =
+    typeof rawTarget.chatId === 'string'
+      ? { chatId: rawTarget.chatId, url }
+      : { orderId: String(rawTarget.orderId ?? ''), url };
+
+  return {
+    id,
+    userId: String(data.userId ?? ''),
+    type: data.type as NotificationType,
+    params,
+    target,
+    readAt: data.readAt ? toIsoString(data.readAt) : null,
+    createdAt: toIsoString(data.createdAt),
+    updatedAt: toIsoString(data.updatedAt),
+  };
+}
+
+function pushData(notificationId: string, target: NotificationTarget): Record<string, string> {
+  const data: Record<string, string> = { notificationId, url: target.url };
+  if ('chatId' in target) data.chatId = target.chatId;
+  if ('orderId' in target) data.orderId = target.orderId;
+  return data;
+}
+
 /**
- * Central notify hook for Phase 10 chat/support events. Future Phase 07B
- * payment, group-buying and price-alert events should call this same function
- * with a new registered type; those types are deliberately not added now.
+ * Central notify hook for Phase 10 chat and order/delivery events. Future Phase
+ * 07B events should call this with a newly registered type; no payment,
+ * group-buying or price-alert notification is registered here.
  *
  * The in-app notification is written first through the Admin SDK. Push is best
- * effort: any failure is logged and swallowed so it never breaks the chat or
- * message action that triggered it. Message content is never persisted here.
+ * effort: any failure is logged and swallowed so it never breaks the main
+ * action. Chat text and delivery codes are never stored in the notification.
  */
 export async function notifyUser(
   userId: string,
@@ -129,11 +175,7 @@ export async function notifyUser(
       await pushProvider().send(userId, tokens, {
         title: text.title,
         body: text.body,
-        data: {
-          notificationId,
-          chatId: target.chatId,
-          url: target.url,
-        },
+        data: pushData(notificationId, target),
       });
       pushDelivered = true;
     }
@@ -157,4 +199,61 @@ export async function markNotificationRead(userId: string, notificationId: strin
     readAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
+}
+
+export async function listNotifications(
+  userId: string,
+  query: { limit: number; offset: number; unread: boolean },
+): Promise<NotificationList> {
+  const { firestore } = getFirebaseAdmin();
+  const base = firestore.collection('notifications').where('userId', '==', userId);
+  const filtered = query.unread ? base.where('readAt', '==', null) : base;
+  const [countSnapshot, pageSnapshot] = await Promise.all([
+    filtered.get(),
+    filtered
+      .orderBy('createdAt', 'desc')
+      .limit(query.limit)
+      .offset(query.offset)
+      .get(),
+  ]);
+
+  return {
+    items: pageSnapshot.docs.map((document) => serializeNotification(document.id, document.data())),
+    total: countSnapshot.size,
+    limit: query.limit,
+    offset: query.offset,
+  };
+}
+
+export async function getUnreadNotificationCount(userId: string): Promise<NotificationUnreadCount> {
+  const { firestore } = getFirebaseAdmin();
+  const snapshot = await firestore
+    .collection('notifications')
+    .where('userId', '==', userId)
+    .where('readAt', '==', null)
+    .get();
+  return { count: snapshot.size };
+}
+
+export async function markAllNotificationsRead(userId: string): Promise<{ updated: number }> {
+  const { firestore } = getFirebaseAdmin();
+  const snapshot = await firestore
+    .collection('notifications')
+    .where('userId', '==', userId)
+    .where('readAt', '==', null)
+    .get();
+
+  const batchSize = 500;
+  for (let index = 0; index < snapshot.docs.length; index += batchSize) {
+    const batch = firestore.batch();
+    for (const document of snapshot.docs.slice(index, index + batchSize)) {
+      batch.update(document.ref, {
+        readAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+
+  return { updated: snapshot.size };
 }

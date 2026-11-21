@@ -31,6 +31,13 @@ export type ChatMessage = {
   text: string;
   createdAt: string;
   readBy: string[];
+  clientMessageId?: string;
+};
+
+export type MessageList = {
+  items: ChatMessage[];
+  nextCursor: string | null;
+  limit: number;
 };
 
 export type ChatList = {
