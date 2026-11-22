@@ -19,6 +19,7 @@ import { createBuyerMarketplaceRouter } from './routes/marketplace';
 import { createMarketRouter } from './routes/market';
 import { createDeliveryRouter } from './routes/delivery';
 import { createOrdersRouter } from './routes/orders';
+import { createEmergencyListingsRouter } from './routes/emergencyListings';
 import { createProductBatchesRouter } from './routes/productBatches';
 import { createProductsRouter } from './routes/products';
 import { createReputationRouter } from './routes/reputation';
@@ -52,6 +53,7 @@ export function createApp(options: AppOptions = {}) {
   app.use('/api/farmers', createFarmerProfileRouter());
   app.use('/api/harvest-records', createHarvestRecordsRouter());
   app.use('/api/product-batches', createProductBatchesRouter());
+  app.use('/api/emergency-listings', createEmergencyListingsRouter());
   app.use('/api/cart', createCartRouter());
   app.use('/api/wishlist', createWishlistRouter());
   app.use('/api/reviews', createReviewsRouter());

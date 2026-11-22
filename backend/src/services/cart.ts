@@ -6,7 +6,9 @@ import { HttpError } from '../middleware/error';
 import type { CartItem, CartResponse } from '../types/buyerState';
 import type { Product } from '../types/product';
 import type { AddCartItemInput, UpdateCartItemInput } from '../validators/buyerState';
+import { getActiveEmergencyListingForProduct } from './emergencyListing';
 import { parseStoredProduct } from './product';
+import { getEffectiveProductPrice } from './pricing';
 
 const storedCartItemSchema = z.object({
   productId: z.string(),
@@ -107,6 +109,8 @@ async function toCartItem(stored: StoredCartItem, buyerId: string): Promise<Cart
       minOrderQty: stored.minOrderQty,
       stock: stored.stock,
       unitPrice: stored.price,
+      baseUnitPrice: stored.price,
+      priceSource: 'base',
       lineTotal: stored.price * stored.quantity,
       available: false,
       unavailableReason: 'PRODUCT_NOT_FOUND',
@@ -114,6 +118,9 @@ async function toCartItem(stored: StoredCartItem, buyerId: string): Promise<Cart
   }
 
   const product = parseStoredProduct(productSnapshot.data());
+  const emergency = await getActiveEmergencyListingForProduct(product.id);
+  const effective = getEffectiveProductPrice(product, emergency);
+
   if (product.sellerId === buyerId) {
     return {
       productId: stored.productId,
@@ -124,8 +131,12 @@ async function toCartItem(stored: StoredCartItem, buyerId: string): Promise<Cart
       quantity: stored.quantity,
       minOrderQty: stored.minOrderQty,
       stock: stored.stock,
-      unitPrice: stored.price,
-      lineTotal: stored.price * stored.quantity,
+      unitPrice: effective.unitPrice,
+      baseUnitPrice: effective.baseUnitPrice,
+      ...(effective.emergencyListingId ? { emergencyListingId: effective.emergencyListingId } : {}),
+      ...(effective.discountPercent !== undefined ? { discountPercent: effective.discountPercent } : {}),
+      priceSource: effective.priceSource,
+      lineTotal: effective.unitPrice * stored.quantity,
       available: false,
       unavailableReason: 'OWN_PRODUCT',
     };
@@ -140,8 +151,12 @@ async function toCartItem(stored: StoredCartItem, buyerId: string): Promise<Cart
       quantity: stored.quantity,
       minOrderQty: product.minOrderQty,
       stock: product.stock,
-      unitPrice: product.price,
-      lineTotal: product.price * stored.quantity,
+      unitPrice: effective.unitPrice,
+      baseUnitPrice: effective.baseUnitPrice,
+      ...(effective.emergencyListingId ? { emergencyListingId: effective.emergencyListingId } : {}),
+      ...(effective.discountPercent !== undefined ? { discountPercent: effective.discountPercent } : {}),
+      priceSource: effective.priceSource,
+      lineTotal: effective.unitPrice * stored.quantity,
       available: false,
       unavailableReason: 'PRODUCT_UNAVAILABLE',
     };
@@ -156,8 +171,12 @@ async function toCartItem(stored: StoredCartItem, buyerId: string): Promise<Cart
     quantity: stored.quantity,
     minOrderQty: product.minOrderQty,
     stock: product.stock,
-    unitPrice: product.price,
-    lineTotal: product.price * stored.quantity,
+    unitPrice: effective.unitPrice,
+    baseUnitPrice: effective.baseUnitPrice,
+    ...(effective.emergencyListingId ? { emergencyListingId: effective.emergencyListingId } : {}),
+    ...(effective.discountPercent !== undefined ? { discountPercent: effective.discountPercent } : {}),
+    priceSource: effective.priceSource,
+    lineTotal: effective.unitPrice * stored.quantity,
     available: true,
   };
 }

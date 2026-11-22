@@ -118,6 +118,14 @@ export default function ProductDetailScreen() {
           <AppText variant="title" className="text-primary">
             {formatNumber(item.price, locale)} / {t(`unit.${item.unit}` as TranslationKey)}
           </AppText>
+          {item.emergency ? (
+            <View className="gap-1">
+              <AppText className="font-semibold text-amber-700">
+                {t('buyer.deals.discount', { value: item.emergency.discountPercent })}
+              </AppText>
+              <AppText variant="caption">{t('buyer.deals.expiresAt', { date: new Date(item.emergency.expiresAt).toLocaleString() })}</AppText>
+            </View>
+          ) : null}
           <AppText variant="caption">{unitConversionLabel(locale)}</AppText>
           <AppText>{t('buyer.product.stockCount', { count: item.stock })}</AppText>
           <AppText variant="caption">{t('buyer.product.minOrder', { count: item.minOrderQty })}</AppText>

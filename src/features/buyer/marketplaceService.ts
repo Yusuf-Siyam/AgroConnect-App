@@ -12,6 +12,14 @@ import type {
   ProductList,
 } from './types';
 
+const emergencySchema = z.object({
+  id: z.string(),
+  discountPercent: z.number(),
+  discountedPrice: z.number(),
+  expiresAt: z.string(),
+  availableQty: z.number().int(),
+});
+
 const productSchema = z.object({
   id: z.string(),
   sellerId: z.string(),
@@ -32,6 +40,7 @@ const productSchema = z.object({
   deleted: z.boolean().default(false),
   createdAt: z.string(),
   updatedAt: z.string(),
+  emergency: emergencySchema.optional(),
 });
 
 const productListSchema = z.object({

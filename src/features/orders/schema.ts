@@ -13,6 +13,10 @@ const orderItemSchema = z.object({
   name: z.object({ bn: z.string().optional(), en: z.string().optional() }),
   quantity: z.number().int(),
   unitPrice: z.number(),
+  baseUnitPrice: z.number().default(0),
+  emergencyListingId: z.string().optional(),
+  discountPercent: z.number().optional(),
+  priceSource: z.enum(['base', 'emergency']).default('base'),
   unit: z.string(),
 });
 

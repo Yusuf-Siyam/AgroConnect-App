@@ -114,6 +114,7 @@ export default function CartScreen() {
                   <AppText variant="caption">
                     {formatNumber(item.unitPrice, locale)} /{' '}
                     {t(`unit.${item.unit}` as TranslationKey)}
+                    {item.priceSource === 'emergency' && item.discountPercent ? ` · ${t('buyer.deals.discount', { value: item.discountPercent })}` : ''}
                   </AppText>
                   <View className="flex-row items-center gap-3">
                     <Button

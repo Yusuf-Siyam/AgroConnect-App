@@ -66,6 +66,8 @@ export const NOTIFICATION_TYPES = [
   'order_collected',
   'order_shipped',
   'order_delivered',
+  'emergency_listing_created',
+  'emergency_listing_cancelled',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 export type ChatNotificationType = 'chat_message' | 'support_message' | 'support_reply';
@@ -74,11 +76,14 @@ export type NotificationParams = {
   chatId?: string;
   senderName?: string;
   orderId?: string;
+  listingId?: string;
+  productId?: string;
 };
 
 export type NotificationTarget = {
   chatId?: string;
   orderId?: string;
+  productId?: string;
   url: string;
 };
 

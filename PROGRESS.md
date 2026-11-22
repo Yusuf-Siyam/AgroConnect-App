@@ -519,6 +519,18 @@ Verification (TESTED): `npx tsc --noEmit --pretty false`; `./node_modules/.bin/t
 
 Verification (TESTED): `npx tsc --noEmit --pretty false`; `npx expo lint --max-warnings 0`; `npm run check:i18n` (88 TSX files); `npm run test:mobile` (38/38); `cd backend && npm test` (28/28); `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` (all suites passed, including phase11-batch 6/6 after follow-up). `npm ls --depth=0` clean; `npx expo-doctor` 20/20 checks passed. Real-device camera scanning, Expo Go/dev-build behavior, and web camera behavior remain UNVERIFIED.
 
+
+## Phase 11 - Advanced Features - STEP 4 emergency listings (complete)
+
+- Added backend emergency listings: `backend/src/types/emergencyListing.ts`, `validators/emergencyListing.ts`, `services/pricing.ts` (`getEffectiveProductPrice` shared), `services/emergencyListing.ts`, and authenticated rate-limited `/api/emergency-listings` routes. Farmer create/list/update/cancel; buyer `GET /public` deals. Config limits come from `backend/src/config/advancedFeatures.ts` (5-50%, max 72h). One active listing per product/farmer is enforced by transaction; server-time expiry normalization marks expired/sold-out on access.
+- Pricing is server-authoritative: marketplace/public product detail include effective emergency price and public emergency metadata; cart recomputes effective price from current product/listing; order creation snapshots `baseUnitPrice`, `emergencyListingId?`, `discountPercent?`, `priceSource` and applies emergency only when remaining emergency qty covers the ordered quantity. Order accept increments `soldQty` and marks sold out when exhausted.
+- Notifications use central registry only: added `emergency_listing_created` and `emergency_listing_cancelled` with bn/en templates and id/target params only (no message text/secrets).
+- Firestore: `emergencyListings` are backend-only writes, signed-in readable; indexes added for farmer+createdAt, product+status, status+createdAt. Registered `backend/tests/phase11-emergency.emulator.test.ts` in emulator runner.
+- Mobile: farmer `/farmer/emergency` create/list/cancel screen; buyer `/buyer/deals` tab/screen; product card/detail/cart show emergency discount/expiry; buyer/farmer services use Zod-validated API responses. Added bn/en keys.
+- Emulator gate fixes during STEP 4: removed two `now` temporal-dead-zone uses in `createOrderCheckout` emergency evaluation (caught by Phase 07A/11 regressions) and fixed Phase 11 emergency emulator test fixture to use UUID checkoutId and valid delivery address.
+
+Verification (TESTED): `npx tsc --noEmit --pretty false`; `npx expo lint --max-warnings 0`; `npm run check:i18n` (90 TSX files); `npm run test:mobile` (38/38); `cd backend && npm test` (28/28); `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` (all suites passed, including phase11-emergency 4/4). Real-device/emulator UI behavior, push delivery, and production scheduling remain UNVERIFIED/not in scope.
+
 ## Phase 11 - Advanced Features - STEP 2 harvest records (complete)
 
 - Backend: added `harvestRecords` types, Zod validators and a farmer-only `/api/harvest-records` router with create, list (status/crop/date filters and pagination), detail, patch, `POST /:id/status` (PATCH alias) and delete. Dates are validated as real ISO calendar dates with sowing <= expected/actual and an explicit actual date required before a record can be `harvested`; all validation lives in shared pure helpers covered by unit tests.

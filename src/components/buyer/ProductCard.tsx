@@ -35,6 +35,11 @@ export function ProductCard({ product }: { product: Product }) {
         <AppText className="font-semibold text-primary">
           {formatNumber(product.price, locale)} / {t(`unit.${product.unit}` as TranslationKey)}
         </AppText>
+        {product.emergency ? (
+          <AppText variant="caption" className="text-amber-700">
+            {t('buyer.deals.discount', { value: product.emergency.discountPercent })}
+          </AppText>
+        ) : null}
         <AppText variant="caption">
           {t('buyer.product.stockCount', { count: product.stock })} ·{' '}
           {t('common.rating')} {rating.average.toFixed(1)} ({rating.count})

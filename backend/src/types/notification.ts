@@ -10,6 +10,8 @@ export const NOTIFICATION_TYPES = [
   'order_collected',
   'order_shipped',
   'order_delivered',
+  'emergency_listing_created',
+  'emergency_listing_cancelled',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -19,11 +21,19 @@ export type NotificationPlatform = (typeof NOTIFICATION_PLATFORMS)[number];
 /** Stored params never include chat message text or a delivery code. */
 export type ChatNotificationParams = { chatId: string; senderName: string };
 export type OrderNotificationParams = { orderId: string };
-export type NotificationParams = ChatNotificationParams | OrderNotificationParams;
+export type EmergencyNotificationParams = { listingId: string; productId: string };
+export type NotificationParams =
+  | ChatNotificationParams
+  | OrderNotificationParams
+  | EmergencyNotificationParams;
 
 export type ChatNotificationTarget = { chatId: string; url: string };
 export type OrderNotificationTarget = { orderId: string; url: string };
-export type NotificationTarget = ChatNotificationTarget | OrderNotificationTarget;
+export type ProductNotificationTarget = { productId: string; url: string };
+export type NotificationTarget =
+  | ChatNotificationTarget
+  | OrderNotificationTarget
+  | ProductNotificationTarget;
 
 export type Notification = {
   id: string;

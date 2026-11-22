@@ -144,7 +144,24 @@ export async function requirePublicProduct(productId: string): Promise<PublicPro
   if (!product || product.status !== 'active' || product.deleted) {
     throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found.');
   }
-  return { ...product, reputation: await getFarmerReputation(product.sellerId) };
+  const { getActiveEmergencyListingForProduct } = await import('./emergencyListing');
+  const { getEffectiveProductPrice } = await import('./pricing');
+  const listing = await getActiveEmergencyListingForProduct(product.id);
+  const effective = getEffectiveProductPrice(product, listing);
+  return {
+    ...product,
+    price: effective.unitPrice,
+    emergency: listing
+      ? {
+          id: listing.id,
+          discountPercent: listing.discountPercent,
+          discountedPrice: listing.discountedPrice,
+          expiresAt: listing.expiresAt,
+          availableQty: Math.max(0, listing.availableQty - listing.soldQty),
+        }
+      : undefined,
+    reputation: await getFarmerReputation(product.sellerId),
+  };
 }
 
 export async function requireOwnedProduct(sellerId: string, productId: string): Promise<Product> {

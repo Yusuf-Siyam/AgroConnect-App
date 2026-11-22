@@ -18,6 +18,10 @@ export type OrderItem = {
   name: { bn?: string; en?: string };
   quantity: number;
   unitPrice: number;
+  baseUnitPrice: number;
+  emergencyListingId?: string;
+  discountPercent?: number;
+  priceSource: 'base' | 'emergency';
   unit: string;
 };
 

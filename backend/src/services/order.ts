@@ -5,7 +5,9 @@ import { z } from 'zod';
 
 import { getFirebaseAdmin } from '../config/firebase';
 import { HttpError } from '../middleware/error';
+import { getActiveEmergencyListingForProduct, normalizeEmergencyListing } from './emergencyListing';
 import { parseStoredProduct } from './product';
+import { getEffectiveProductPrice } from './pricing';
 import { recomputeFarmerReputationsForOrder } from './reputation';
 import {
   assertAllowedOrderTransition,
@@ -72,6 +74,10 @@ const storedOrderSchema = z
         name: z.object({ bn: z.string().optional(), en: z.string().optional() }).default({}),
         quantity: z.number().int().positive(),
         unitPrice: z.number().nonnegative(),
+        baseUnitPrice: z.number().nonnegative().optional(),
+        emergencyListingId: z.string().optional(),
+        discountPercent: z.number().optional(),
+        priceSource: z.enum(['base', 'emergency']).optional(),
         unit: z.string().min(1),
       }),
     ),
@@ -140,7 +146,11 @@ function serializeOrder(data: unknown): Order {
     sellerIds:
       raw.sellerIds.length > 0 ? raw.sellerIds : [...new Set(raw.items.map((item) => item.sellerId))],
     ...(raw.transporterId ? { transporterId: raw.transporterId } : {}),
-    items: raw.items,
+    items: raw.items.map((item) => ({
+      ...item,
+      baseUnitPrice: item.baseUnitPrice ?? item.unitPrice,
+      priceSource: item.priceSource ?? 'base',
+    })),
     status: raw.status,
     totalAmount: raw.totalAmount,
     deliveryFee: raw.deliveryFee,
@@ -365,7 +375,11 @@ export async function createOrderCheckout(
       quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
     }
 
-    const validatedItems: Array<{ item: StoredCartItem; product: ReturnType<typeof parseStoredProduct> }> = [];
+    const validatedItems: Array<{
+      item: StoredCartItem;
+      product: ReturnType<typeof parseStoredProduct>;
+      pricing: ReturnType<typeof getEffectiveProductPrice>;
+    }> = [];
     for (const item of cart.items) {
       const product = products.get(item.productId)!;
       if (product.deleted || product.status !== 'active' || product.stock <= 0) {
@@ -383,7 +397,34 @@ export async function createOrderCheckout(
       if ((quantities.get(product.id) ?? item.quantity) > product.stock) {
         throw new HttpError(409, 'INSUFFICIENT_STOCK', 'Requested quantity exceeds available stock.');
       }
-      validatedItems.push({ item, product });
+
+      const listingSnap = await transaction.get(
+        firestore
+          .collection('emergencyListings')
+          .where('productId', '==', product.id)
+          .where('status', '==', 'active')
+          .limit(5),
+      );
+      let emergency = null as ReturnType<typeof normalizeEmergencyListing> | null;
+      for (const doc of listingSnap.docs) {
+        const normalized = normalizeEmergencyListing(
+          {
+            ...(doc.data() as any),
+            createdAt: typeof doc.get('createdAt')?.toDate === 'function' ? doc.get('createdAt').toDate().toISOString() : String(doc.get('createdAt') ?? ''),
+            updatedAt: typeof doc.get('updatedAt')?.toDate === 'function' ? doc.get('updatedAt').toDate().toISOString() : String(doc.get('updatedAt') ?? ''),
+          },
+          new Date(),
+        );
+        if (normalized.status === 'active') {
+          const remaining = normalized.availableQty - normalized.soldQty;
+          if (item.quantity <= remaining) {
+            emergency = normalized;
+          }
+          break;
+        }
+      }
+      const pricing = getEffectiveProductPrice(product, emergency, new Date());
+      validatedItems.push({ item, product, pricing });
     }
 
     const sellerIds = [...new Set(validatedItems.map(({ item }) => item.sellerId))];
@@ -394,12 +435,16 @@ export async function createOrderCheckout(
 
     for (const sellerId of sellerIds) {
       const sellerItems = validatedItems.filter(({ item }) => item.sellerId === sellerId);
-      const items = sellerItems.map(({ item, product }) => ({
+      const items = sellerItems.map(({ item, product, pricing }) => ({
         productId: item.productId,
         sellerId,
         name: { bn: product.name.bn, en: product.name.en },
         quantity: item.quantity,
-        unitPrice: product.price,
+        unitPrice: pricing.unitPrice,
+        baseUnitPrice: pricing.baseUnitPrice,
+        ...(pricing.emergencyListingId ? { emergencyListingId: pricing.emergencyListingId } : {}),
+        ...(pricing.discountPercent !== undefined ? { discountPercent: pricing.discountPercent } : {}),
+        priceSource: pricing.priceSource,
         unit: product.unit,
       }));
       const sellerTotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -534,6 +579,23 @@ export async function acceptFarmerOrder(sellerId: string, orderId: string): Prom
         createdAt: now,
         updatedAt: now,
       });
+
+      const emergencyItems = order.items.filter(
+        (item) => item.sellerId === sellerId && item.productId === productId && item.emergencyListingId,
+      );
+      for (const item of emergencyItems) {
+        const listingRef = firestore.collection('emergencyListings').doc(item.emergencyListingId!);
+        const listingSnap = await transaction.get(listingRef);
+        if (!listingSnap.exists) continue;
+        const soldQty = Number(listingSnap.get('soldQty') ?? 0);
+        const availableQty = Number(listingSnap.get('availableQty') ?? 0);
+        const nextSold = soldQty + item.quantity;
+        transaction.update(listingRef, {
+          soldQty: nextSold,
+          status: nextSold >= availableQty ? 'sold_out' : listingSnap.get('status'),
+          updatedAt: now,
+        });
+      }
     }
 
     const event = createStatusEvent({

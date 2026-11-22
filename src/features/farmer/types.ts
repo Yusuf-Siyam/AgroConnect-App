@@ -11,6 +11,14 @@ export type LocalizedText = { bn: string; en: string };
 
 export type RatingSummary = { average: number; count: number };
 
+export type ProductEmergency = {
+  id: string;
+  discountPercent: number;
+  discountedPrice: number;
+  expiresAt: string;
+  availableQty: number;
+};
+
 export type Product = {
   id: string;
   sellerId: string;
@@ -31,6 +39,7 @@ export type Product = {
   deleted: boolean;
   createdAt: string;
   updatedAt: string;
+  emergency?: ProductEmergency;
 };
 
 export type ProductList = {

@@ -226,6 +226,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /emergencyListings/{listingId} {
+      allow read: if signedIn() || isAdmin();
+      allow write: if false;
+    }
+
     match /priceHistory/{priceId} {
       allow read: if signedIn() || isAdmin();
       allow write: if false;

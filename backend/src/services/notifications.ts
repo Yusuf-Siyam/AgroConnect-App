@@ -101,16 +101,24 @@ function serializeNotification(id: string, data: DocumentData): Notification {
   const rawParams = (data.params ?? {}) as Record<string, unknown>;
   const rawTarget = (data.target ?? {}) as Record<string, unknown>;
 
-  const params: NotificationParams =
-    typeof rawParams.chatId === 'string' && typeof rawParams.senderName === 'string'
-      ? { chatId: rawParams.chatId, senderName: rawParams.senderName }
-      : { orderId: String(rawParams.orderId ?? '') };
+  let params: NotificationParams;
+  if (typeof rawParams.chatId === 'string' && typeof rawParams.senderName === 'string') {
+    params = { chatId: rawParams.chatId, senderName: rawParams.senderName };
+  } else if (typeof rawParams.listingId === 'string' && typeof rawParams.productId === 'string') {
+    params = { listingId: rawParams.listingId, productId: rawParams.productId };
+  } else {
+    params = { orderId: String(rawParams.orderId ?? '') };
+  }
 
   const url = String(rawTarget.url ?? '');
-  const target: NotificationTarget =
-    typeof rawTarget.chatId === 'string'
-      ? { chatId: rawTarget.chatId, url }
-      : { orderId: String(rawTarget.orderId ?? ''), url };
+  let target: NotificationTarget;
+  if (typeof rawTarget.chatId === 'string') {
+    target = { chatId: rawTarget.chatId, url };
+  } else if (typeof rawTarget.productId === 'string') {
+    target = { productId: rawTarget.productId, url };
+  } else {
+    target = { orderId: String(rawTarget.orderId ?? ''), url };
+  }
 
   return {
     id,
@@ -128,6 +136,7 @@ function pushData(notificationId: string, target: NotificationTarget): Record<st
   const data: Record<string, string> = { notificationId, url: target.url };
   if ('chatId' in target) data.chatId = target.chatId;
   if ('orderId' in target) data.orderId = target.orderId;
+  if ('productId' in target) data.productId = target.productId;
   return data;
 }
 

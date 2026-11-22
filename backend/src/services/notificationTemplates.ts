@@ -57,6 +57,14 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationType, Record<Locale, Tem
     bn: { title: 'অর্ডার ডেলিভারি সম্পন্ন', body: 'আপনার অর্ডার ডেলিভারি সম্পন্ন হয়েছে।' },
     en: { title: 'Order delivered', body: 'Your order has been delivered.' },
   },
+  emergency_listing_created: {
+    bn: { title: 'জরুরি ছাড়', body: 'একটি পণ্যে সীমিত সময়ের জরুরি ছাড় যোগ হয়েছে।' },
+    en: { title: 'Emergency deal', body: 'A limited-time emergency discount was added to a product.' },
+  },
+  emergency_listing_cancelled: {
+    bn: { title: 'জরুরি ছাড় বন্ধ', body: 'একটি পণ্যের জরুরি ছাড় বন্ধ করা হয়েছে।' },
+    en: { title: 'Emergency deal ended', body: 'An emergency discount was cancelled.' },
+  },
 };
 
 export function renderNotification(

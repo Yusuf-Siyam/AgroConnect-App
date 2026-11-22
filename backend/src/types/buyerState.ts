@@ -11,6 +11,10 @@ export type CartItem = {
   stock: number;
   /** Always recomputed from the current product, never from a stored snapshot. */
   unitPrice: number;
+  baseUnitPrice: number;
+  emergencyListingId?: string;
+  discountPercent?: number;
+  priceSource: 'base' | 'emergency';
   lineTotal: number;
   available: boolean;
   unavailableReason?: 'PRODUCT_NOT_FOUND' | 'PRODUCT_UNAVAILABLE' | 'OWN_PRODUCT';

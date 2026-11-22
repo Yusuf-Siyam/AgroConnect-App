@@ -4,7 +4,9 @@ import { HttpError } from '../middleware/error';
 import type { CategoryResponse, FarmerProfile, RatingSummary } from '../types/marketplace';
 import type { ProductListResponse } from '../types/product';
 import type { MarketplaceQuery } from '../validators/marketplace';
+import { getActiveEmergencyListingForProduct } from './emergencyListing';
 import { parseStoredProduct } from './product';
+import { getEffectiveProductPrice } from './pricing';
 import { getFarmerReputation } from './reputation';
 
 function productsCollection() {
@@ -31,26 +33,45 @@ export async function listMarketplaceProducts(query: MarketplaceQuery): Promise<
   const needle = query.search?.toLocaleLowerCase();
   const districtNeedle = query.district?.toLocaleLowerCase();
 
-  const products = snapshot.docs
-    .map((document) => parseStoredProduct(document.data()))
-    .filter((product) => {
-      if (query.inStock !== false && product.stock <= 0) return false;
-      if (query.category && product.category !== query.category) return false;
-      if (query.unit && product.unit !== query.unit) return false;
-      if (query.minPrice !== undefined && product.price < query.minPrice) return false;
-      if (query.maxPrice !== undefined && product.price > query.maxPrice) return false;
-      if (
-        districtNeedle &&
-        !product.harvestInfo.district.toLocaleLowerCase().includes(districtNeedle)
-      ) {
-        return false;
-      }
-      if (!needle) return true;
-      return [product.name.bn, product.name.en, product.category, product.harvestInfo.variety]
-        .join(' ')
-        .toLocaleLowerCase()
-        .includes(needle);
-    });
+  const products = (
+    await Promise.all(
+      snapshot.docs.map(async (document) => {
+        const product = parseStoredProduct(document.data());
+        const listing = await getActiveEmergencyListingForProduct(product.id);
+        const effective = getEffectiveProductPrice(product, listing);
+        return {
+          ...product,
+          price: effective.unitPrice,
+          emergency: listing
+            ? {
+                id: listing.id,
+                discountPercent: listing.discountPercent,
+                discountedPrice: listing.discountedPrice,
+                expiresAt: listing.expiresAt,
+                availableQty: Math.max(0, listing.availableQty - listing.soldQty),
+              }
+            : undefined,
+        };
+      }),
+    )
+  ).filter((product) => {
+    if (query.inStock !== false && product.stock <= 0) return false;
+    if (query.category && product.category !== query.category) return false;
+    if (query.unit && product.unit !== query.unit) return false;
+    if (query.minPrice !== undefined && product.price < query.minPrice) return false;
+    if (query.maxPrice !== undefined && product.price > query.maxPrice) return false;
+    if (
+      districtNeedle &&
+      !product.harvestInfo.district.toLocaleLowerCase().includes(districtNeedle)
+    ) {
+      return false;
+    }
+    if (!needle) return true;
+    return [product.name.bn, product.name.en, product.category, product.harvestInfo.variety]
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(needle);
+  });
 
   if (query.sort === 'price_asc') {
     products.sort((left, right) => left.price - right.price);

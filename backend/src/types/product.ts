@@ -24,6 +24,14 @@ export type ProductHarvestInfo = {
   variety: string;
 };
 
+export type ProductEmergency = {
+  id: string;
+  discountPercent: number;
+  discountedPrice: number;
+  expiresAt: string;
+  availableQty: number;
+};
+
 export type Product = {
   id: string;
   sellerId: string;
@@ -44,6 +52,7 @@ export type Product = {
   deletedAt?: string;
   createdAt: string;
   updatedAt: string;
+  emergency?: ProductEmergency;
 };
 
 export type ProductListResponse = {
