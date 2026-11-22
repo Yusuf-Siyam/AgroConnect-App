@@ -249,7 +249,7 @@ Deterministic chat IDs are `bf_{buyerId}_{farmerId}`, `bt_{orderId}` and `suppor
 
 ## 8. Backend API
 
-REST modules (Phase 11 additions are planned in the Step 0 record in `PROGRESS.md`; only the modules listed as current below are mounted):
+REST modules (current mounted modules; Phase 11 modules marked implemented/deferred below):
 
 ```text
 Current:
@@ -258,16 +258,16 @@ Current:
 /api/reviews /api/orders    /api/delivery      /api/chat
 /api/notifications /api/ai  /api/analytics     /api/weather
 /api/market  /api/reputation /api/admin /api/harvest-records
-/api/product-batches
+/api/product-batches /api/emergency-listings /api/group-purchases
 
-Phase 11:
-/api/emergency-listings /api/group-purchases
+Phase 11 deferred by owner (not mounted):
+/api/market/prediction (STEP 6)  voice assistant adapters (STEP 8, no new route)  offline cache (STEP 7, client-only)
 
 Deferred, not mounted:
 /api/users /api/payments
 ```
 
-`/api/admin` is added in Phase 11 only for group-purchase maintenance and reputation recompute; Step 1 mounts only the reputation recompute action. `/api/payments` and `/api/users` remain Phase 07B/12 work and must not be treated as implemented because they are listed here.
+`/api/admin` is currently limited to reputation recompute and group-purchase evaluation. `/api/payments` and `/api/users` remain Phase 07B/12 work and must not be treated as implemented.
 
 Required middleware and practices:
 - Authentication middleware (Firebase ID token verification).
@@ -305,21 +305,21 @@ Chat creation is authorized by role and, for delivery chats, by an assigned deli
 | Messages per user | 30 / minute | `CHAT_MESSAGES_PER_MINUTE` |
 | New conversations per user | 20 / day | `CHAT_CONVERSATIONS_PER_DAY` |
 | Support messages per user | 10 / hour | `CHAT_SUPPORT_MESSAGES_PER_HOUR` |
-| Notification types | `chat_message`, `support_message`, `support_reply`, `order_placed`, `order_accepted`, `order_rejected`, `order_cancelled`, `job_accepted`, `order_collected`, `order_shipped`, `order_delivered` | — (central `notifyUser` registry) |
+| Notification types | `chat_message`, `support_message`, `support_reply`, `order_placed`, `order_accepted`, `order_rejected`, `order_cancelled`, `job_accepted`, `order_collected`, `order_shipped`, `order_delivered`, `emergency_listing_created`, `emergency_listing_cancelled`, `group_successful`, `group_failed` | — (central `notifyUser` registry) |
 
-Payment and price-alert notifications remain intentionally **not** registered. Phase 11 Step 5 will add only `group_successful` and `group_failed` through `notifyUser`, each with bn/en templates containing no message text or secrets.
+Payment and price-alert notifications remain intentionally **not** registered. Phase 11 added only emergency/group notification types through `notifyUser`, each with bn/en templates containing no message text or secrets.
 
-**Phase 11 planned defaults — owner must confirm.** All values will live in the single overridable config module `backend/src/config/advancedFeatures.ts`; the mobile offline cache reads the same module for its max-age value. No Phase 11 feature code is implemented by this Step 0 record.
+**Phase 11 defaults (owner must confirm before production).** All values live in the single overridable config module `backend/src/config/advancedFeatures.ts`; the mobile offline cache reads the same module for its max-age value.
 
-| Setting | Planned default | Environment override |
-|---------|-----------------|----------------------|
-| Reputation minimum reviews | 3 | `REPUTATION_MIN_REVIEWS` |
-| Reputation weights | rating 50%, delivered 30%, low cancel/reject 20%; final score 0–100 | `REPUTATION_WEIGHT_RATING`, `REPUTATION_WEIGHT_DELIVERED`, `REPUTATION_WEIGHT_CANCEL_REJECT` |
-| Emergency discount | 5–50%, maximum 72 hours | `EMERGENCY_DISCOUNT_MIN_PERCENT`, `EMERGENCY_DISCOUNT_MAX_PERCENT`, `EMERGENCY_LISTING_MAX_HOURS` |
-| Group discount | 5–40%, maximum 7 days, maximum 50 participants | `GROUP_DISCOUNT_MIN_PERCENT`, `GROUP_DISCOUNT_MAX_PERCENT`, `GROUP_PURCHASE_MAX_DAYS`, `GROUP_PURCHASE_MAX_PARTICIPANTS` |
-| Price prediction input | at least 20 points spanning 30 days, no point older than 120 days | `PRICE_PREDICTION_MIN_POINTS`, `PRICE_PREDICTION_WINDOW_DAYS`, `PRICE_PREDICTION_MAX_AGE_DAYS` |
-| Price prediction horizon | 7 days, moving average plus linear trend only | `PRICE_PREDICTION_HORIZON_DAYS` |
-| Offline cache maximum age | 24 hours | `OFFLINE_CACHE_MAX_AGE_HOURS` / `EXPO_PUBLIC_OFFLINE_CACHE_MAX_AGE_HOURS` |
+| Setting | Default | Environment override | Status |
+|---------|---------|----------------------|--------|
+| Reputation minimum reviews | 3 | `REPUTATION_MIN_REVIEWS` | Implemented (STEP 1) |
+| Reputation weights | rating 50%, delivered 30%, low cancel/reject 20%; final score 0–100 | `REPUTATION_WEIGHT_RATING`, `REPUTATION_WEIGHT_DELIVERED`, `REPUTATION_WEIGHT_CANCEL_REJECT` | Implemented (STEP 1) |
+| Emergency discount | 5–50%, maximum 72 hours | `EMERGENCY_DISCOUNT_MIN_PERCENT`, `EMERGENCY_DISCOUNT_MAX_PERCENT`, `EMERGENCY_LISTING_MAX_HOURS` | Implemented (STEP 4) |
+| Group discount | 5–40%, maximum 7 days, maximum 50 participants | `GROUP_DISCOUNT_MIN_PERCENT`, `GROUP_DISCOUNT_MAX_PERCENT`, `GROUP_PURCHASE_MAX_DAYS`, `GROUP_PURCHASE_MAX_PARTICIPANTS` | Implemented (STEP 5) |
+| Price prediction input | at least 20 points spanning 30 days, no point older than 120 days | `PRICE_PREDICTION_MIN_POINTS`, `PRICE_PREDICTION_WINDOW_DAYS`, `PRICE_PREDICTION_MAX_AGE_DAYS` | DEFERRED by owner (STEP 6) |
+| Price prediction horizon | 7 days, moving average plus linear trend only | `PRICE_PREDICTION_HORIZON_DAYS` | DEFERRED by owner (STEP 6) |
+| Offline cache maximum age | 24 hours | `OFFLINE_CACHE_MAX_AGE_HOURS` / `EXPO_PUBLIC_OFFLINE_CACHE_MAX_AGE_HOURS` | DEFERRED by owner (STEP 7) |
 
 ---
 
@@ -535,15 +535,16 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 
 ### Phase 11 - Advanced Features
 Implement individually:
-- [ ] Voice assistant
-- [ ] Crop price prediction
-- [ ] Group buying
-- [ ] QR traceability
-- [ ] Harvest calendar
-- [ ] Offline mode
-- [ ] Farmer reputation
+- [x] Farmer reputation (STEP 1)
+- [x] Harvest calendar (STEP 2)
+- [x] QR traceability (STEP 3)
+- [x] Emergency listings / deals (STEP 4)
+- [x] Group buying (STEP 5)
+- [ ] Crop price prediction — **DEFERRED by owner** (STEP 6 not started)
+- [ ] Offline mode — **DEFERRED by owner** (STEP 7 not started)
+- [ ] Voice assistant — **DEFERRED by owner** (STEP 8 not started)
 
-**Result:** advanced AgroConnect features.
+**Result:** partial Phase 11 delivery complete. Reputation, harvest, traceability, emergency listings, and group buying are implemented with backend-owned writes, Firestore rules/indexes, tests, and mobile UI. Price prediction, offline mode, and voice assistant are intentionally deferred by owner scope change after STEP 5; they are not complete.
 
 ### Phase 12 - Admin and Deployment
 - [ ] Admin dashboard

@@ -203,6 +203,22 @@ Pop-Location
 
 ## 7. Manual buyer/farmer smoke test
 
+### Phase 11 implemented smoke checks (local emulator)
+
+- **Reputation (STEP 1):** as buyer, complete an eligible delivered order flow and submit a review; farmer profile/product detail shows backend-computed reputation or "New farmer" when below minimum reviews. Admin can POST `/api/admin/reputation/recompute`.
+- **Harvest calendar (STEP 2):** farmer creates/edits/deletes harvest records; list/calendar views read backend data only.
+- **QR traceability (STEP 3):** farmer creates a batch from owned harvest/product data and gets QR code; authenticated user scans trace code and sees only public trace fields (no private contact/internal IDs).
+- **Emergency listings (STEP 4):** farmer creates/cancels emergency discount (5-50%, max 72h, one active per product/farmer). Buyer sees deal in marketplace/deals; cart/order snapshot uses server-computed effective emergency price.
+- **Group buying (STEP 5):** farmer creates group (5-40%, max 7 days, max 50 participants). Buyers join idempotently; success creates/accepts real orders through canonical path; expiry/failure cancels through canonical path. Admin evaluate endpoint: `POST /api/admin/group-purchases/evaluate`.
+
+### Phase 11 deferred by owner (NOT smoke-tested/implemented)
+
+- **STEP 6 Crop price prediction:** DEFERRED by owner. No prediction endpoint/card/CSV prediction import behavior added in this scope.
+- **STEP 7 Offline mode:** DEFERRED by owner. No TanStack Query persistence, offline banner, write-block queue, or bundled guides added.
+- **STEP 8 Voice assistant:** DEFERRED by owner. No STT/TTS adapters, mic controls, or speech permissions added.
+
+## 7b. Manual buyer/farmer smoke test
+
 1. Open <http://127.0.0.1:4004> and confirm the Auth, Firestore and Storage emulators are active.
 2. In the app, register a **farmer**, create a product, set available stock, and publish it as active.
 3. Log out and register a **buyer** (or use a separate browser profile). Open the marketplace, search/filter for the product, view its detail page, add it to the cart and wishlist, and open the checkout preview.
