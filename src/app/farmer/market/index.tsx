@@ -41,14 +41,14 @@ export default function MarketScreen() {
           label={t('farmer.market.crop')}
           value={crop}
           onChangeText={setCrop}
-          placeholder="Rice"
+          placeholder={t('farmer.market.cropPlaceholder')}
         />
         <TextField
           className="flex-1"
           label={t('common.district')}
           value={district}
           onChangeText={setDistrict}
-          placeholder="Dhaka"
+          placeholder={t('farmer.market.districtPlaceholder')}
         />
       </View>
       <Button label={t('farmer.market.searchAction')} onPress={() => setFilters({ crop: crop.trim(), district: district.trim() })} />

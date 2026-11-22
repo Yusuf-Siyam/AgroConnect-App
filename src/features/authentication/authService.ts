@@ -12,35 +12,7 @@ import { env } from '@/config/env';
 import { getFirebase } from '@/services/firebase';
 import type { RegisterValues } from './schemas';
 
-export type AuthErrorCode =
-  | 'invalid-credentials'
-  | 'email-in-use'
-  | 'weak-password'
-  | 'invalid-email'
-  | 'network'
-  | 'config-missing'
-  | 'unknown';
-
-function errorCode(error: unknown): string {
-  return typeof error === 'object' && error !== null && 'code' in error
-    ? String((error as { code: unknown }).code)
-    : '';
-}
-
-export function toAuthErrorCode(error: unknown): AuthErrorCode {
-  const code = errorCode(error);
-
-  if (code === 'auth/config-missing') return 'config-missing';
-  if (code.includes('wrong-password') || code.includes('user-not-found') || code.includes('invalid-credential')) {
-    return 'invalid-credentials';
-  }
-  if (code.includes('email-already-in-use')) return 'email-in-use';
-  if (code.includes('weak-password')) return 'weak-password';
-  if (code.includes('invalid-email')) return 'invalid-email';
-  if (code.includes('network')) return 'network';
-
-  return 'unknown';
-}
+export { toAuthErrorCode, type AuthErrorCode } from './authErrors';
 
 function assertConfigured(): void {
   if (!env.isFirebaseConfigured) {

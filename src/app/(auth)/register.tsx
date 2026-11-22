@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, router } from 'expo-router';
-import { Controller, useForm } from 'react-hook-form';
-import { useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { View } from 'react-native';
 
 import { AppText } from '@/components/common/AppText';
@@ -11,34 +10,35 @@ import { RolePicker } from '@/components/common/RolePicker';
 import { Screen } from '@/components/common/Screen';
 import { TextField } from '@/components/common/TextField';
 import { authErrorKey, validationKey } from '@/features/authentication/errorMessages';
-import { registerSchema, type RegisterValues } from '@/features/authentication/schemas';
+import { registerFormSchema, type RegisterFormValues } from '@/features/authentication/schemas';
 import { useTranslation } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
-import { homePathForRole, type Role } from '@/types/user';
+import { homePathForRole } from '@/types/user';
 
 export default function RegisterScreen() {
   const { t } = useTranslation();
   const { signUp, errorCode, isConfigured, clearError } = useAuth();
-  const { control, handleSubmit, formState } = useForm<RegisterValues>({
-    resolver: zodResolver(registerSchema),
+  const { control, handleSubmit, formState } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerFormSchema),
     defaultValues: {
       fullName: '',
       email: '',
       phoneNumber: '',
       password: '',
       confirmPassword: '',
-      role: 'farmer',
+      role: '',
       vehicleType: '',
       registrationNumber: '',
     },
   });
 
-  const [selectedRole, setSelectedRole] = useState<Role>('farmer');
+  const selectedRole = useWatch({ control, name: 'role' });
 
   const onSubmit = handleSubmit(async (values) => {
+    if (!values.role) return;
     clearError();
     try {
-      const profile = await signUp(values);
+      const profile = await signUp({ ...values, role: values.role });
       router.replace(homePathForRole(profile.role));
     } catch {
       // Error state is exposed through the auth context.
@@ -74,13 +74,7 @@ export default function RegisterScreen() {
             name="role"
             render={({ field, fieldState }) => (
               <View className="gap-1.5">
-                <RolePicker
-                  value={field.value}
-                  onChange={(role) => {
-                    field.onChange(role);
-                    setSelectedRole(role);
-                  }}
-                />
+                <RolePicker value={field.value} onChange={field.onChange} />
                 {fieldState.error ? <AppText variant="error">{errorFor(fieldState.error.message)}</AppText> : null}
               </View>
             )}

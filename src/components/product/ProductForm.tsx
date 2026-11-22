@@ -181,7 +181,7 @@ export function ProductForm({ product }: { product?: Product }) {
 
           <Card className="gap-4">
             <AppText className="font-semibold">{t('farmer.products.harvestInfo')}</AppText>
-            {field('harvestDate', t('common.harvestDate'), { placeholder: 'YYYY-MM-DD' })}
+            {field('harvestDate', t('common.harvestDate'), { placeholder: t('common.datePlaceholder') })}
             {field('district', t('common.district'))}
             {field('variety', t('common.variety'))}
           </Card>

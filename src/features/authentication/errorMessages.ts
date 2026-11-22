@@ -1,8 +1,9 @@
 import type { TranslationKey } from '@/i18n';
-import type { AuthErrorCode } from './authService';
+import type { AuthErrorCode } from './authErrors';
 
 const authErrorKeys: Record<AuthErrorCode, TranslationKey> = {
   'invalid-credentials': 'error.invalidCredentials',
+  'too-many-attempts': 'error.tooManyAttempts',
   'email-in-use': 'error.emailInUse',
   'weak-password': 'error.weakPassword',
   'invalid-email': 'error.invalidEmail',

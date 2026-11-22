@@ -49,11 +49,12 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "postinstall": "node scripts/ensure-lightningcss-windows.cjs",
     "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-agroconnect",
     "emulators:persist": "firebase emulators:start --only auth,firestore,storage --project demo-agroconnect --import ./emulator-data --export-on-exit ./emulator-data",
     "test:emulators": "firebase emulators:exec --only auth,firestore,storage --project demo-agroconnect \"node scripts/run-emulator-tests.mjs\"",
-    "test:mobile": "tsx --test src/features/chat/chatIds.test.ts src/features/chat/validation.test.ts src/features/chat/notificationText.test.ts src/features/chat/notificationRouting.test.ts",
+    "test:mobile": "tsx --test src/features/chat/chatIds.test.ts src/features/chat/validation.test.ts src/features/chat/notificationText.test.ts src/features/chat/notificationRouting.test.ts src/features/authentication/authErrors.test.ts src/locales/keyParity.test.ts",
     "seed:dev-paid-order": "cd backend && npm run seed:dev-paid-order --"
   },
   "private": true

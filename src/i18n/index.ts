@@ -1,5 +1,3 @@
-import { getLocales } from 'expo-localization';
-
 import { bn } from '@/locales/bn';
 import { en, type TranslationKey } from '@/locales/en';
 import { useLocaleStore } from '@/store/locale';
@@ -11,10 +9,6 @@ const dictionaries: Record<Locale, Record<TranslationKey, string>> = { bn, en };
 
 export function normalizeLocale(value?: string | null): Locale {
   return value?.toLowerCase().startsWith('en') ? 'en' : 'bn';
-}
-
-export function detectDeviceLocale(): Locale {
-  return normalizeLocale(getLocales()[0]?.languageCode);
 }
 
 export function translate(

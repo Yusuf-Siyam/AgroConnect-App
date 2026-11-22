@@ -3,11 +3,13 @@ import { Link } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { View } from 'react-native';
 
+import { env } from '@/config/env';
 import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { Screen } from '@/components/common/Screen';
 import { TextField } from '@/components/common/TextField';
+import { AUTH_EMULATOR_RESET_URL } from '@/features/authentication/emulatorLinks';
 import { authErrorKey, validationKey } from '@/features/authentication/errorMessages';
 import { forgotPasswordSchema, type ForgotPasswordValues } from '@/features/authentication/schemas';
 import { useTranslation } from '@/i18n';
@@ -47,6 +49,11 @@ export default function ForgotPasswordScreen() {
           <Card className="gap-3">
             <AppText className="font-semibold text-success">{t('auth.resetSentTitle')}</AppText>
             <AppText variant="caption">{t('auth.resetSentMessage')}</AppText>
+            {env.useEmulator ? (
+              <AppText variant="caption" className="text-muted">
+                {t('auth.resetEmulatorNote', { url: AUTH_EMULATOR_RESET_URL })}
+              </AppText>
+            ) : null}
           </Card>
         ) : (
           <Card className="gap-4">

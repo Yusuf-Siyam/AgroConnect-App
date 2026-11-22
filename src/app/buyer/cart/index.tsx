@@ -117,7 +117,7 @@ export default function CartScreen() {
                   </AppText>
                   <View className="flex-row items-center gap-3">
                     <Button
-                      label="-"
+                      label={t('common.decrease')}
                       variant="outline"
                       disabled={item.quantity <= item.minOrderQty}
                       onPress={() =>
@@ -126,7 +126,7 @@ export default function CartScreen() {
                     />
                     <AppText>{item.quantity}</AppText>
                     <Button
-                      label="+"
+                      label={t('common.increase')}
                       variant="outline"
                       disabled={item.quantity >= item.stock}
                       onPress={() =>

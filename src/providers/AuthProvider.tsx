@@ -24,6 +24,7 @@ import { parseRole, parseUserProfile } from '@/features/authentication/profile';
 import type { ForgotPasswordValues, LoginValues, RegisterValues } from '@/features/authentication/schemas';
 import { patchMyProfile, setAuthTokenProvider, type ProfileUpdate } from '@/services/api';
 import { getFirebase } from '@/services/firebase';
+import type { Locale } from '@/types/locale';
 import type { Role, UserProfile } from '@/types/user';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -41,6 +42,8 @@ type AuthContextValue = {
   logout: () => Promise<void>;
   refreshProfile: () => Promise<UserProfile | null>;
   updateProfile: (values: ProfileUpdate) => Promise<UserProfile>;
+  /** Best-effort mirror of the device locale choice to the profile endpoint. */
+  syncPreferredLanguage: (locale: Locale) => Promise<void>;
   clearError: () => void;
 };
 
@@ -277,6 +280,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loadProfile, wrap],
   );
 
+  const syncPreferredLanguage = useCallback(async (locale: Locale) => {
+    const user = userRef.current;
+    if (!user || !env.isApiConfigured) return;
+
+    try {
+      const remote = await patchMyProfile({ preferredLanguage: locale });
+      setProfile(remote);
+    } catch {
+      // A failed server mirror must never undo or crash the local choice.
+      // The device persists the selection independently in the locale store.
+    }
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -291,9 +307,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       refreshProfile,
       updateProfile,
+      syncPreferredLanguage,
       clearError: () => setErrorCode(null),
     }),
-    [status, firebaseUser, profile, errorCode, signIn, signUp, resetPassword, logout, refreshProfile, updateProfile],
+    [
+      status,
+      firebaseUser,
+      profile,
+      errorCode,
+      signIn,
+      signUp,
+      resetPassword,
+      logout,
+      refreshProfile,
+      updateProfile,
+      syncPreferredLanguage,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

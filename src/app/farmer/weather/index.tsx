@@ -134,7 +134,7 @@ function WeatherFallback({
         label={t('farmer.weather.manualDistrict')}
         value={district}
         onChangeText={setDistrict}
-        placeholder="Dhaka"
+        placeholder={t('farmer.weather.districtPlaceholder')}
       />
       <Button label={t('farmer.weather.loadDistrict')} variant="outline" disabled={!canLoad} onPress={onLoad} />
     </Card>

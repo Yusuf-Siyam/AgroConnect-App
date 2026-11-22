@@ -29,6 +29,7 @@ junit.xml
 
 # Local Firebase emulator export (contains user data; never commit)
 emulator-data/
+firebase-export-*
 
 # Environment variables, credentials and service accounts
 .env

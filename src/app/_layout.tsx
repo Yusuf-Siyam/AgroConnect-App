@@ -9,6 +9,7 @@ import { NotificationBridge } from '@/components/chat/NotificationBridge';
 import { SplashScreen } from '@/components/common/SplashScreen';
 import { AppLocaleProvider } from '@/providers/AppLocaleProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
+import { LanguagePreferenceSync } from '@/providers/LanguagePreferenceSync';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +49,7 @@ function RootContent() {
 
   return (
     <>
+      <LanguagePreferenceSync />
       <NotificationBridge />
       <AppNavigator />
     </>

@@ -157,7 +157,7 @@ export default function TransporterJobDetailScreen() {
             keyboardType="number-pad"
             maxLength={6}
             error={codeError ?? undefined}
-            placeholder="000000"
+            placeholder={t('transporter.jobDetail.codePlaceholder')}
           />
           <Button
             label={t('transporter.jobDetail.deliverAction')}

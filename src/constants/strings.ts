@@ -1,3 +1,5 @@
-// Foundation display strings. Full Bangla/English localization is added in Phase 04.
-export const APP_NAME = 'AgroConnect';
-export const TAGLINE = 'Connecting Farmers. Empowering Agriculture.';
+import { en } from '@/locales/en';
+
+// Compatibility aliases. The dictionaries remain the single source of truth.
+export const APP_NAME = en['common.appName'];
+export const TAGLINE = en['common.tagline'];
