@@ -116,7 +116,7 @@ describe('Phase 11 group purchase emulator verification', () => {
     assert.equal(bad.status, 400);
   });
 
-  it('allows buyer join idempotently and creates deterministic pending group order', async () => {
+  it('join creates no order and does not change stock', async () => {
     const farmer = await registerUser('gp-farmer2', 'farmer');
     const buyer = await registerUser('gp-buyer2', 'buyer');
     const product = await createProduct(farmer, { id: randomUUID(), stock: 50 });
@@ -128,24 +128,25 @@ describe('Phase 11 group purchase emulator verification', () => {
 
     const join1 = await fetchAs(`/api/group-purchases/${group.id}/join`, buyer.token, { method: 'POST', body: '{}' });
     assert.equal(join1.status, 201, await join1.clone().text());
-    const j1 = await join1.json() as { orderId: string; participant: { buyerId: string } };
-    assert.equal(j1.orderId, `gp_${group.id}_${buyer.uid}`);
+    const j1 = await join1.json() as { participant: { buyerId: string; quantity: number }; group: { committedQuantity: number } };
+    assert.equal(j1.participant.buyerId, buyer.uid);
+    assert.equal(j1.participant.quantity, 10);
+    assert.equal(j1.group.committedQuantity, 10);
 
+    // joining twice is idempotent
     const join2 = await fetchAs(`/api/group-purchases/${group.id}/join`, buyer.token, { method: 'POST', body: '{}' });
-    assert.equal(join2.status, 201);
-    const j2 = await join2.json() as { orderId: string };
-    assert.equal(j2.orderId, j1.orderId);
+    assert.equal(join2.status, 201, await join2.clone().text());
+    const j2 = await join2.json() as { group: { committedQuantity: number } };
+    assert.equal(j2.group.committedQuantity, 10);
 
-    const orderRes = await fetchAs(`/api/orders/${j1.orderId}`, buyer.token);
-    assert.equal(orderRes.status, 200);
-    const order = await orderRes.json() as { status: string; totalAmount: number; items: Array<{ priceSource: string; discountPercent?: number }> };
-    assert.equal(order.status, 'pending');
-    assert.equal(order.items[0].priceSource, 'group');
-    assert.equal(order.items[0].discountPercent, 10);
-    assert.equal(order.totalAmount, 900);
+    const orderRes = await fetchAs(`/api/orders/gp_${group.id}_${buyer.uid}`, buyer.token);
+    assert.equal(orderRes.status, 404);
+
+    const prod = await (await fetchAs(`/api/products/${product.id}`, farmer.token)).json() as { stock: number };
+    assert.equal(prod.stock, 50);
   });
 
-  it('finalizes successful group by confirming participant orders through canonical path', async () => {
+  it('target reached creates exactly one pending order per participant with the group price', async () => {
     const farmer = await registerUser('gp-farmer3', 'farmer');
     const buyer1 = await registerUser('gp-buyer3a', 'buyer');
     const buyer2 = await registerUser('gp-buyer3b', 'buyer');
@@ -162,13 +163,18 @@ describe('Phase 11 group purchase emulator verification', () => {
     const g = await final.json() as { status: string };
     assert.equal(g.status, 'successful');
 
-    const o1 = await (await fetchAs(`/api/orders/gp_${group.id}_${buyer1.uid}`, buyer1.token)).json() as { status: string };
-    const o2 = await (await fetchAs(`/api/orders/gp_${group.id}_${buyer2.uid}`, buyer2.token)).json() as { status: string };
-    assert.equal(o1.status, 'accepted');
-    assert.equal(o2.status, 'accepted');
+    const o1 = await (await fetchAs(`/api/orders/gp_${group.id}_${buyer1.uid}`, buyer1.token)).json() as { status: string; source?: string; items: Array<{ unitPrice: number; baseUnitPrice: number; discountPercent?: number; priceSource: string; quantity: number }> };
+    const o2 = await (await fetchAs(`/api/orders/gp_${group.id}_${buyer2.uid}`, buyer2.token)).json() as { status: string; items: Array<{ unitPrice: number; priceSource: string }> };
+    assert.equal(o1.status, 'pending');
+    assert.equal(o2.status, 'pending');
+    assert.equal(o1.items[0].priceSource, 'group');
+    assert.equal(o1.items[0].discountPercent, 10);
+    assert.equal(o1.items[0].unitPrice, 90);
+    assert.equal(o1.items[0].baseUnitPrice, 100);
+    assert.equal(o1.items[0].quantity, 10);
   });
 
-  it('fails expired open group, cancels pending group orders, and notifies participants', async () => {
+  it('fails expired open group with no orders and notifies participants', async () => {
     const farmer = await registerUser('gp-farmer4', 'farmer');
     const buyer = await registerUser('gp-buyer4', 'buyer');
     const adminUser = await registerUser('gp-admin4', 'buyer');
@@ -187,9 +193,189 @@ describe('Phase 11 group purchase emulator verification', () => {
 
     const g = await (await fetchAs(`/api/group-purchases/${group.id}`, buyer.token)).json() as { status: string };
     assert.equal(g.status, 'failed');
-    const order = await (await fetchAs(`/api/orders/gp_${group.id}_${buyer.uid}`, buyer.token)).json() as { status: string };
-    assert.equal(order.status, 'cancelled');
+    const orderRes = await fetchAs(`/api/orders/gp_${group.id}_${buyer.uid}`, buyer.token);
+    assert.equal(orderRes.status, 404);
 
+    const notifs = await admin.firestore.collection('notifications').where('userId', '==', buyer.uid).where('type', '==', 'group_failed').get();
+    assert.ok(notifs.size >= 1);
+  });
+
+  it('notifies every participant and the farmer when a group purchase succeeds', async () => {
+    const farmer = await registerUser('gp-farmer5', 'farmer');
+    const buyer1 = await registerUser('gp-buyer5a', 'buyer');
+    const buyer2 = await registerUser('gp-buyer5b', 'buyer');
+    const product = await createProduct(farmer, { id: randomUUID(), stock: 50, price: 100 });
+    const create = await fetchAs('/api/group-purchases', farmer.token, {
+      method: 'POST',
+      body: JSON.stringify({ productId: product.id, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 2, deadlineInDays: 3 }),
+    });
+    const group = await create.json() as { id: string };
+    await fetchAs(`/api/group-purchases/${group.id}/join`, buyer1.token, { method: 'POST', body: '{}' });
+    await fetchAs(`/api/group-purchases/${group.id}/join`, buyer2.token, { method: 'POST', body: '{}' });
+
+    const final = await fetchAs(`/api/group-purchases/${group.id}`, buyer1.token);
+    assert.equal(final.status, 200);
+    const g = await final.json() as { status: string };
+    assert.equal(g.status, 'successful');
+
+    for (const uid of [buyer1.uid, buyer2.uid, farmer.uid]) {
+      const notifs = await admin.firestore.collection('notifications').where('userId', '==', uid).where('type', '==', 'group_successful').get();
+      assert.ok(notifs.size >= 1, `expected group_successful notification for ${uid}`);
+    }
+  });
+
+  it('rejects join when quantity exceeds available stock', async () => {
+    const farmer = await registerUser('gp-stock-farmer', 'farmer');
+    const buyer1 = await registerUser('gp-stock-buyer1', 'buyer');
+    const buyer2 = await registerUser('gp-stock-buyer2', 'buyer');
+    const product = await createProduct(farmer, { id: randomUUID(), stock: 15 });
+    const create = await fetchAs('/api/group-purchases', farmer.token, {
+      method: 'POST',
+      body: JSON.stringify({ productId: product.id, targetQuantity: 10, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 2, deadlineInDays: 3 }),
+    });
+    assert.equal(create.status, 201, await create.clone().text());
+    const group = await create.json() as { id: string };
+    const join1 = await fetchAs(`/api/group-purchases/${group.id}/join`, buyer1.token, { method: 'POST', body: '{}' });
+    assert.equal(join1.status, 201, await join1.clone().text());
+    const join2 = await fetchAs(`/api/group-purchases/${group.id}/join`, buyer2.token, { method: 'POST', body: '{}' });
+    assert.equal(join2.status, 409);
+  });
+
+  it('allows a buyer to leave while deal is open', async () => {
+    const farmer = await registerUser('gp-leave-farmer', 'farmer');
+    const buyer = await registerUser('gp-leave-buyer', 'buyer');
+    const product = await createProduct(farmer, { id: randomUUID(), stock: 50 });
+    const create = await fetchAs('/api/group-purchases', farmer.token, {
+      method: 'POST',
+      body: JSON.stringify({ productId: product.id, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 5, deadlineInDays: 3 }),
+    });
+    const group = await create.json() as { id: string };
+    await fetchAs(`/api/group-purchases/${group.id}/join`, buyer.token, { method: 'POST', body: '{}' });
+    const leave = await fetchAs(`/api/group-purchases/${group.id}/leave`, buyer.token, { method: 'POST', body: '{}' });
+    assert.equal(leave.status, 200, await leave.clone().text());
+    const g = await leave.json() as { committedQuantity: number; participantCount: number };
+    assert.equal(g.committedQuantity, 0);
+    assert.equal(g.participantCount, 0);
+  });
+
+  it('blocks leave after group success', async () => {
+    const farmer = await registerUser('gp-leave2-farmer', 'farmer');
+    const buyer1 = await registerUser('gp-leave2-buyer1', 'buyer');
+    const buyer2 = await registerUser('gp-leave2-buyer2', 'buyer');
+    const product = await createProduct(farmer, { id: randomUUID(), stock: 50 });
+    const create = await fetchAs('/api/group-purchases', farmer.token, {
+      method: 'POST',
+      body: JSON.stringify({ productId: product.id, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 2, deadlineInDays: 3 }),
+    });
+    const group = await create.json() as { id: string };
+    await fetchAs(`/api/group-purchases/${group.id}/join`, buyer1.token, { method: 'POST', body: '{}' });
+    await fetchAs(`/api/group-purchases/${group.id}/join`, buyer2.token, { method: 'POST', body: '{}' });
+    await fetchAs(`/api/group-purchases/${group.id}`, buyer1.token);
+    const leave = await fetchAs(`/api/group-purchases/${group.id}/leave`, buyer1.token, { method: 'POST', body: '{}' });
+    assert.equal(leave.status, 409);
+  });
+
+  it('evaluation twice creates no duplicate orders', async () => {
+    const farmer = await registerUser('gp-dup-farmer', 'farmer');
+    const buyer1 = await registerUser('gp-dup-buyer1', 'buyer');
+    const buyer2 = await registerUser('gp-dup-buyer2', 'buyer');
+    const product = await createProduct(farmer, { id: randomUUID(), stock: 50 });
+    const create = await fetchAs('/api/group-purchases', farmer.token, {
+      method: 'POST',
+      body: JSON.stringify({ productId: product.id, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 2, deadlineInDays: 3 }),
+    });
+    const group = await create.json() as { id: string };
+    await fetchAs(`/api/group-purchases/${group.id}/join`, buyer1.token, { method: 'POST', body: '{}' });
+    await fetchAs(`/api/group-purchases/${group.id}/join`, buyer2.token, { method: 'POST', body: '{}' });
+    await fetchAs(`/api/group-purchases/${group.id}`, buyer1.token);
+    await fetchAs(`/api/group-purchases/${group.id}`, buyer1.token);
+    const evalRes = await fetchAs('/api/admin/group-purchases/evaluate', (await (async () => { const a = await registerUser('gp-dup-admin', 'buyer'); await admin.firestore.collection('users').doc(a.uid).set({ role: 'admin' }, { merge: true }); return a; })()).token, { method: 'POST', body: '{}' });
+    assert.equal(evalRes.status, 200);
+    const orders = await admin.firestore.collection('orders').where('groupId', '==', group.id).get();
+    assert.equal(orders.size, 2);
+  });
+
+  it('counts two simultaneous joins correctly', async () => {
+    const farmer = await registerUser('gp-race-farmer', 'farmer');
+    const buyer1 = await registerUser('gp-race-buyer1', 'buyer');
+    const buyer2 = await registerUser('gp-race-buyer2', 'buyer');
+    const product = await createProduct(farmer, { id: randomUUID(), stock: 50 });
+    const create = await fetchAs('/api/group-purchases', farmer.token, {
+      method: 'POST',
+      body: JSON.stringify({ productId: product.id, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 5, deadlineInDays: 3 }),
+    });
+    const group = await create.json() as { id: string };
+    const [r1, r2] = await Promise.all([
+      fetchAs(`/api/group-purchases/${group.id}/join`, buyer1.token, { method: 'POST', body: '{}' }),
+      fetchAs(`/api/group-purchases/${group.id}/join`, buyer2.token, { method: 'POST', body: '{}' }),
+    ]);
+    assert.equal(r1.status, 201);
+    assert.equal(r2.status, 201);
+    const g = await (await fetchAs(`/api/group-purchases/${group.id}`, buyer1.token)).json() as { participantCount: number; committedQuantity: number };
+    assert.equal(g.participantCount, 2);
+    assert.equal(g.committedQuantity, 20);
+  });
+
+  it('fails with stock_unavailable and creates no orders when stock is insufficient at success', async () => {
+    const farmer = await registerUser('gp-short-farmer', 'farmer');
+    const buyer1 = await registerUser('gp-short-buyer1', 'buyer');
+    const buyer2 = await registerUser('gp-short-buyer2', 'buyer');
+    const adminUser = await registerUser('gp-short-admin', 'buyer');
+    await admin.firestore.collection('users').doc(adminUser.uid).set({ role: 'admin' }, { merge: true });
+    const product = await createProduct(farmer, { id: randomUUID(), stock: 20 });
+    const create = await fetchAs('/api/group-purchases', farmer.token, {
+      method: 'POST',
+      body: JSON.stringify({ productId: product.id, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 2, deadlineInDays: 3 }),
+    });
+    const group = await create.json() as { id: string };
+    // Insert participants directly to reach target without triggering eager finalize on join path, then reduce stock before evaluation.
+    const now = new Date().toISOString();
+    for (const b of [buyer1, buyer2]) {
+      await admin.firestore.collection('groupPurchases').doc(group.id).collection('participants').doc(b.uid).set({
+        groupId: group.id, buyerId: b.uid, quantity: 10, joinedAt: now, status: 'joined',
+      });
+    }
+    await admin.firestore.collection('groupPurchases').doc(group.id).set({ participantCount: 2, committedQuantity: 20 }, { merge: true });
+    await admin.firestore.collection('products').doc(product.id as string).set({ stock: 5 }, { merge: true });
+    const evalRes = await fetchAs('/api/admin/group-purchases/evaluate', adminUser.token, { method: 'POST', body: '{}' });
+    assert.equal(evalRes.status, 200, await evalRes.clone().text());
+    const g = await (await fetchAs(`/api/group-purchases/${group.id}`, buyer1.token)).json() as { status: string; failureReason?: string };
+    assert.equal(g.status, 'failed');
+    assert.equal(g.failureReason, 'stock_unavailable');
+    const orders = await admin.firestore.collection('orders').where('groupId', '==', group.id).get();
+    assert.equal(orders.size, 0);
+  });
+
+  it('farmer sees no group orders before success', async () => {
+    const farmer = await registerUser('gp-noshow-farmer', 'farmer');
+    const buyer = await registerUser('gp-noshow-buyer', 'buyer');
+    const product = await createProduct(farmer, { id: randomUUID(), stock: 50 });
+    const create = await fetchAs('/api/group-purchases', farmer.token, {
+      method: 'POST',
+      body: JSON.stringify({ productId: product.id, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 5, deadlineInDays: 3 }),
+    });
+    const group = await create.json() as { id: string };
+    await fetchAs(`/api/group-purchases/${group.id}/join`, buyer.token, { method: 'POST', body: '{}' });
+    const ordersRes = await fetchAs('/api/orders', farmer.token);
+    assert.equal(ordersRes.status, 200, await ordersRes.clone().text());
+    const body = await ordersRes.json() as { items: Array<{ groupId?: string }> };
+    assert.equal(body.items.filter((o) => o.groupId === group.id).length, 0);
+  });
+
+  it('group_failed notifies participants', async () => {
+    const farmer = await registerUser('gp-failnotif-farmer', 'farmer');
+    const buyer = await registerUser('gp-failnotif-buyer', 'buyer');
+    const adminUser = await registerUser('gp-failnotif-admin', 'buyer');
+    await admin.firestore.collection('users').doc(adminUser.uid).set({ role: 'admin' }, { merge: true });
+    const product = await createProduct(farmer, { id: randomUUID(), stock: 50 });
+    const create = await fetchAs('/api/group-purchases', farmer.token, {
+      method: 'POST',
+      body: JSON.stringify({ productId: product.id, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 5, deadlineInDays: 1 }),
+    });
+    const group = await create.json() as { id: string };
+    await fetchAs(`/api/group-purchases/${group.id}/join`, buyer.token, { method: 'POST', body: '{}' });
+    await admin.firestore.collection('groupPurchases').doc(group.id).set({ deadline: new Date(Date.now() - 3600_000).toISOString() }, { merge: true });
+    await fetchAs('/api/admin/group-purchases/evaluate', adminUser.token, { method: 'POST', body: '{}' });
     const notifs = await admin.firestore.collection('notifications').where('userId', '==', buyer.uid).where('type', '==', 'group_failed').get();
     assert.ok(notifs.size >= 1);
   });

@@ -6,7 +6,7 @@ import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { Screen } from '@/components/common/Screen';
-import { getGroupPurchase, joinGroupPurchase, type GroupPurchase } from '@/features/buyer/groupService';
+import { getGroupPurchase, joinGroupPurchase, leaveGroupPurchase, type GroupPurchase } from '@/features/buyer/groupService';
 import { useTranslation } from '@/i18n';
 
 export default function BuyerGroupDetailScreen() {
@@ -15,6 +15,7 @@ export default function BuyerGroupDetailScreen() {
   const [group, setGroup] = useState<GroupPurchase | null>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -44,6 +45,20 @@ export default function BuyerGroupDetailScreen() {
     }
   };
 
+  const onLeave = async () => {
+    if (!id) return;
+    setLeaving(true);
+    try {
+      const next = await leaveGroupPurchase(id);
+      setGroup(next);
+      Alert.alert(t('common.success'), t('buyer.groups.left'));
+    } catch {
+      Alert.alert(t('common.error'), t('buyer.groups.leaveError'));
+    } finally {
+      setLeaving(false);
+    }
+  };
+
   if (loading) return <Screen><ActivityIndicator /></Screen>;
   if (!group) return <Screen><AppText>{t('buyer.groups.notFound')}</AppText></Screen>;
 
@@ -64,9 +79,18 @@ export default function BuyerGroupDetailScreen() {
           {t('buyer.groups.progress', { committed: group.committedQuantity, target: group.targetQuantity, unit: group.unit })}
         </AppText>
         <AppText className="text-xs text-gray-600 mt-1">{t('buyer.groups.participants', { count: group.participantCount, max: group.maxParticipants })}</AppText>
+        {group.myParticipant ? (
+          <AppText className="text-xs text-green-700 mt-2">{t('buyer.groups.joinedQty', { qty: group.myParticipant.quantity, unit: group.unit })}</AppText>
+        ) : null}
+        {group.status === 'failed' && group.failureReason === 'stock_unavailable' ? (
+          <AppText className="text-xs text-red-600 mt-2">{t('buyer.groups.failureStockUnavailable')}</AppText>
+        ) : null}
       </Card>
-      {group.status === 'open' ? (
+      {group.status === 'open' && !group.myParticipant ? (
         <Button className="mt-4" label={joining ? t('common.loading') : t('buyer.groups.join')} onPress={() => void onJoin()} disabled={joining} />
+      ) : null}
+      {group.status === 'open' && group.myParticipant ? (
+        <Button variant="outline" className="mt-3" label={leaving ? t('common.loading') : t('buyer.groups.leave')} onPress={() => void onLeave()} disabled={leaving} />
       ) : null}
     </Screen>
   );

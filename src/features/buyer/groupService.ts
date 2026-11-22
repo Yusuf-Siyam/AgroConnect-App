@@ -2,6 +2,14 @@ import { z } from 'zod';
 
 import { api } from '@/services/api';
 
+const participantSchema = z.object({
+  groupId: z.string(),
+  buyerId: z.string(),
+  quantity: z.number(),
+  joinedAt: z.string(),
+  status: z.enum(['joined', 'cancelled']),
+}).nullable();
+
 const groupSchema = z.object({
   id: z.string(),
   creatorId: z.string(),
@@ -16,6 +24,8 @@ const groupSchema = z.object({
   status: z.enum(['open', 'successful', 'failed', 'cancelled']),
   participantCount: z.number(),
   committedQuantity: z.number(),
+  failureReason: z.enum(['stock_unavailable']).optional(),
+  myParticipant: participantSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -25,12 +35,10 @@ const joinResponseSchema = z.object({
   participant: z.object({
     groupId: z.string(),
     buyerId: z.string(),
-    orderId: z.string(),
     quantity: z.number(),
     joinedAt: z.string(),
     status: z.enum(['joined', 'cancelled']),
   }),
-  orderId: z.string(),
 });
 
 const listSchema = z.object({
@@ -53,6 +61,10 @@ export async function getGroupPurchase(groupId: string): Promise<GroupPurchase> 
   return groupSchema.parse(await api.get<unknown>(`/api/group-purchases/${groupId}`));
 }
 
-export async function joinGroupPurchase(groupId: string): Promise<GroupJoinResponse> {
-  return joinResponseSchema.parse(await api.post<unknown>(`/api/group-purchases/${groupId}/join`, {}));
+export async function joinGroupPurchase(groupId: string, quantity?: number): Promise<GroupJoinResponse> {
+  return joinResponseSchema.parse(await api.post<unknown>(`/api/group-purchases/${groupId}/join`, quantity ? { quantity } : {}));
+}
+
+export async function leaveGroupPurchase(groupId: string): Promise<GroupPurchase> {
+  return groupSchema.parse(await api.post<unknown>(`/api/group-purchases/${groupId}/leave`, {}));
 }

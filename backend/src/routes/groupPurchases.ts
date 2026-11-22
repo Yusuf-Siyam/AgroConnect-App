@@ -6,14 +6,17 @@ import { createRateLimiter } from '../middleware/rateLimit';
 import {
   cancelGroupPurchase,
   createGroupPurchase,
+  getGroupParticipation,
   getGroupPurchase,
   joinGroupPurchase,
+  leaveGroupPurchase,
   listGroupPurchases,
 } from '../services/groupPurchase';
 import {
   createGroupPurchaseSchema,
   groupPurchaseIdParamSchema,
   groupPurchaseQuerySchema,
+  joinGroupPurchaseSchema,
 } from '../validators/groupPurchase';
 import { emptyQuerySchema, validationMessage } from '../validators/validation';
 
@@ -47,7 +50,11 @@ export function createGroupPurchasesRouter(): Router {
       return;
     }
     try {
-      res.json(await getGroupPurchase(params.data.groupId));
+      const group = await getGroupPurchase(params.data.groupId);
+      const myParticipant = req.auth?.role === 'buyer'
+        ? await getGroupParticipation(params.data.groupId, req.auth.uid)
+        : null;
+      res.json({ ...group, myParticipant });
     } catch (error) {
       next(error);
     }
@@ -68,6 +75,24 @@ export function createGroupPurchasesRouter(): Router {
 
   router.post('/:groupId/join', requireRole('buyer'), async (req, res, next) => {
     const params = groupPurchaseIdParamSchema.safeParse(req.params);
+    const body = joinGroupPurchaseSchema.safeParse(req.body ?? {});
+    if (!params.success) {
+      next(new HttpError(400, 'VALIDATION_ERROR', validationMessage(params.error)));
+      return;
+    }
+    if (!body.success) {
+      next(new HttpError(400, 'VALIDATION_ERROR', validationMessage(body.error)));
+      return;
+    }
+    try {
+      res.status(201).json(await joinGroupPurchase(params.data.groupId, req.auth!.uid, body.data));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/:groupId/leave', requireRole('buyer'), async (req, res, next) => {
+    const params = groupPurchaseIdParamSchema.safeParse(req.params);
     const body = emptyQuerySchema.safeParse(req.body ?? {});
     if (!params.success) {
       next(new HttpError(400, 'VALIDATION_ERROR', validationMessage(params.error)));
@@ -78,7 +103,7 @@ export function createGroupPurchasesRouter(): Router {
       return;
     }
     try {
-      res.status(201).json(await joinGroupPurchase(params.data.groupId, req.auth!.uid));
+      res.json(await leaveGroupPurchase(params.data.groupId, req.auth!.uid));
     } catch (error) {
       next(error);
     }

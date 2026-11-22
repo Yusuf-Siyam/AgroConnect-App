@@ -42,5 +42,12 @@ export const groupPurchaseQuerySchema = z
 
 export const groupPurchaseIdParamSchema = z.object({ groupId: idSchema }).strict();
 
+export const joinGroupPurchaseSchema = z
+  .object({
+    quantity: z.number().int().positive().max(100_000).optional(),
+  })
+  .strict();
+
 export type CreateGroupPurchaseInput = z.infer<typeof createGroupPurchaseSchema>;
 export type GroupPurchaseQuery = z.infer<typeof groupPurchaseQuerySchema>;
+export type JoinGroupPurchaseInput = z.infer<typeof joinGroupPurchaseSchema>;

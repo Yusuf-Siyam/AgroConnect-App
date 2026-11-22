@@ -18,6 +18,7 @@ export type GroupPurchase = {
   status: GroupPurchaseStatus;
   participantCount: number;
   committedQuantity: number;
+  failureReason?: 'stock_unavailable';
   createdAt: string;
   updatedAt: string;
 };
@@ -25,7 +26,6 @@ export type GroupPurchase = {
 export type GroupParticipant = {
   groupId: string;
   buyerId: string;
-  orderId: string;
   quantity: number;
   joinedAt: string;
   status: GroupParticipantStatus;
@@ -41,5 +41,4 @@ export type GroupPurchaseListResponse = {
 export type GroupPurchaseJoinResponse = {
   group: GroupPurchase;
   participant: GroupParticipant;
-  orderId: string;
 };

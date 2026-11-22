@@ -56,4 +56,22 @@ describe('notification templates', () => {
       }
     }
   });
+
+  it('renders emergency notification templates in bn and en without secrets', () => {
+    const params = { listingId: 'listing-1', productId: 'product-1' };
+    for (const type of ['emergency_listing_created', 'emergency_listing_cancelled'] as const) {
+      for (const locale of ['bn', 'en'] as const) {
+        const text = renderNotification(locale, type, params);
+        assert.ok(text.title.length > 0, `${type}/${locale} title`);
+        assert.ok(text.body.length > 0, `${type}/${locale} body`);
+        const serialized = JSON.stringify(text).toLowerCase();
+        assert.ok(!serialized.includes('secret'));
+        assert.ok(!serialized.includes('token'));
+        assert.ok(!serialized.includes('password'));
+        assert.ok(!serialized.includes('apikey'));
+        assert.ok(!serialized.includes('listing-1'));
+        assert.ok(!serialized.includes('product-1'));
+      }
+    }
+  });
 });

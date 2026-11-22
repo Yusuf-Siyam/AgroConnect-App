@@ -11,8 +11,8 @@ import type {
 } from '../types/groupPurchase';
 import type { CreateGroupPurchaseInput, GroupPurchaseQuery } from '../validators/groupPurchase';
 import { notifyUser } from './notifications';
-import { finalizeGroupOrder, getOrder, materializeGroupOrder, restoreGroupOrder } from './order';
-import { requireOwnedProduct } from './product';
+
+import { parseStoredProduct, requireOwnedProduct } from './product';
 
 type TimestampLike = { toDate?: () => Date };
 
@@ -30,6 +30,7 @@ const groupSchema = z.object({
   status: z.enum(['open', 'successful', 'failed', 'cancelled']),
   participantCount: z.number().int().min(0),
   committedQuantity: z.number().int().min(0),
+  failureReason: z.enum(['stock_unavailable']).optional(),
   createdAt: z.unknown(),
   updatedAt: z.unknown(),
 });
@@ -37,7 +38,6 @@ const groupSchema = z.object({
 const participantSchema = z.object({
   groupId: z.string().min(1),
   buyerId: z.string().min(1),
-  orderId: z.string().min(1),
   quantity: z.number().int().positive(),
   joinedAt: z.string(),
   status: z.enum(['joined', 'cancelled']),
@@ -54,7 +54,12 @@ function toIso(value: unknown): string {
 
 function parseGroup(data: unknown): GroupPurchase {
   const raw = groupSchema.parse(data);
-  return { ...raw, createdAt: toIso(raw.createdAt), updatedAt: toIso(raw.updatedAt) };
+  return {
+    ...raw,
+    ...(raw.failureReason ? { failureReason: raw.failureReason } : {}),
+    createdAt: toIso(raw.createdAt),
+    updatedAt: toIso(raw.updatedAt),
+  };
 }
 
 function parseParticipant(data: unknown): GroupParticipant {
@@ -88,68 +93,136 @@ function evaluateStatus(group: GroupPurchase, now = new Date()): GroupPurchase['
 
 async function notifyParticipants(group: GroupPurchase, type: 'group_successful' | 'group_failed'): Promise<void> {
   const snap = await participants(group.id).where('status', '==', 'joined').get();
+  const targets = snap.docs.map((doc) => parseParticipant(doc.data()).buyerId);
+  if (type === 'group_successful') targets.push(group.farmerId);
+  const uniqueTargets = [...new Set(targets)];
   await Promise.all(
-    snap.docs.map(async (doc) => {
-      const participant = parseParticipant(doc.data());
-      await notifyUser(
-        participant.buyerId,
+    uniqueTargets.map(async (userId) =>
+      notifyUser(
+        userId,
         type,
         { groupId: group.id, productId: group.productId },
         { productId: group.productId, url: `/buyer/groups/${group.id}` },
-      ).catch(() => undefined);
-    }),
+      ).catch(() => undefined),
+    ),
   );
 }
 
 async function finalizeGroup(groupId: string): Promise<GroupPurchase> {
+  const { firestore } = getFirebaseAdmin();
   const currentSnap = await groupDoc(groupId).get();
   if (!currentSnap.exists) throw new HttpError(404, 'GROUP_PURCHASE_NOT_FOUND', 'Group purchase not found.');
   let group = parseGroup(currentSnap.data());
   const next = evaluateStatus(group);
   if (next === group.status) return group;
 
-  const joined = (await participants(groupId).where('status', '==', 'joined').get()).docs.map((d) => parseParticipant(d.data()));
+  const joinedSnap = await participants(groupId).where('status', '==', 'joined').get();
+  const joined = joinedSnap.docs.map((d) => parseParticipant(d.data()));
 
   if (next === 'successful') {
-    for (const participant of joined) {
-      let order = await getOrder(participant.orderId);
-      if (!order) {
-        order = await materializeGroupOrder({
-          orderId: participant.orderId,
+    // Re-check stock and create pending orders atomically per group; deterministic IDs prevent duplicates.
+    const outcome = await firestore.runTransaction(async (tx) => {
+      const gSnap = await tx.get(groupDoc(groupId));
+      if (!gSnap.exists) throw new HttpError(404, 'GROUP_PURCHASE_NOT_FOUND', 'Group purchase not found.');
+      const g = parseGroup(gSnap.data());
+      if (g.status !== 'open') return { status: g.status as GroupPurchase['status'], reason: g.failureReason };
+      const now = new Date();
+      if (g.committedQuantity < g.targetQuantity && new Date(g.deadline).getTime() <= now.getTime()) {
+        tx.set(groupDoc(groupId), { status: 'failed', updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        return { status: 'failed' as const, reason: undefined };
+      }
+      if (g.committedQuantity < g.targetQuantity) return { status: 'open' as const, reason: undefined };
+
+      const pSnap = await tx.get(participants(groupId).where('status', '==', 'joined'));
+      const participantsJoined = pSnap.docs.map((d) => parseParticipant(d.data()));
+      const productRef = firestore.collection('products').doc(g.productId);
+      const productSnap = await tx.get(productRef);
+      if (!productSnap.exists) {
+        tx.set(groupDoc(groupId), { status: 'failed', failureReason: 'stock_unavailable', updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        return { status: 'failed' as const, reason: 'stock_unavailable' as const };
+      }
+      let product: ReturnType<typeof parseStoredProduct>;
+      try {
+        product = parseStoredProduct(productSnap.data());
+      } catch {
+        tx.set(groupDoc(groupId), { status: 'failed', failureReason: 'stock_unavailable', updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        return { status: 'failed' as const, reason: 'stock_unavailable' as const };
+      }
+      const required = participantsJoined.reduce((sum, p) => sum + p.quantity, 0);
+      if (product.status !== 'active' || product.deleted || product.stock < required) {
+        tx.set(groupDoc(groupId), { status: 'failed', failureReason: 'stock_unavailable', updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        return { status: 'failed' as const, reason: 'stock_unavailable' as const };
+      }
+
+      const orderRefs = participantsJoined.map((p) => ({
+        participant: p,
+        oid: orderIdFor(groupId, p.buyerId),
+        ref: firestore.collection('orders').doc(orderIdFor(groupId, p.buyerId)),
+      }));
+      const existingSnaps = await Promise.all(orderRefs.map((o) => tx.get(o.ref)));
+
+      const ts = FieldValue.serverTimestamp();
+      const nowIso = new Date().toISOString();
+      for (let i = 0; i < orderRefs.length; i += 1) {
+        if (existingSnaps[i].exists) continue; // idempotent
+        const { participant: p, oid } = orderRefs[i];
+        const baseUnitPrice = product.price;
+        const unitPrice = Math.round(baseUnitPrice * (1 - g.discountPercent / 100) * 100) / 100;
+        tx.set(orderRefs[i].ref, {
+          id: oid,
+          buyerId: p.buyerId,
+          sellerIds: [g.farmerId],
+          items: [{
+            productId: g.productId,
+            sellerId: g.farmerId,
+            name: { bn: product.name.bn, en: product.name.en },
+            quantity: p.quantity,
+            unitPrice,
+            baseUnitPrice,
+            discountPercent: g.discountPercent,
+            priceSource: 'group',
+            unit: g.unit,
+          }],
+          status: 'pending',
+          totalAmount: unitPrice * p.quantity,
+          deliveryFee: null,
+          statusHistory: [{
+            id: oid + '_created',
+            from: null,
+            to: 'pending',
+            actorId: 'system',
+            actorRole: 'system',
+            reason: `Group purchase ${groupId} success`,
+            stockAdjusted: false,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          }],
+          source: 'group_purchase',
           groupId,
-          buyerId: participant.buyerId,
-          productId: group.productId,
-          quantity: participant.quantity,
-          discountPercent: group.discountPercent,
-        });
+          stockAdjusted: false,
+          stockRestored: false,
+          createdAt: ts,
+          updatedAt: ts,
+        }, { merge: false });
       }
-      if (order.status === 'pending') {
-        await finalizeGroupOrder(participant.orderId, participant.buyerId);
-      }
+      tx.set(groupDoc(groupId), { status: 'successful', failureReason: FieldValue.delete(), updatedAt: ts }, { merge: true });
+      return { status: 'successful' as const, reason: undefined };
+    });
+
+    group = parseGroup((await groupDoc(groupId).get()).data());
+    if (outcome.status === 'successful' || outcome.status === 'failed') {
+      await notifyParticipants(group, outcome.status === 'successful' ? 'group_successful' : 'group_failed');
     }
-    const allAccepted = await Promise.all(
-      joined.map(async (p) => {
-        const o = await getOrder(p.orderId);
-        return o?.status === 'accepted';
-      }),
-    );
-    if (!allAccepted.every(Boolean)) {
-      return parseGroup((await groupDoc(groupId).get()).data());
-    }
-  } else if (next === 'failed') {
-    for (const participant of joined) {
-      await restoreGroupOrder(participant.orderId, 'system', 'Group purchase target not met by deadline');
-    }
+    return group;
   }
 
-  await groupDoc(groupId).set(
-    { status: next, updatedAt: FieldValue.serverTimestamp() },
-    { merge: true },
-  );
-  group = parseGroup((await groupDoc(groupId).get()).data());
-  if (next === 'successful' || next === 'failed') {
-    await notifyParticipants(group, next === 'successful' ? 'group_successful' : 'group_failed');
+  if (next === 'failed') {
+    await groupDoc(groupId).set({ status: 'failed', updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    group = parseGroup((await groupDoc(groupId).get()).data());
+    await notifyParticipants(group, 'group_failed');
+    return group;
   }
+
   return group;
 }
 
@@ -216,11 +289,14 @@ export async function createGroupPurchase(farmerId: string, input: CreateGroupPu
   return getGroupPurchase(ref.id);
 }
 
-export async function joinGroupPurchase(groupId: string, buyerId: string): Promise<GroupPurchaseJoinResponse> {
+export async function joinGroupPurchase(
+  groupId: string,
+  buyerId: string,
+  input?: { quantity?: number },
+): Promise<GroupPurchaseJoinResponse> {
   const { firestore } = getFirebaseAdmin();
   const ref = groupDoc(groupId);
   const participantRef = participants(groupId).doc(buyerId);
-  const orderId = orderIdFor(groupId, buyerId);
 
   let result: GroupPurchaseJoinResponse | null = null;
   await firestore.runTransaction(async (tx) => {
@@ -231,54 +307,93 @@ export async function joinGroupPurchase(groupId: string, buyerId: string): Promi
     if (next !== 'open') throw new HttpError(409, 'GROUP_PURCHASE_NOT_OPEN', 'Group purchase is not open.');
     if (group.farmerId === buyerId) throw new HttpError(400, 'OWN_PRODUCT', 'You cannot join your own group purchase.');
 
+    const requestedQty = input?.quantity ?? group.quantityPerParticipant;
+    if (requestedQty < group.quantityPerParticipant) {
+      throw new HttpError(400, 'GROUP_MIN_QTY_NOT_MET', 'Quantity is below the minimum per participant.');
+    }
+
     if (participantSnap.exists) {
       const participant = parseParticipant(participantSnap.data());
-      result = { group, participant, orderId: participant.orderId };
-      return;
+      if (participant.status === 'joined') {
+        // Idempotent: same quantity returns existing; different quantity rejected clearly.
+        if (participant.quantity !== requestedQty) {
+          throw new HttpError(409, 'ALREADY_JOINED', 'Already joined this group purchase.');
+        }
+        result = { group, participant };
+        return;
+      }
+      // Re-join after cancel not supported in this phase; treat as duplicate/closed for simplicity.
+      throw new HttpError(409, 'ALREADY_JOINED', 'Already joined this group purchase.');
     }
 
     if (group.participantCount >= group.maxParticipants) {
       throw new HttpError(409, 'GROUP_PURCHASE_FULL', 'Group purchase is full.');
     }
 
+    const productSnap = await tx.get(firestore.collection('products').doc(group.productId));
+    if (!productSnap.exists) throw new HttpError(409, 'PRODUCT_UNAVAILABLE', 'Product is not available.');
+    const product = parseStoredProduct(productSnap.data());
+    if (product.status !== 'active' || product.deleted) {
+      throw new HttpError(409, 'PRODUCT_UNAVAILABLE', 'Product is not available.');
+    }
+    const newCommitted = group.committedQuantity + requestedQty;
+    if (newCommitted > product.stock) {
+      throw new HttpError(409, 'INSUFFICIENT_STOCK', 'Requested quantity exceeds available stock.');
+    }
+
     const nowIso = new Date().toISOString();
     const participant: GroupParticipant = {
       groupId,
       buyerId,
-      orderId,
-      quantity: group.quantityPerParticipant,
+      quantity: requestedQty,
       joinedAt: nowIso,
       status: 'joined',
     };
     tx.set(participantRef, participant);
 
-    const nextCommitted = group.committedQuantity + group.quantityPerParticipant;
     const nextCount = group.participantCount + 1;
     tx.set(ref, {
       participantCount: nextCount,
-      committedQuantity: nextCommitted,
+      committedQuantity: newCommitted,
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
 
     result = {
-      group: { ...group, participantCount: nextCount, committedQuantity: nextCommitted },
+      group: { ...group, participantCount: nextCount, committedQuantity: newCommitted },
       participant,
-      orderId,
     };
   });
 
-  const finalResult = result!;
-  await materializeGroupOrder({
-    orderId: finalResult.orderId,
-    groupId,
-    buyerId,
-    productId: (await getGroupPurchase(groupId)).productId,
-    quantity: finalResult.participant.quantity,
-    discountPercent: finalResult.group.discountPercent,
+  const evaluated = await getGroupPurchase(groupId);
+  return { ...result!, group: evaluated };
+}
+
+export async function leaveGroupPurchase(groupId: string, buyerId: string): Promise<GroupPurchase> {
+  const { firestore } = getFirebaseAdmin();
+  const ref = groupDoc(groupId);
+  const participantRef = participants(groupId).doc(buyerId);
+
+  await firestore.runTransaction(async (tx) => {
+    const [groupSnap, participantSnap] = await Promise.all([tx.get(ref), tx.get(participantRef)]);
+    if (!groupSnap.exists) throw new HttpError(404, 'GROUP_PURCHASE_NOT_FOUND', 'Group purchase not found.');
+    const group = parseGroup(groupSnap.data());
+    const next = evaluateStatus(group);
+    if (next !== 'open') {
+      throw new HttpError(409, 'GROUP_PURCHASE_NOT_OPEN', 'Cannot leave a group purchase that is not open.');
+    }
+    if (!participantSnap.exists) throw new HttpError(404, 'PARTICIPANT_NOT_FOUND', 'Participant not found.');
+    const participant = parseParticipant(participantSnap.data());
+    if (participant.status !== 'joined') throw new HttpError(409, 'ALREADY_LEFT', 'Participant already left.');
+
+    tx.set(participantRef, { status: 'cancelled' }, { merge: true });
+    tx.set(ref, {
+      participantCount: Math.max(0, group.participantCount - 1),
+      committedQuantity: Math.max(0, group.committedQuantity - participant.quantity),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
   });
 
-  const evaluated = await getGroupPurchase(groupId);
-  return { ...finalResult, group: evaluated };
+  return getGroupPurchase(groupId);
 }
 
 export async function cancelGroupPurchase(groupId: string, actorId: string, isAdmin: boolean): Promise<GroupPurchase> {
@@ -290,12 +405,8 @@ export async function cancelGroupPurchase(groupId: string, actorId: string, isAd
     throw new HttpError(409, 'GROUP_PURCHASE_NOT_OPEN', 'Only open group purchases can be cancelled.');
   }
 
-  const joined = (await participants(groupId).where('status', '==', 'joined').get()).docs.map((d) => parseParticipant(d.data()));
-  for (const p of joined) {
-    await restoreGroupOrder(p.orderId, isAdmin ? 'admin' : 'system', 'Group purchase cancelled');
-  }
   await groupDoc(groupId).set({ status: 'cancelled', updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-  const cancelled = await getGroupPurchase(groupId);
+  const cancelled = parseGroup((await groupDoc(groupId).get()).data());
   await notifyParticipants(cancelled, 'group_failed');
   return cancelled;
 }
@@ -309,4 +420,12 @@ export async function evaluateOpenGroupPurchases(): Promise<{ evaluated: number 
     if (after.status !== before.status) evaluated += 1;
   }
   return { evaluated };
+}
+
+
+export async function getGroupParticipation(groupId: string, buyerId: string): Promise<GroupParticipant | null> {
+  const snap = await participants(groupId).doc(buyerId).get();
+  if (!snap.exists) return null;
+  const p = parseParticipant(snap.data());
+  return p.status === 'joined' ? p : null;
 }

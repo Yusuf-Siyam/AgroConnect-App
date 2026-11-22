@@ -771,22 +771,31 @@ export async function materializeGroupOrder(input: {
   productId: string;
   quantity: number;
   discountPercent: number;
-}): Promise<Order> {
+}): Promise<Order | null> {
   const { firestore } = getFirebaseAdmin();
   const orderRef = ordersCollection().doc(input.orderId);
   const existing = await orderRef.get();
   if (existing.exists) return serializeOrder(existing.data());
 
-  const now = new Date().toISOString();
   const productSnap = await firestore.collection('products').doc(input.productId).get();
-  if (!productSnap.exists) throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found.');
+  if (!productSnap.exists) return null;
   const product = parseStoredProduct(productSnap.data());
-  if (product.status !== 'active' || product.deleted) {
-    throw new HttpError(409, 'PRODUCT_UNAVAILABLE', 'Product is not available.');
-  }
+  if (product.status !== 'active' || product.deleted) return null;
 
   const baseUnitPrice = product.price;
   const unitPrice = Math.round(baseUnitPrice * (1 - input.discountPercent / 100) * 100) / 100;
+  const now = new Date().toISOString();
+  const statusHistory = [
+    createStatusEvent({
+      from: null,
+      to: 'pending',
+      actorId: 'system',
+      actorRole: 'system',
+      at: now,
+      reason: `Group purchase ${input.groupId} success`,
+      stockAdjusted: false,
+    }),
+  ];
   const order: Order = {
     id: input.orderId,
     buyerId: input.buyerId,
@@ -807,16 +816,9 @@ export async function materializeGroupOrder(input: {
     status: 'pending',
     totalAmount: unitPrice * input.quantity,
     deliveryFee: null,
-    statusHistory: [
-      createStatusEvent({
-        from: null,
-        to: 'pending',
-        actorId: input.buyerId,
-        actorRole: 'buyer',
-        at: now,
-        reason: `Group purchase ${input.groupId} join`,
-      }),
-    ],
+    stockAdjusted: false,
+    stockRestored: false,
+    statusHistory,
     createdAt: now,
     updatedAt: now,
   };
@@ -829,24 +831,6 @@ export async function materializeGroupOrder(input: {
     createdAt: ts,
     updatedAt: ts,
   }, { merge: false });
+  await orderRef.collection('statusHistory').doc(statusHistory[0].id).set(statusHistory[0]);
   return (await getOrder(input.orderId))!;
-}
-
-export async function finalizeGroupOrder(orderId: string, actorId: string): Promise<Order | null> {
-  const order = await getOrder(orderId);
-  if (!order) return null;
-  if (order.status !== 'pending') return order;
-  return acceptFarmerOrder(order.items[0].sellerId, orderId);
-}
-
-export async function restoreGroupOrder(orderId: string, role: 'buyer' | 'admin' | 'system', reason: string): Promise<Order | null> {
-  const order = await getOrder(orderId);
-  if (!order) return null;
-  if (order.status === 'cancelled' || order.status === 'rejected') return order;
-  const actorId = role === 'buyer' ? order.buyerId : 'system';
-  const cancelRole: 'buyer' | 'admin' = role === 'buyer' ? 'buyer' : 'admin';
-  if (order.status === 'pending' || order.status === 'accepted') {
-    return cancelOrder(actorId, cancelRole, orderId, reason);
-  }
-  return order;
 }

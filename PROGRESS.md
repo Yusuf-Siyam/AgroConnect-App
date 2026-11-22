@@ -284,6 +284,15 @@ Read-only result (EXISTS / MISSING, with evidence files):
 
 Conclusion: every requested gap already EXISTS, so STEP 1 (backend) and STEP 2 (mobile) require no further code changes in this recheck. Phase 07B, Phase 11, Phase 12 and later work remain untouched.
 
+## Phase 11 Intended Group-Buying Design Fix (2026-11-22, complete)
+
+- **Owner decision:** intended group-buying design fix (Option A), not documentation-only.
+- **Pre-fix audit:** join created deterministic pending group order immediately with no stock reservation; farmer could accept/reject pending group orders while open; fail/cancel restored/cancelled group orders; no buyer leave endpoint; mobile assumed join/order behavior.
+- **Implemented:** join is participant-only (no order, no stock change) with open/min-qty/stock/max checks and idempotent same-quantity rejoin; `POST /:groupId/leave` while open only. Success evaluation re-checks stock in transaction, creates exactly one pending order per participant with deterministic `gp_{groupId}_{buyerId}`, group price snapshot, `source: group_purchase`, no duplicates on repeated/concurrent eval, no auto-accept. Stock shortage at success => `failed` + `failureReason: stock_unavailable`, no orders, `group_failed` notifications. Fail/cancel => no orders, `group_failed` notifications. No pre-success group orders exist for farmer.
+- **Mobile:** buyer group detail shows joined quantity/state, leave button while open, `stock_unavailable` failure reason; removed post-join order assumption; bn/en keys added.
+- **Tests added/updated:** emergency templates bn/en/no secrets/tokens/password/apikey/listing/product ids; `group_successful` notifies every participant and farmer; phase11-group covers join-no-order/no-stock-change, stock-exceeded join, leave, leave-after-success blocked, duplicate-eval no duplicates, simultaneous joins count, stock_unavailable no orders, farmer no pre-success group orders, group_failed notifications.
+- **Data:** emulator group data is test data only; no migration needed.
+
 ## Pre-Phase-11 language/auth hardening - STEP 0 read-only check (2026-11-22, complete)
 
 Baseline before any change: read `README.md`, `PROGRESS.md`, `RUN.md` and `git log` (HEAD `2cdcd83`). `npx tsc --noEmit` passed. `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` passed all 12 suites (Phase 3 6/6, 05A 5/5, 05B 6/6, 06A 4/4, 06B 4/4, 07A 5/5, 08 6/6, 09A 7/7, 09B 8/8, 10A 6/6, 10B 6/6, 10 gap 17/17). No code was changed in this step; the untracked `firebase-export-1795246212178wM8nNP/` folder is a local emulator artifact and was not staged.
@@ -520,6 +529,26 @@ Verification (TESTED): `npx tsc --noEmit --pretty false`; `./node_modules/.bin/t
 Verification (TESTED): `npx tsc --noEmit --pretty false`; `npx expo lint --max-warnings 0`; `npm run check:i18n` (88 TSX files); `npm run test:mobile` (38/38); `cd backend && npm test` (28/28); `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` (all suites passed, including phase11-batch 6/6 after follow-up). `npm ls --depth=0` clean; `npx expo-doctor` 20/20 checks passed. Real-device camera scanning, Expo Go/dev-build behavior, and web camera behavior remain UNVERIFIED.
 
 
+
+
+## Phase 11 close-out - verification and gap notes (2026-11-22)
+
+- Ran full `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` (see verification below). All suites passed; no suite failures required product-code fixes.
+- Added two tests (one scenario each): `backend/src/services/notificationTemplates.test.ts` verifies emergency notification templates render in bn/en and contain no secrets/tokens/password/apikey/listing/product ids; `backend/tests/phase11-group.emulator.test.ts` verifies `group_successful` notifies every participant and the farmer. To satisfy the requested group-success farmer notification, `backend/src/services/groupPurchase.ts` `notifyParticipants` now also notifies `group.farmerId` on `group_successful` (participants only on `group_failed`, unchanged).
+- Group buying current behavior (read-only audit, no behavior changes made for intended-design gap): see "Group buying behavior audit" below.
+
+### Group buying behavior audit (current code)
+
+Files read: `backend/src/services/groupPurchase.ts`, `backend/src/services/order.ts`, `backend/src/routes/groupPurchases.ts`, `backend/src/routes/orders.ts`.
+
+- **2a. Order creation timing:** An order IS created when a buyer joins. `joinGroupPurchase` creates a participant record and immediately calls `materializeGroupOrder`, which creates a real pending order with deterministic id `gp_{groupId}_{buyerId}`, `status: 'pending'`, `source: 'group_purchase'`, `groupId`, `priceSource: 'group'`, and discount snapshot. It is not created only on success; on success, existing pending orders are finalized/accepted.
+- **2b. Stock reservation:** A pending group order does NOT reserve stock. `materializeGroupOrder` writes the order document only. Stock is deducted by the canonical `acceptFarmerOrder` path when `finalizeGroupOrder` accepts the pending order on group success.
+- **2c. Farmer accept/reject while deal open:** Yes, currently possible. `/api/orders/:orderId/accept` and `/reject` route to `acceptFarmerOrder`/`rejectFarmerOrder`, which validate farmer ownership and pending->accepted/rejected transition but do not check `order.groupId` or group status. A farmer can individually accept/reject a pending group order while the group is still open.
+- **2d. Failure/cancel/leave:** On failure/expiry/cancel, `finalizeGroup`/`cancelGroupPurchase` calls `restoreGroupOrder` for joined participants; `restoreGroupOrder` cancels pending/accepted orders through canonical `cancelOrder` (restoring stock when appropriate) and marks them cancelled/rejected as applicable. `group_failed` notifications are sent to participants. There is no buyer leave/withdraw endpoint; a buyer cannot leave after joining.
+
+**Difference vs intended design:** Intended: joining creates NO order and reserves NO stock; when deal succeeds server creates one pending order per participant. Current: joining creates a pending group order immediately (no stock reserved); success finalizes/accepts those pending orders through canonical path.
+
+**Risk:** Because pending group orders exist before success and are not specially guarded, farmers can accept/reject them individually while the deal is open, breaking group semantics. Stock is also not reserved at join time, so a successful group can fail to finalize/accept if stock becomes insufficient before success. These are product/consistency risks; no code change made pending owner decision.
 
 ## Phase 11 - Advanced Features - STEP 5 group purchases (complete)
 
