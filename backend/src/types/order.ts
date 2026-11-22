@@ -12,7 +12,7 @@ export type OrderItem = {
   baseUnitPrice: number;
   emergencyListingId?: string;
   discountPercent?: number;
-  priceSource: 'base' | 'emergency';
+  priceSource: 'base' | 'emergency' | 'group';
   unit: string;
 };
 

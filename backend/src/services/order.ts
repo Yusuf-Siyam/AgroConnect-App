@@ -77,7 +77,7 @@ const storedOrderSchema = z
         baseUnitPrice: z.number().nonnegative().optional(),
         emergencyListingId: z.string().optional(),
         discountPercent: z.number().optional(),
-        priceSource: z.enum(['base', 'emergency']).optional(),
+        priceSource: z.enum(['base','emergency','group']).optional(),
         unit: z.string().min(1),
       }),
     ),
@@ -683,6 +683,7 @@ export async function cancelOrder(
     if (!snapshot.exists) throw new HttpError(404, 'ORDER_NOT_FOUND', 'Order not found.');
     const order = serializeOrder(snapshot.data());
     if (role === 'buyer') assertBuyerOwnsOrder(order, actorId);
+    if (role !== 'buyer' && role !== 'admin') throw new HttpError(403, 'FORBIDDEN', 'Invalid cancel actor.');
     assertAllowedOrderTransition(role, order.status, 'cancelled');
 
     const shouldRestore =
@@ -761,4 +762,91 @@ export async function cancelOrder(
   const cancelled = (await getOrder(orderId))!;
   await safeNotifyOrder(cancelled, 'cancelled', role);
   return cancelled;
+}
+
+export async function materializeGroupOrder(input: {
+  orderId: string;
+  groupId: string;
+  buyerId: string;
+  productId: string;
+  quantity: number;
+  discountPercent: number;
+}): Promise<Order> {
+  const { firestore } = getFirebaseAdmin();
+  const orderRef = ordersCollection().doc(input.orderId);
+  const existing = await orderRef.get();
+  if (existing.exists) return serializeOrder(existing.data());
+
+  const now = new Date().toISOString();
+  const productSnap = await firestore.collection('products').doc(input.productId).get();
+  if (!productSnap.exists) throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found.');
+  const product = parseStoredProduct(productSnap.data());
+  if (product.status !== 'active' || product.deleted) {
+    throw new HttpError(409, 'PRODUCT_UNAVAILABLE', 'Product is not available.');
+  }
+
+  const baseUnitPrice = product.price;
+  const unitPrice = Math.round(baseUnitPrice * (1 - input.discountPercent / 100) * 100) / 100;
+  const order: Order = {
+    id: input.orderId,
+    buyerId: input.buyerId,
+    sellerIds: [product.sellerId],
+    items: [
+      {
+        productId: product.id,
+        sellerId: product.sellerId,
+        name: { bn: product.name.bn, en: product.name.en },
+        quantity: input.quantity,
+        unitPrice,
+        baseUnitPrice,
+        discountPercent: input.discountPercent,
+        priceSource: 'group',
+        unit: product.unit,
+      },
+    ],
+    status: 'pending',
+    totalAmount: unitPrice * input.quantity,
+    deliveryFee: null,
+    statusHistory: [
+      createStatusEvent({
+        from: null,
+        to: 'pending',
+        actorId: input.buyerId,
+        actorRole: 'buyer',
+        at: now,
+        reason: `Group purchase ${input.groupId} join`,
+      }),
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const ts = FieldValue.serverTimestamp();
+  await orderRef.set({
+    ...order,
+    source: 'group_purchase',
+    groupId: input.groupId,
+    createdAt: ts,
+    updatedAt: ts,
+  }, { merge: false });
+  return (await getOrder(input.orderId))!;
+}
+
+export async function finalizeGroupOrder(orderId: string, actorId: string): Promise<Order | null> {
+  const order = await getOrder(orderId);
+  if (!order) return null;
+  if (order.status !== 'pending') return order;
+  return acceptFarmerOrder(order.items[0].sellerId, orderId);
+}
+
+export async function restoreGroupOrder(orderId: string, role: 'buyer' | 'admin' | 'system', reason: string): Promise<Order | null> {
+  const order = await getOrder(orderId);
+  if (!order) return null;
+  if (order.status === 'cancelled' || order.status === 'rejected') return order;
+  const actorId = role === 'buyer' ? order.buyerId : 'system';
+  const cancelRole: 'buyer' | 'admin' = role === 'buyer' ? 'buyer' : 'admin';
+  if (order.status === 'pending' || order.status === 'accepted') {
+    return cancelOrder(actorId, cancelRole, orderId, reason);
+  }
+  return order;
 }

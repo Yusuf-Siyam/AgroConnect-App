@@ -236,10 +236,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Group purchases are backend-only. Reads allow authenticated users to see
+    // public group state; participants subcollection is also backend-only.
     match /groupPurchases/{groupPurchaseId} {
       allow read: if signedIn() || isAdmin();
-      allow create: if hasRole('buyer') && hasTimestamps();
-      allow update, delete: if false;
+      allow write: if false;
+
+      match /participants/{buyerId} {
+        allow read: if isAdmin() || ownsField('buyerId') || ownsParentField('farmerId');
+        allow write: if false;
+      }
     }
 
     // ---------- Reports ----------

@@ -144,8 +144,8 @@ export async function requirePublicProduct(productId: string): Promise<PublicPro
   if (!product || product.status !== 'active' || product.deleted) {
     throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found.');
   }
-  const { getActiveEmergencyListingForProduct } = await import('./emergencyListing');
-  const { getEffectiveProductPrice } = await import('./pricing');
+  const { getActiveEmergencyListingForProduct } = await import('./emergencyListing.js');
+  const { getEffectiveProductPrice } = await import('./pricing.js');
   const listing = await getActiveEmergencyListingForProduct(product.id);
   const effective = getEffectiveProductPrice(product, listing);
   return {

@@ -33,6 +33,9 @@ export default function FarmerMoreScreen() {
         <Link href={'/farmer/emergency' as Href}>
           <AppText className="font-semibold text-primary">{t('farmer.more.emergency')}</AppText>
         </Link>
+        <Link href={'/farmer/groups' as Href}>
+          <AppText className="font-semibold text-primary">{t('farmer.more.groups')}</AppText>
+        </Link>
         <Link href={'/farmer/ai' as Href}>
           <AppText className="font-semibold text-primary">{t('farmer.more.ai')}</AppText>
         </Link>

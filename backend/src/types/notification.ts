@@ -12,6 +12,8 @@ export const NOTIFICATION_TYPES = [
   'order_delivered',
   'emergency_listing_created',
   'emergency_listing_cancelled',
+  'group_successful',
+  'group_failed',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -22,10 +24,12 @@ export type NotificationPlatform = (typeof NOTIFICATION_PLATFORMS)[number];
 export type ChatNotificationParams = { chatId: string; senderName: string };
 export type OrderNotificationParams = { orderId: string };
 export type EmergencyNotificationParams = { listingId: string; productId: string };
+export type GroupNotificationParams = { groupId: string; productId: string };
 export type NotificationParams =
   | ChatNotificationParams
   | OrderNotificationParams
-  | EmergencyNotificationParams;
+  | EmergencyNotificationParams
+  | GroupNotificationParams;
 
 export type ChatNotificationTarget = { chatId: string; url: string };
 export type OrderNotificationTarget = { orderId: string; url: string };

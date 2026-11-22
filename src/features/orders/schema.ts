@@ -16,7 +16,7 @@ const orderItemSchema = z.object({
   baseUnitPrice: z.number().default(0),
   emergencyListingId: z.string().optional(),
   discountPercent: z.number().optional(),
-  priceSource: z.enum(['base', 'emergency']).default('base'),
+  priceSource: z.enum(['base', 'emergency', 'group']).default('base'),
   unit: z.string(),
 });
 

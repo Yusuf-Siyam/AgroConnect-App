@@ -106,6 +106,8 @@ function serializeNotification(id: string, data: DocumentData): Notification {
     params = { chatId: rawParams.chatId, senderName: rawParams.senderName };
   } else if (typeof rawParams.listingId === 'string' && typeof rawParams.productId === 'string') {
     params = { listingId: rawParams.listingId, productId: rawParams.productId };
+  } else if (typeof rawParams.groupId === 'string' && typeof rawParams.productId === 'string') {
+    params = { groupId: rawParams.groupId, productId: rawParams.productId };
   } else {
     params = { orderId: String(rawParams.orderId ?? '') };
   }

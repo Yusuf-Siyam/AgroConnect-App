@@ -520,6 +520,18 @@ Verification (TESTED): `npx tsc --noEmit --pretty false`; `./node_modules/.bin/t
 Verification (TESTED): `npx tsc --noEmit --pretty false`; `npx expo lint --max-warnings 0`; `npm run check:i18n` (88 TSX files); `npm run test:mobile` (38/38); `cd backend && npm test` (28/28); `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` (all suites passed, including phase11-batch 6/6 after follow-up). `npm ls --depth=0` clean; `npx expo-doctor` 20/20 checks passed. Real-device camera scanning, Expo Go/dev-build behavior, and web camera behavior remain UNVERIFIED.
 
 
+
+## Phase 11 - Advanced Features - STEP 5 group purchases (complete)
+
+- Reused reserved `groupPurchases` collection and added backend-only `participants/{buyerId}` subcollection. Added types/validators/service/routes: farmer create, authenticated list/get, buyer idempotent join, creator/admin cancel, admin `POST /api/admin/group-purchases/evaluate`.
+- Config bounds come from `backend/src/config/advancedFeatures.ts` (5-40%, max 7 days, max 50 participants). Server evaluates status on reads/writes from server time/committed quantity; no scheduler required. Success only after all participant orders are confirmed through canonical farmer-accept path; failure/cancel restores participant orders through canonical cancel/stock-restoration path.
+- Join is idempotent with deterministic order id `gp_{groupId}_{buyerId}`. Group orders are materialized as real pending orders with `priceSource: 'group'` and discount snapshot; stock is deducted/restored by canonical 07A transitions, never by group counters alone.
+- Notifications are registry-only: added `group_successful` and `group_failed` bn/en templates with groupId/productId/target only (no message text/secrets).
+- Firestore: `groupPurchases` and participants backend-only writes; authenticated reads; participant read allowed for buyer/admin/farmer owner. Added indexes for status+createdAt, creatorId+createdAt, productId+status. Registered `backend/tests/phase11-group.emulator.test.ts`.
+- Mobile: buyer `/buyer/groups` list + detail/join, farmer `/farmer/groups` create/list/cancel, buyer tab and farmer more links, bn/en keys, notification routing allows buyer group/product targets.
+
+Verification (TESTED): `npx tsc --noEmit --pretty false`; `npx expo lint --max-warnings 0`; `npm run check:i18n` (94 TSX files); `npm run test:mobile` (38/38); `cd backend && npm test` (28/28); `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` (all suites passed, including phase11-group 4/4 and phase11-emergency 4/4). Real-device UI/push delivery remain UNVERIFIED.
+
 ## Phase 11 - Advanced Features - STEP 4 emergency listings (complete)
 
 - Added backend emergency listings: `backend/src/types/emergencyListing.ts`, `validators/emergencyListing.ts`, `services/pricing.ts` (`getEffectiveProductPrice` shared), `services/emergencyListing.ts`, and authenticated rate-limited `/api/emergency-listings` routes. Farmer create/list/update/cancel; buyer `GET /public` deals. Config limits come from `backend/src/config/advancedFeatures.ts` (5-50%, max 72h). One active listing per product/farmer is enforced by transaction; server-time expiry normalization marks expired/sold-out on access.

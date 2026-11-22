@@ -55,7 +55,7 @@ export type CartItem = {
   baseUnitPrice: number;
   emergencyListingId?: string;
   discountPercent?: number;
-  priceSource: 'base' | 'emergency';
+  priceSource: 'base' | 'emergency' | 'group';
   lineTotal: number;
   available: boolean;
   unavailableReason?: 'PRODUCT_NOT_FOUND' | 'PRODUCT_UNAVAILABLE' | 'OWN_PRODUCT';

@@ -6,6 +6,8 @@ export type PushPlatform = 'ios' | 'android' | 'web';
 const CHAT_URL_PATTERN = /^\/chat\/[A-Za-z0-9_-]{1,180}$/;
 const BUYER_ORDER_URL_PATTERN = /^\/buyer\/orders\/[A-Za-z0-9_-]{1,180}$/;
 const FARMER_ORDER_URL_PATTERN = /^\/farmer\/orders\/[A-Za-z0-9_-]{1,180}$/;
+const BUYER_GROUP_URL_PATTERN = /^\/buyer\/groups\/[A-Za-z0-9_-]{1,180}$/;
+const BUYER_PRODUCT_URL_PATTERN = /^\/buyer\/product\/[A-Za-z0-9_-]{1,180}$/;
 
 function isAllowedUrl(value: unknown): value is string {
   return (
@@ -58,6 +60,7 @@ export function notificationHref(role: Role, url: string | null | undefined): st
     return url;
   }
   if (role === 'buyer' && BUYER_ORDER_URL_PATTERN.test(url)) return url;
+  if (role === 'buyer' && (BUYER_GROUP_URL_PATTERN.test(url) || BUYER_PRODUCT_URL_PATTERN.test(url))) return url;
   if (role === 'farmer' && FARMER_ORDER_URL_PATTERN.test(url)) return url;
   return null;
 }

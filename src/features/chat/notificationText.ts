@@ -64,6 +64,14 @@ export const NOTIFICATION_TEMPLATES: TemplateRegistry<NotificationType> = {
     bn: { title: 'জরুরি ছাড় বন্ধ', body: 'একটি পণ্যের জরুরি ছাড় বন্ধ করা হয়েছে।' },
     en: { title: 'Emergency deal ended', body: 'An emergency discount was cancelled.' },
   },
+  group_successful: {
+    bn: { title: 'গ্রুপ ক্রয় সফল', body: 'আপনার গ্রুপ ক্রয় লক্ষ্য পূরণ হয়েছে এবং অর্ডার নিশ্চিত হয়েছে।' },
+    en: { title: 'Group purchase successful', body: 'Your group purchase reached its target and the order was confirmed.' },
+  },
+  group_failed: {
+    bn: { title: 'গ্রুপ ক্রয় ব্যর্থ', body: 'গ্রুপ ক্রয় লক্ষ্য পূরণ হয়নি বা বাতিল হয়েছে।' },
+    en: { title: 'Group purchase failed', body: 'The group purchase did not meet its target or was cancelled.' },
+  },
 };
 
 function replaceParams(value: string, params: NotificationParams): string {
