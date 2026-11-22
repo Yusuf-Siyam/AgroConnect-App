@@ -257,10 +257,10 @@ Current:
 /api/categories /api/farmers /api/cart          /api/wishlist
 /api/reviews /api/orders    /api/delivery      /api/chat
 /api/notifications /api/ai  /api/analytics     /api/weather
-/api/market  /api/reputation /api/admin
+/api/market  /api/reputation /api/admin /api/harvest-records
+/api/product-batches
 
 Phase 11:
-/api/harvest-records /api/product-batches
 /api/emergency-listings /api/group-purchases
 
 Deferred, not mounted:

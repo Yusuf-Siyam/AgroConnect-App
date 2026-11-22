@@ -21,6 +21,7 @@ const apiErrorKeys: Record<string, TranslationKey> = {
   REVIEW_NOT_ELIGIBLE: 'error.reviewNotEligible',
   REVIEW_DUPLICATE: 'error.reviewDuplicate',
   INVALID_RATING: 'error.ratingInvalid',
+  PRODUCT_BATCH_NOT_FOUND: 'error.batchNotFound',
 };
 
 export function buyerApiErrorKey(code: string | undefined): TranslationKey {

@@ -215,13 +215,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Product batches and trace codes are backend-only. The signed-in trace
+    // endpoint returns a public allow-list and never exposes farmer contact data.
     match /productBatches/{batchId} {
       allow read: if isAdmin() || ownsField('farmerId');
-      allow create: if hasRole('farmer')
-                    && hasTimestamps()
-                    && request.resource.data.farmerId == request.auth.uid;
-      allow update: if isAdmin() || (hasRole('farmer') && ownsField('farmerId') && unchanged('createdAt'));
-      allow delete: if isAdmin() || (hasRole('farmer') && ownsField('farmerId'));
+      allow write: if false;
+    }
+
+    match /productBatchCodes/{code} {
+      allow read, write: if false;
     }
 
     match /priceHistory/{priceId} {

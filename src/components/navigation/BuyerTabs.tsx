@@ -19,6 +19,7 @@ export function BuyerTabs() {
       <Tabs.Screen name="cart" options={{ title: t('buyer.tab.cart') }} />
       <Tabs.Screen name="wishlist" options={{ title: t('buyer.tab.wishlist') }} />
       <Tabs.Screen name="orders" options={{ title: t('buyer.tab.orders') }} />
+      <Tabs.Screen name="trace" options={{ title: t('buyer.tab.trace') }} />
       <Tabs.Screen name="profile" options={{ title: t('buyer.tab.profile') }} />
     </Tabs>
   );

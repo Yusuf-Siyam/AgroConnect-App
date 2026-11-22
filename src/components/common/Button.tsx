@@ -27,6 +27,7 @@ export function Button({
   disabled = false,
   variant = 'primary',
   testID,
+  className = '',
 }: {
   label: string;
   onPress?: () => void;
@@ -34,6 +35,7 @@ export function Button({
   disabled?: boolean;
   variant?: Variant;
   testID?: string;
+  className?: string;
 }) {
   const inactive = disabled || loading;
 
@@ -46,7 +48,7 @@ export function Button({
       onPress={onPress}
       className={`min-h-12 items-center justify-center rounded-xl px-5 py-3 ${variantClasses[variant]} ${
         inactive ? 'opacity-60' : ''
-      }`}
+      } ${className}`}
     >
       <View className="flex-row items-center gap-2">
         {loading ? (

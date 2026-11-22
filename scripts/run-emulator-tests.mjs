@@ -22,6 +22,7 @@ const testFiles = [
   'backend/tests/phase10G.emulator.test.ts',
   'backend/tests/phase11-reputation.emulator.test.ts',
   'backend/tests/phase11-harvest.emulator.test.ts',
+  'backend/tests/phase11-batch.emulator.test.ts',
 ];
 
 for (const testFile of testFiles) {

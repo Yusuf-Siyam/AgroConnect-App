@@ -29,6 +29,8 @@ const apiErrorKeys: Record<string, TranslationKey> = {
   PRODUCT_NOT_FOUND: 'error.productNotFound',
   HARVEST_RECORD_NOT_FOUND: 'error.harvestNotFound',
   INVALID_HARVEST_DATE: 'error.harvestInvalidDate',
+  PRODUCT_BATCH_NOT_FOUND: 'error.batchNotFound',
+  INVALID_BATCH_DATE: 'error.batchInvalidDate',
   FORBIDDEN: 'error.forbidden',
   UNAUTHORIZED: 'error.unauthorized',
   INVALID_STOCK: 'error.invalidStock',
