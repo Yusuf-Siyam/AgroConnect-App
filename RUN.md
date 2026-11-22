@@ -190,6 +190,7 @@ Stop the interactive emulators and backend first; `npm run test:emulators` start
 Set-Location 'E:\13 Trimester\AgroApp'
 npx tsc --noEmit
 npm run lint
+npm run check:i18n
 npm run test:mobile
 npm run test:emulators
 Push-Location backend
@@ -198,7 +199,7 @@ npm test
 Pop-Location
 ```
 
-`npm run test:mobile` runs the pure Phase 10 chat helper tests (deterministic IDs, validation, notification templates and role-aware push routing). `npm run test:emulators` starts Auth/Firestore/Storage, runs all TypeScript suites (including Phase 10A/10B and the Phase 10 gap suite) sequentially through a Node runner, and stops the emulators afterwards. It does not rely on Linux `&&` chaining. Emulator suites inject a push-provider test double; they never contact a real push service.
+`npm run check:i18n` fails on literal user-facing JSX text/string props with a small ignore list for format and unit tokens, so hardcoded copy cannot be reintroduced. `npm run test:mobile` runs the pure mobile helper tests (Phase 10 chat IDs/validation/templates/routing plus auth error mapping and locale key parity). `npm run test:emulators` starts Auth/Firestore/Storage, runs all TypeScript suites (including Phase 10A/10B and the Phase 10 gap suite) sequentially through a Node runner, and stops the emulators afterwards. It does not rely on Linux `&&` chaining. Emulator suites inject a push-provider test double; they never contact a real push service.
 
 ## 7. Manual buyer/farmer smoke test
 
@@ -289,6 +290,14 @@ All steps below use the local emulators. Chat/message/notification writes are pe
 | Chat list stays empty or shows a load error | Confirm `EXPO_PUBLIC_USE_EMULATOR=true`, both accounts are signed in, and the backend is running. All chat/message writes are backend-only; the client cannot create them directly. |
 | Admin cannot see a support thread | Sign out and back in after `npm run admin:provision -- <uid>` so the refreshed admin claim is in the ID token. Admins see only `type == 'support'` threads. |
 | No system notification on a device | Emulator mode cannot deliver remote push. Use a development build with real FCM/APNs credentials (section 8.3); in-app notifications still appear on the Messages screen. |
+| App starts in English on an English device, or the language resets after reinstall | Bangla is now the first-launch default. A persisted device choice is restored from AsyncStorage; for a signed-in user who never chose locally, `preferredLanguage` is adopted from the profile. |
+| Language changes only one screen, or fails after a profile save | Every screen subscribes to the Zustand locale store. A local change is mirrored through `PATCH /api/auth/profile` on a best-effort basis; a failed mirror is swallowed and the device choice still works. |
+| English words still appear in the UI | Run `npm run check:i18n`. Move each reported string into `src/locales/en.ts` and `src/locales/bn.ts` and render it with `t()`. Only format/unit tokens are ignored. |
+| Register role is preselected, a role tap does nothing, or no error appears when skipped | Use the `Pressable` radio cards. Only Farmer/Buyer/Transporter are offered (never Admin), no role is preselected, submitting without one shows the localized `roleRequired` error, and the chosen role is saved to the real profile. |
+| Login reveals whether the email or password was wrong | All wrong-credential Firebase codes now render one generic message. Too many attempts has its own localized message. |
+| Emulator/network outage shows a vague error | `auth/network-request-failed` and `auth/emulator-config-failed` map to the localized unreachable-service message. Confirm the emulators and backend are running. |
+| Forgot-password confirms whether an email exists | Success is always the same neutral message. The reset-link note appears only when `EXPO_PUBLIC_USE_EMULATOR=true` and points to `http://127.0.0.1:9099/emulator/v1/projects/demo-agroconnect/oobCodes`; it is never rendered in production. |
+| `firebase-export-*` folders appear as untracked | Both `emulator-data/` and `firebase-export-*` are git-ignored. Local emulator exports contain user data and must never be committed. |
 
 ## 10. Scope limits
 

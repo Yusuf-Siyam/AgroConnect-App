@@ -71,6 +71,8 @@ Update this table at the end of every phase.
 
 Status values: `Not started` / `In progress` / `Complete` / `Blocked`. `Deferred` means the phase is planned but intentionally scheduled after Phase 12.
 
+**Pre-Phase-11 hardening (not a phase): Complete.** Bangla is the first-launch default, language choice is persisted and mirrored to `preferredLanguage`, hardcoded UI text is gated by `npm run check:i18n`, registration uses an explicit accessible role picker, and auth/forgot-password messaging is privacy-safe. Phase 11, Phase 12 and Phase 07B remain untouched.
+
 ---
 
 ## 3. Technology Stack
@@ -368,8 +370,9 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 - Loading, error, and empty states on every data screen.
 
 ### Localization
-- Bangla (default) and English.
-- Centralized translation files. **No hardcoded UI text.**
+- Bangla is the first-launch default; English is switchable. A device locale no longer overrides Bangla on first launch.
+- The chosen language is persisted on the device with AsyncStorage and mirrored to signed-in `users/{uid}.preferredLanguage` through `PATCH /api/auth/profile`; a failed mirror is non-fatal.
+- Centralized translation files in `src/locales/`. **No hardcoded UI text**; `npm run check:i18n` fails on literal JSX user-facing strings, with a small ignore list for format/unit tokens.
 - Localized notifications and order statuses.
 - Supported units: kg, gram, মণ (maund), ton, with conversion.
 - **Confirmation needed:** the conversion utility currently uses the common Bangladesh value `1 mon = 40 kg` (`MAUND_TO_KG` in `backend/src/utils/units.ts` and `src/features/farmer/types.ts`). Confirm this before production pricing.
@@ -497,6 +500,15 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 - [x] Chat delivery closure, `clientMessageId` idempotency, simultaneous unread counts and cursor pagination covered by emulator tests
 
 **Result:** Phase 10 complete, including the scoped communication-gap fixes. Buyers, farmers and transporters can chat from contextual entry points or the shared Messages screen; users can contact support and admins can read/reply only to support threads. Every role header opens a notification center that paginates owner-only REST results, marks one/all notifications read, shows unread dots and routes by role. Chat, message, notification and device-token writes go exclusively through the backend; mobile reads Firestore via realtime listeners. In-app notifications are verified against the emulators. Real FCM/APNs delivery remains UNVERIFIED without a development build and real push credentials (see `RUN.md`). No payment, group-buying or price-alert notifications were added.
+
+### Pre-Phase-11 language/auth hardening (complete)
+- [x] Bangla is the first-launch default; locale changes update every screen live, persist through AsyncStorage and are mirrored to signed-in `preferredLanguage` without crashing on profile-endpoint failure.
+- [x] Hardcoded UI copy moved into `src/locales/` with `npm run check:i18n` guarding against regressions.
+- [x] Registration role cards are accessible `Pressable` radio buttons with a visible selection, large touch targets, no preselection, no Admin option and explicit validation.
+- [x] Auth errors map to generic invalid credentials, too many attempts, unreachable service/network and weak password in Bangla and English; forgot-password always shows one neutral success message, with an emulator-only reset-link note.
+- [x] `firebase-export-*` and `emulator-data/` are ignored; pure auth-mapping and locale key-parity tests were added.
+
+**Result:** scoped pre-Phase-11 hardening is complete and documented in `RUN.md`'s troubleshooting table. Physical-device UI, AsyncStorage uninstall/reinstall behavior and real password-reset email delivery remain UNVERIFIED. Phase 07B, Phase 11, Phase 12 and later work were not started.
 
 ### Phase 11 - Advanced Features
 Implement individually:
@@ -733,7 +745,7 @@ Verification performed in this repository: mobile `npm run typecheck`, `npm run 
 - Design tokens are centralized in `src/theme/index.ts`; Tailwind class tokens are declared in `tailwind.config.js`. Primary green, dark-green secondary, light canvas, rounded cards/buttons, and accessible touch targets are the baseline.
 - Reusable components: `AppText`, `Button`, `TextField`, `Card`, `Screen`, `StateView`, `RoleBadge`, `RolePicker`, `LanguageSwitcher`, `RoleGuard`, and `SplashScreen` in `src/components/common/`.
 - Common navigation is provided by `src/components/navigation/RoleNavigator.tsx` and `DashboardHeader.tsx`, giving all four role dashboards the same header, role badge, profile action, and language switcher.
-- Localization uses typed flat dictionaries in `src/locales/en.ts` and `src/locales/bn.ts`. Bangla is the default; a device locale of `en` selects English on first launch. A user's choice is persisted with Zustand and can be changed from Profile. `app.json` declares `bn` and `en` as supported locales and disables RTL (both languages are LTR). Web text receives the matching `lang` attribute.
+- Localization uses typed flat dictionaries in `src/locales/en.ts` and `src/locales/bn.ts`. Bangla is the first-launch default. A user's choice is persisted with Zustand, applied globally through `useTranslation()`, and mirrored to signed-in `preferredLanguage` on a best-effort basis. `app.json` declares `bn` and `en` as supported locales and disables RTL (both languages are LTR). Web text receives the matching `lang` attribute.
 - Loading, error, and empty states use `StateView`; profile mutations show a real loading/error state with retry. No simulated data or mock success responses were added.
 - This phase needs no new credentials. Verification: mobile `npm run typecheck`, `npm run lint`, `npx expo-doctor` (20/20), and web/iOS/Android exports. Visual review on physical devices is **UNVERIFIED** in this environment.
 

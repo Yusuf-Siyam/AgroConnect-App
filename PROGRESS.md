@@ -309,3 +309,11 @@ Implemented the STEP 0 gaps without starting any later phase:
 - **Emulator data:** `.gitignore` now ignores `firebase-export-*` in addition to `emulator-data/`.
 
 Verification after the changes: `npx tsc --noEmit --pretty false`, `npx expo lint --max-warnings 0`, `npm run check:i18n`, `npm run test:mobile` (31/31, including new auth-mapping and locale-parity tests), backend `npm test` (23/23), and `git diff --check` all passed. The baseline full emulator suite passed before this step; no backend/emulator behavior was changed in this mobile-only step. Actual device UI, AsyncStorage removal/reinstall behavior and non-emulator reset-link delivery remain UNVERIFIED here.
+
+## Pre-Phase-11 language/auth hardening - STEP 2 documentation (complete)
+
+- `RUN.md` gained troubleshooting rows for every STEP 0 problem/fix: first-launch device-locale override, non-global/persisted language changes, hardcoded UI text, register role selector behavior, credential-disclosing login errors, unclear network/emulator failures, account-enumerating or emulator-leaking reset messages, and untracked `firebase-export-*` folders. Its check sequence now includes `npm run check:i18n` and explains the new mobile-test coverage.
+- `README.md` now records the scoped hardening as Complete without changing any phase status, updates the Localization section and Phase 04 setup notes to state the Bangla first-launch default and best-effort `preferredLanguage` mirror, and adds a pre-Phase-11 checklist/result directly before the untouched Phase 11 section.
+- This STEP 2 record completes the required per-step `PROGRESS.md` updates. No Phase 07B, Phase 11, Phase 12 or later work was started; no push, review or merge was performed.
+
+Final re-verification for the round: `npx tsc --noEmit --pretty false`, `npx expo lint --max-warnings 0`, `npm run check:i18n`, `npm run test:mobile` (31/31), backend `npm test` (23/23), and `git diff --check` all passed. The baseline `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` passed all 12 suites before the mobile-only STEP 1 changes. Real-device UI behavior, uninstall/reinstall AsyncStorage behavior, production reset-link delivery and Windows/PowerShell execution remain UNVERIFIED.
