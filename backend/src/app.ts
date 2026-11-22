@@ -14,6 +14,7 @@ import { createCategoriesRouter } from './routes/categories';
 import { createChatRouter } from './routes/chat';
 import { createNotificationsRouter } from './routes/notifications';
 import { createFarmerProfileRouter } from './routes/farmers';
+import { createHarvestRecordsRouter } from './routes/harvestRecords';
 import { createBuyerMarketplaceRouter } from './routes/marketplace';
 import { createMarketRouter } from './routes/market';
 import { createDeliveryRouter } from './routes/delivery';
@@ -48,6 +49,7 @@ export function createApp(options: AppOptions = {}) {
   app.use('/api/marketplace', createBuyerMarketplaceRouter());
   app.use('/api/categories', createCategoriesRouter());
   app.use('/api/farmers', createFarmerProfileRouter());
+  app.use('/api/harvest-records', createHarvestRecordsRouter());
   app.use('/api/cart', createCartRouter());
   app.use('/api/wishlist', createWishlistRouter());
   app.use('/api/reviews', createReviewsRouter());

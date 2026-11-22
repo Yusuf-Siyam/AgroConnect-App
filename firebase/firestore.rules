@@ -208,13 +208,11 @@ service cloud.firestore {
     }
 
     // ---------- Farmer data and market information ----------
+    // Writes are backend-only so date ordering, product ownership and route-level
+    // role checks cannot be bypassed by a direct client write.
     match /harvestRecords/{recordId} {
       allow read: if isAdmin() || ownsField('farmerId');
-      allow create: if hasRole('farmer')
-                    && hasTimestamps()
-                    && request.resource.data.farmerId == request.auth.uid;
-      allow update: if isAdmin() || (hasRole('farmer') && ownsField('farmerId') && unchanged('createdAt'));
-      allow delete: if isAdmin() || (hasRole('farmer') && ownsField('farmerId'));
+      allow write: if false;
     }
 
     match /productBatches/{batchId} {

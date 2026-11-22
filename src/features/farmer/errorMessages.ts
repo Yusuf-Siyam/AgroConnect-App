@@ -9,6 +9,9 @@ const farmerValidationKeys = new Set<TranslationKey>([
   'error.imageType',
   'error.imageSize',
   'error.productSaveFailed',
+  'validation.harvestDateOrder',
+  'validation.harvestActualRequired',
+  'validation.harvestActualOrder',
 ]);
 
 export function validationKey(message: string | undefined): TranslationKey {
@@ -24,6 +27,8 @@ const apiErrorKeys: Record<string, TranslationKey> = {
   VALIDATION_ERROR: 'error.productValidation',
   INVALID_IMAGE_URL: 'error.imageType',
   PRODUCT_NOT_FOUND: 'error.productNotFound',
+  HARVEST_RECORD_NOT_FOUND: 'error.harvestNotFound',
+  INVALID_HARVEST_DATE: 'error.harvestInvalidDate',
   FORBIDDEN: 'error.forbidden',
   UNAUTHORIZED: 'error.unauthorized',
   INVALID_STOCK: 'error.invalidStock',

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { View } from 'react-native';
 
 import { AppText } from '@/components/common/AppText';
@@ -8,12 +8,17 @@ import { Card } from '@/components/common/Card';
 import { StateView } from '@/components/common/StateView';
 import { FarmerPage } from '@/components/farmer/FarmerPage';
 import { farmerApiErrorKey } from '@/features/farmer/errorMessages';
+import { listHarvestRecords } from '@/features/farmer/harvestService';
 import { getProductStats } from '@/features/farmer/productService';
 import { useTranslation } from '@/i18n';
 
 export default function FarmerDashboard() {
   const { t } = useTranslation();
   const stats = useQuery({ queryKey: ['farmer', 'product-stats'], queryFn: getProductStats });
+  const harvest = useQuery({
+    queryKey: ['farmer', 'harvest-records', 'dashboard'],
+    queryFn: () => listHarvestRecords({ limit: 1, offset: 0 }),
+  });
 
   return (
     <FarmerPage
@@ -63,7 +68,18 @@ export default function FarmerDashboard() {
               {stats.data.lowStock}
             </AppText>
           </Card>
+          <Card className="w-[46%]">
+            <AppText variant="caption">{t('farmer.dashboard.harvestRecords')}</AppText>
+            <AppText variant="title">{harvest.data?.total ?? 0}</AppText>
+          </Card>
         </View>
+      ) : null}
+      {harvest.data ? (
+        <Button
+          label={t('farmer.dashboard.manageHarvest')}
+          variant="outline"
+          onPress={() => router.push('/farmer/harvest' as Href)}
+        />
       ) : null}
     </FarmerPage>
   );
