@@ -1,4 +1,5 @@
 import type { ProductUnit } from './product';
+import type { FarmerReputation } from './reputation';
 
 export const PRODUCT_BATCH_STATUSES = ['active', 'inactive'] as const;
 export type ProductBatchStatus = (typeof PRODUCT_BATCH_STATUSES)[number];
@@ -37,4 +38,5 @@ export type ProductBatchTraceResponse = {
   quantity: number;
   unit: ProductUnit;
   status: ProductBatchStatus;
+  reputation: Pick<FarmerReputation, 'score' | 'isNew' | 'reviewCount'>;
 };

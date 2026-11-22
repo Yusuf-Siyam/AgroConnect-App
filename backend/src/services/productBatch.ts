@@ -17,6 +17,7 @@ import type {
 } from '../validators/productBatch';
 import { requireOwnedHarvestRecord } from './harvestRecord';
 import { requireOwnedProduct } from './product';
+import { getFarmerReputation } from './reputation';
 
 type TimestampLike = { toDate?: () => Date };
 
@@ -195,9 +196,10 @@ export async function traceProductBatch(code: string): Promise<ProductBatchTrace
   const batch = parseStored(snapshot.docs[0].data());
   if (batch.status !== 'active') throw traceNotFound();
 
-  const [productSnapshot, farmerSnapshot] = await Promise.all([
+  const [productSnapshot, farmerSnapshot, reputation] = await Promise.all([
     firestore.collection('products').doc(batch.productId).get(),
     firestore.collection('users').doc(batch.farmerId).get(),
+    getFarmerReputation(batch.farmerId),
   ]);
 
   if (!productSnapshot.exists || productSnapshot.get('deleted') === true) throw traceNotFound();
@@ -238,5 +240,10 @@ export async function traceProductBatch(code: string): Promise<ProductBatchTrace
     quantity: batch.quantity,
     unit: batch.unit,
     status: batch.status,
+    reputation: {
+      score: reputation.isNew ? null : reputation.score,
+      isNew: reputation.isNew,
+      reviewCount: reputation.reviewCount,
+    },
   };
 }

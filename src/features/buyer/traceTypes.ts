@@ -11,4 +11,9 @@ export type ProductBatchTrace = {
   quantity: number;
   unit: ProductUnit;
   status: 'active' | 'inactive';
+  reputation: {
+    score: number | null;
+    isNew: boolean;
+    reviewCount: number;
+  };
 };

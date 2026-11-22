@@ -16,6 +16,11 @@ const traceSchema = z.object({
   quantity: z.number(),
   unit: z.enum(PRODUCT_UNITS),
   status: z.enum(['active', 'inactive']),
+  reputation: z.object({
+    score: z.number().nullable(),
+    isNew: z.boolean(),
+    reviewCount: z.number().int().min(0),
+  }),
 });
 
 export async function traceProductBatch(code: string): Promise<ProductBatchTrace> {

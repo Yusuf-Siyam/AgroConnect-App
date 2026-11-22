@@ -9,6 +9,7 @@ import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { StateView } from '@/components/common/StateView';
 import { TextField } from '@/components/common/TextField';
+import { ReputationBadge } from '@/components/buyer/ReputationBadge';
 import { buyerApiErrorKey } from '@/features/buyer/errorMessages';
 import { traceProductBatch } from '@/features/buyer/traceService';
 import type { ProductBatchTrace } from '@/features/buyer/traceTypes';
@@ -22,6 +23,24 @@ function TraceResult({ trace }: { trace: ProductBatchTrace }) {
       <AppText variant="subtitle">{name || trace.crop}</AppText>
       <AppText variant="caption">{t('buyer.trace.crop', { value: trace.crop })}</AppText>
       <AppText variant="caption">{t('buyer.trace.farmer', { value: trace.farmerDisplayName })}</AppText>
+      <ReputationBadge
+        reputation={{
+          farmerId: '',
+          score: trace.reputation.score,
+          isNew: trace.reputation.isNew,
+          reviewCount: trace.reputation.reviewCount,
+          deliveredCount: 0,
+          cancelledCount: 0,
+          rejectedCount: 0,
+          breakdown: {
+            rating: { weight: 0, componentScore: 0, averageRating: 0 },
+            delivered: { weight: 0, componentScore: 0, deliveredCount: 0, decisionCount: 0 },
+            cancelReject: { weight: 0, componentScore: 0, cancelledCount: 0, rejectedCount: 0, decisionCount: 0 },
+          },
+          createdAt: '',
+          updatedAt: '',
+        }}
+      />
       <AppText variant="caption">{t('buyer.trace.district', { value: trace.district })}</AppText>
       <AppText variant="caption">{t('buyer.trace.producedAt', { value: trace.producedAt })}</AppText>
       {trace.harvestDate ? (

@@ -151,9 +151,10 @@ describe('Phase 11 product batch emulator verification', () => {
       assert.equal(raw.includes(forbidden), false, `trace leaked ${forbidden}`);
     }
     const trace = JSON.parse(raw) as Record<string, unknown>;
-    assert.deepEqual(Object.keys(trace).sort(), ['code', 'crop', 'district', 'farmerDisplayName', 'producedAt', 'productName', 'quantity', 'status', 'unit']);
+    assert.deepEqual(Object.keys(trace).sort(), ['code', 'crop', 'district', 'farmerDisplayName', 'producedAt', 'productName', 'quantity', 'reputation', 'status', 'unit']);
     assert.equal(trace.code, batch.code);
     assert.equal(trace.status, 'active');
+    assert.deepEqual(trace.reputation, { score: null, isNew: true, reviewCount: 0 });
   });
 
   it('returns 404 for unknown, inactive, or malformed trace codes', async () => {
