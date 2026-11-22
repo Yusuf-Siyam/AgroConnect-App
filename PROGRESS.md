@@ -317,3 +317,178 @@ Verification after the changes: `npx tsc --noEmit --pretty false`, `npx expo lin
 - This STEP 2 record completes the required per-step `PROGRESS.md` updates. No Phase 07B, Phase 11, Phase 12 or later work was started; no push, review or merge was performed.
 
 Final re-verification for the round: `npx tsc --noEmit --pretty false`, `npx expo lint --max-warnings 0`, `npm run check:i18n`, `npm run test:mobile` (31/31), backend `npm test` (23/23), and `git diff --check` all passed. The baseline `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` passed all 12 suites before the mobile-only STEP 1 changes. Real-device UI behavior, uninstall/reinstall AsyncStorage behavior, production reset-link delivery and Windows/PowerShell execution remain UNVERIFIED.
+
+## Phase 11 - Advanced Features - STEP 0 plan check (2026-11-22, docs only)
+
+Baseline before any Phase 11 change: read `README.md`, `PROGRESS.md`, `RUN.md`, the recent git log and the existing 07A/06B/10/09/05B backend and mobile code. Working tree was clean at `f7cedaa`. `npx tsc --noEmit --pretty false` passed. `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` passed all 12 suites (Phase 3 6/6, 05A 5/5, 05B 6/6, 06A 4/4, 06B 4/4, 07A 5/5, 08 6/6, 09A 7/7, 09B 8/8, 10A 6/6, 10B 6/6, 10 gap 17/17). Plain `npm run test:emulators` cannot start Java in this shell; the explicit JDK 21 PATH is an environment workaround only and is not stored in the app. No feature code or dependency was changed in STEP 0.
+
+Official Expo SDK 58 docs were checked before planning native features:
+
+- `https://docs.expo.dev/versions/v58.0.0/sdk/camera.md`: use `expo-camera` (`CameraView`, `useCameraPermissions`, `barcodeScannerSettings={{ barcodeTypes: ['qr'] }}`); `expo-barcode-scanner` has no SDK 58 documentation. Camera scanning is not available on web and needs a development build for reliable native use, although Expo Go support is documented for the camera module.
+- `https://docs.expo.dev/versions/v58.0.0/sdk/network.md`: use `expo-network` and `useNetworkState()` for the offline banner. It supports Android, iOS, web and Expo Go. `isInternetReachable` is not a true internet probe on iOS.
+- `https://docs.expo.dev/versions/v58.0.0/sdk/speech.md`: use `expo-speech` for TTS (`getAvailableVoicesAsync`, `speak`, `stop`), with no permission API and no guarantee of a Bangla voice.
+- `expo-speech-recognition` (not in the Expo SDK 58 index) is the maintained successor suggested by `@react-native-voice/voice`; it needs `expo-speech-recognition@58.0.1`, a config plugin and a native development build. Web/browser support and `bn` locale support are UNVERIFIED. All speech modules will be lazily imported in try/catch and disabled cleanly.
+
+### STEP 0 exists / missing inventory
+
+- **Single advanced-features config — MISSING.** No owner-confirmed DEFAULTS module exists. STEP 1 will add one pure, env-overridable module for reputation, emergency, group, prediction and offline-cache values and mirror the documented list already added to README Section 8.
+- **Reputation — PARTIAL.** `reviews/{buyerId_productId}` exists with real rating aggregates in `backend/src/services/review.ts`; `orders` and `statusHistory` contain real delivered/rejected/cancelled data; `backend/src/routes/farmers.ts` and `backend/src/routes/products.ts` expose public profiles/product details. There is no server-computed reputation score, breakdown, recompute hook, `New farmer` rule, `/api/reputation`, mobile badge or public response field. Firestore rules still allow buyer clients to create `reviews`; this must become backend-only before reputation can be trusted.
+- **Harvest records — PARTIAL / RESERVED.** `harvestRecords` is already named in README Section 7 and has owner/public Firestore rules in `firebase/firestore.rules`, but there is no backend route/service/schema, no concrete field contract, no index and no mobile calendar/list/form/status screen. Existing client-write permission must be tightened to backend-only. STEP 2 will reuse the existing collection name rather than create a new one.
+- **Product batches / QR trace — PARTIAL / RESERVED.** `productBatches` is named in README and rules but has no backend or mobile implementation, no unguessable batch code, no signed-in trace endpoint, no rate limit, no tests and no indexes. Existing client-write permission must be tightened. STEP 3 will reuse this collection.
+- **Emergency listings — MISSING.** No emergency collection, effective-price function, marketplace/cart/order integration, discounted order snapshot, expiry evaluation, form or buyer deals section exists. `backend/src/services/order.ts` already snapshots `unitPrice`, `name` and `unit` inside the 07A transaction; STEP 4 will extend that snapshot with the listing id/discount/source while reusing the shared effective-price helper.
+- **Group purchases — PARTIAL / RESERVED.** `groupPurchases` is named in README and rules with signed-in reads and buyer create, but there is no participant subcollection, server-evaluated state, discount/participant/deadline validation, order reuse, `group_successful`/`group_failed` notification, admin maintenance endpoint, test or index. STEP 5 will reuse this collection; client writes become backend-only.
+- **Price prediction — PARTIAL.** `priceHistory`, its authenticated read endpoint, importer, indexes and mobile observed-price list exist. There is no CSV importer with the required columns/bad-row report/rerun safety, no moving-average/trend/range calculation, no sufficient-data gate, no `/api/market/prediction`, no prediction card and no updated advisory wording. STEP 6 will read only stored `priceHistory`; it will not call Gemini or invent numbers.
+- **Offline mode — MISSING.** TanStack Query has no persistence layer; there is no network hook, offline banner, allowlisted cache policy, write block, logout cache clear or bundled guides. AsyncStorage exists only for locale and Firebase auth. STEP 7 will use `expo-network`, add query persistence, and keep all writes online-only with no queue.
+- **Voice assistant — PARTIAL.** The Phase 09 text-only assistant exists in `src/app/farmer/ai/index.tsx` and `sendAiMessage()` already passes the current locale to the backend. There are no speech packages, adapters, per-reply listen/stop controls, editable transcript, mic button, permission explanation, lazy imports or Open Decisions for native/web speech. STEP 8 will extend this existing chat only; no new AI backend, numbers or claims.
+
+Planned new route modules are ` /api/reputation`, `/api/harvest-records`, `/api/product-batches`, `/api/emergency-listings`, `/api/group-purchases` and the narrow `/api/admin` maintenance/recompute routes. `/api/market` is existing and will gain a prediction subroute. README Section 8 now names every current and planned module and marks `/api/users` and `/api/payments` as deferred.
+
+### STEP 0 data model and endpoint contract
+
+All new writes go through the backend with Zod validation, role checks, rate limits and owner checks; mobile/Firestore clients only read. Every new collection/query will get explicit Firestore rules and required indexes.
+
+#### Backend-owned reputation
+
+```text
+farmerReputation/{farmerId}
+  { farmerId, score, reviewCount, deliveredCount, cancelledCount, rejectedCount,
+    breakdown: {
+      rating:     { weight, componentScore, averageRating },
+      delivered:  { weight, componentScore, deliveredCount, completedCount },
+      cancelReject:{ weight, componentScore, cancelledCount, rejectedCount }
+    },
+    createdAt, updatedAt }
+```
+
+- Score is 0–100 from real reviews and real order statuses only. With fewer than the configured minimum reviews, the API returns `score: null`, `isNew: true` and the same counts/breakdown; the mobile badge says `New farmer`. No phone, email or address is returned.
+- Recompute is deterministic/idempotent: a full recount from source documents writes the same doc again after `createReview` and after any delivered/rejected/cancelled transition. Each hook runs after the main write and inside try/catch so it never fails the action.
+- Endpoints: `GET /api/reputation/:farmerId`; extend `GET /api/farmers/:farmerId` and `GET /api/products/:productId` with the same public `reputation` object. `POST /api/admin/reputation/recompute` is admin-only and idempotent (optional body `{ farmerId }`, otherwise all farmers).
+
+#### Harvest records (reuse `harvestRecords`)
+
+```text
+harvestRecords/{recordId}
+  { id, farmerId, crop, productId?, plot?, sowingDate, expectedHarvestDate,
+    actualHarvestDate?, expectedQuantity, unit, status, notes?, createdAt, updatedAt }
+```
+
+- `status`: `planned | growing | ready | harvested`. Dates are `YYYY-MM-DD` with sowing <= expected/actual; `unit` uses the existing product unit vocabulary and existing kg conversion helpers. `productId`, when present, must be owned by the farmer.
+- Endpoints: `GET /api/harvest-records` (farmer owner, filters `status`, `crop`, `from`, `to`, pagination), `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id`, `POST /:id/status`.
+- Mobile: farmer calendar/list route, create/edit form, status control, dashboard card with a real count/link and localized empty state.
+
+#### Product batches and trace (reuse `productBatches`)
+
+```text
+productBatches/{batchId}
+  { id, code, productId, farmerId, harvestRecordId?, quantity, unit,
+    producedAt, expiresAt?, status, createdAt, updatedAt }
+
+Trace response (public fields only)
+  { code, productName, crop, farmerDisplayName, district, producedAt,
+    harvestDate?, quantity, unit, status }
+```
+
+- `code` is generated server-side with at least 16 random bytes encoded base64url (22+ chars), unique with a transaction-backed uniqueness check. No client-supplied code is accepted.
+- Endpoints: farmer `GET /api/product-batches`, `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id`; signed-in and rate-limited `POST /api/product-batches/trace` accepting only `{ code }`. Trace never returns farmer contact details, internal ids, notes or stock/cost data, and returns 404 for unknown/inactive codes. No public web trace page is added.
+- Mobile: farmer QR display from the real generated code; buyer camera scanner using `expo-camera` with a permission explanation plus a manual code field. Web exposes manual entry only.
+
+#### Emergency listings and effective price
+
+```text
+emergencyListings/{listingId}
+  { id, farmerId, productId, discountPercent, startsAt, expiresAt,
+    status: active | expired | cancelled, createdAt, updatedAt }
+```
+
+- One active listing per product per farmer, enforced in a transaction. Discount, start/expiry and 72-hour maximum come from the config module. `startsAt`/`expiresAt` are evaluated against the server's current time; expired listings are never priced or shown as active even if no scheduler has run.
+- One shared `getEffectiveProductPrice(product, listing, now)` helper is called by marketplace listing, cart totals and order creation. Order items gain `baseUnitPrice`, `emergencyListingId?`, `discountPercent?` and `priceSource: 'regular' | 'emergency'`; `unitPrice` remains the effective paid snapshot.
+- Endpoints: `GET /api/emergency-listings` (filters `productId`, `farmerId`, `active`), `GET /:id`, farmer-only `POST /`, `PATCH /:id`, `POST /:id/cancel`.
+- Mobile: farmer discount form and buyer "deals" section with server-computed effective prices and remaining time; no client-side price calculation is trusted.
+
+#### Group purchases (reuse `groupPurchases`)
+
+```text
+groupPurchases/{groupId}
+  { id, creatorId, productId, farmerId, unit, targetQuantity, quantityPerParticipant,
+    discountPercent, maxParticipants, deadline, status: open | successful | failed | cancelled,
+    participantCount, committedQuantity, createdAt, updatedAt }
+
+groupPurchases/{groupId}/participants/{buyerId}
+  { groupId, buyerId, orderId, quantity, joinedAt, status: joined | cancelled }
+```
+
+- Farmer creates the group; buyer join is idempotent. State is evaluated on reads and writes from current time and committed quantity; no scheduler is required. Success creates/confirms one real pending order per participant with deterministic id `gp_{groupId}_{buyerId}` through the extracted 07A order-items helper. Failure/cancellation cancels those real orders through the canonical status transition and stock-restoration path.
+- `group_successful` and `group_failed` use the central notification registry with bn/en templates and ids/targets only. No price-alert or payment notification is added.
+- Endpoints: `GET /api/group-purchases`, `GET /:groupId`, farmer-only `POST /`, buyer `POST /:groupId/join`, creator/admin `POST /:groupId/cancel`, admin `POST /api/admin/group-purchases/evaluate`.
+- Mobile: buyer group card/progress/join UI and two-window tests: before deadline (join/order created) and after deadline (server evaluates success/failure without a scheduler). RUN.md will state that production needs a scheduled maintenance job in Phase 12.
+
+#### Price prediction (read `priceHistory` only)
+
+```text
+priceHistory/{id}  // existing; CSV import sets deterministic ids for safe reruns
+
+GET /api/market/prediction?crop=&district=&unit=
+  { sufficientData, crop, district, unit, sampleCount, firstDate, lastDate,
+    latestObservedPrice, movingAverage, trendPerDay,
+    horizonDays, points: [{ date, low, high }], advisory, reason? }
+```
+
+- Importer: `npm run import:prices -- <file.csv>` with header `crop,district,date,unit,price`, per-row validation, a printed bad-row report (row number + reason), deterministic doc ids for safe reruns and no deletion of unrelated history.
+- Prediction uses only stored observations: moving average plus a least-squares linear trend and bounded low/high range. If the configured minimum points/span/age test fails, return `sufficientData: false`, a localized "not enough data" reason and no predicted numbers. No Gemini call and no invented prices.
+- Mobile: advisory prediction card on the existing farmer market price screen; preserve the observed-history list and remove the stale "no estimated prices ever" wording without claiming accuracy.
+
+#### Offline mode and bundled guides
+
+```text
+Allowlisted persisted read-only query keys:
+products, categories, guides, weather, prices (by explicit query-key prefixes)
+Denied: users, orders, chats, notifications, reputation, groups, emergency, batches, writes
+Bundled guides: src/constants/guides.ts entries with locale, title, body, expertReview: 'pending'
+```
+
+- `expo-network` `useNetworkState()` drives one global banner mounted above every screen. TanStack Query persistence uses AsyncStorage with the configured 24-hour max age and an explicit predicate; writes are rejected by a clear localized message with no queue; logout clears both the in-memory query cache and persisted store.
+- General guides are bundled for offline reading with no chemical names, doses or crop-specific prescriptions. Each guide is marked pending agriculture-expert review and recorded as an owner task below.
+
+#### Voice adapters
+
+```text
+VoiceInput:  { supported, listening, transcript, start(), stop(), clear() }
+VoiceOutput: { supported, speak(text, locale), stop() }
+```
+
+- Both adapters lazy-load native modules in try/catch and expose `supported: false` when unavailable. Assistant UI keeps the existing text send path; mic produces an editable transcript and manual Send. Per-reply listen/stop calls TTS only. No quality claim about Bangla recognition/synthesis, no new AI backend and no device behavior claimed as TESTED.
+
+### README conflicts and stale documentation to resolve during steps
+
+1. Section 8 previously listed `/api/users` and `/api/payments` as REST modules even though neither is mounted. STEP 0 now marks them deferred; Phase 11 adds only the narrow `/api/admin` maintenance routes, not payments/users.
+2. Section 5 lists "smart demand forecasting"; STEP 6 implements statistical price prediction from real `priceHistory` only. Smart demand forecasting remains deferred and will be noted as such in the final tracker.
+3. Section 5 lists "Bangla voice assistant"; STEP 8 adds voice adapters around the existing assistant, but native STT availability, web behavior and `bn` voice quality remain Open Decisions/UNVERIFIED.
+4. Section 7 already names `harvestRecords`, `productBatches`, `groupPurchases` and `priceHistory`, while the rules still allow some client writes to the first three. All Phase 11 writes become backend-only; mobile reads stay read-only.
+5. Section 8 previously said payment, group-buying and price-alert notifications were all absent. STEP 0 narrows this to payment/price-alert only; STEP 5 registers exactly `group_successful` and `group_failed`.
+6. Section 11 Phase 11 checkboxes are feature names in a different order from the required STEP 1–9 build order. The final step will rewrite them in the required order and mark completion only after every test passes.
+7. Farmer market copy currently says "Observed price history only — no estimated prices." STEP 6 will replace this with an advisory statistical-forecast statement that clearly says the forecast is derived only from stored observations and may be unavailable.
+8. Section 15 Open Decision #6 still has no trusted price source selected; the CSV importer accepts owner-supplied observations but does not create or bundle sample prices.
+9. Production group expiry still needs a scheduled maintenance job. Phase 11 deliberately uses on-access evaluation plus the admin endpoint; Phase 12 must schedule `POST /api/admin/group-purchases/evaluate`.
+10. Public web traceability is explicitly deferred; Phase 3 adds only the native camera and signed-in manual code flow.
+
+### Owner tasks added by this plan (not blockers for implementation)
+
+- Confirm all planned DEFAULTS listed in README Section 8.
+- Supply a trusted price-observation source/CSV and decide its update cadence; no sample prices are bundled.
+- Have an agriculture expert review every bundled offline guide before production release.
+- Decide whether to procure a development build/EAS pipeline for QR scanning and speech; Expo Go/web limitations are documented as UNVERIFIED where applicable.
+- Schedule group-purchase evaluation in Phase 12.
+
+### Execution order and step gates
+
+1. STEP 1: config, server-computed reputation, rules/indexes, tests, public profile/product detail and `New farmer` badge.
+2. STEP 2: farmer harvest-record CRUD/status backend plus calendar/list/form/dashboard/empty state.
+3. STEP 3: product batch code/trace backend plus farmer QR and buyer camera/manual flow.
+4. STEP 4: emergency listings with shared effective price, order snapshots, expiry, farmer form and buyer deals.
+5. STEP 5: group purchases with extracted 07A order reuse, states, admin maintenance, notifications and two-window tests.
+6. STEP 6: CSV price import, statistical prediction endpoint and mobile prediction card.
+7. STEP 7: offline banner/cache/guides, write blocking, logout clear.
+8. STEP 8: voice adapters and assistant UI with documented Open Decisions.
+9. STEP 9: README/RUN/final tracker updates, all checks, final report and stop.
+
+Each step will be committed separately with a `PROGRESS.md` update; the next step starts only after the previous commit and passing checks. No payment, Phase 12 or later feature is started.
