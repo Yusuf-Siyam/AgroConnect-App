@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { getFirebaseAdmin } from '../config/firebase';
 import { HttpError } from '../middleware/error';
 import { parseStoredProduct } from './product';
+import { recomputeFarmerReputationsForOrder } from './reputation';
 import {
   assertAllowedOrderTransition,
   assertApiMutableOrderStatus,
@@ -159,12 +160,15 @@ function ordersCollection() {
   return firestore.collection('orders');
 }
 
-/** Notification hooks run only after a committed transaction and are non-fatal. */
+/** Side-effect hooks run only after a committed transaction and are non-fatal. */
 async function safeNotifyOrder(order: Order, status: OrderStatus, role: ActorRole): Promise<void> {
   try {
     await notifyOrderTransition(order, status, role);
   } catch (error) {
     console.error('[order] notification hook failed (non-fatal)', error);
+  }
+  if (status === 'rejected' || status === 'cancelled' || status === 'delivered') {
+    await recomputeFarmerReputationsForOrder(order);
   }
 }
 

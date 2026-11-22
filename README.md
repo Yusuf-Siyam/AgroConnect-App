@@ -257,17 +257,17 @@ Current:
 /api/categories /api/farmers /api/cart          /api/wishlist
 /api/reviews /api/orders    /api/delivery      /api/chat
 /api/notifications /api/ai  /api/analytics     /api/weather
-/api/market
+/api/market  /api/reputation /api/admin
 
 Phase 11:
-/api/reputation /api/harvest-records /api/product-batches
-/api/emergency-listings /api/group-purchases /api/admin
+/api/harvest-records /api/product-batches
+/api/emergency-listings /api/group-purchases
 
 Deferred, not mounted:
 /api/users /api/payments
 ```
 
-`/api/admin` is added in Phase 11 only for group-purchase maintenance and reputation recompute. `/api/payments` and `/api/users` remain Phase 07B/12 work and must not be treated as implemented because they are listed here.
+`/api/admin` is added in Phase 11 only for group-purchase maintenance and reputation recompute; Step 1 mounts only the reputation recompute action. `/api/payments` and `/api/users` remain Phase 07B/12 work and must not be treated as implemented because they are listed here.
 
 Required middleware and practices:
 - Authentication middleware (Firebase ID token verification).

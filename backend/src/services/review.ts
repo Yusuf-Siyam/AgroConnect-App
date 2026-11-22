@@ -10,6 +10,7 @@ import type {
 } from '../types/buyerState';
 import type { CreateReviewInput, ReviewQuery } from '../validators/buyerState';
 import { parseStoredProduct } from './product';
+import { safeRecomputeFarmerReputation } from './reputation';
 
 const storedReviewSchema = z.object({
   id: z.string(),
@@ -113,6 +114,7 @@ export async function createReview(buyerId: string, input: CreateReviewInput): P
 
   const reviewRef = firestore.collection('reviews').doc(reviewId(buyerId, input.productId));
   const productRef = firestore.collection('products').doc(input.productId);
+  let sellerId = '';
 
   await firestore.runTransaction(async (transaction) => {
     const [existingReview, productSnapshot] = await Promise.all([
@@ -127,6 +129,7 @@ export async function createReview(buyerId: string, input: CreateReviewInput): P
     }
 
     const product = parseStoredProduct(productSnapshot.data());
+    sellerId = product.sellerId;
     const farmerRef = firestore.collection('users').doc(product.sellerId);
     const farmerSnapshot = await transaction.get(farmerRef);
     if (!farmerSnapshot.exists) {
@@ -175,5 +178,6 @@ export async function createReview(buyerId: string, input: CreateReviewInput): P
   });
 
   const saved = await reviewRef.get();
+  await safeRecomputeFarmerReputation(sellerId);
   return serializeReview(saved.data());
 }

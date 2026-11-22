@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Image, ScrollView, View } from 'react-native';
 
 import { BuyerPage } from '@/components/buyer/BuyerPage';
+import { ReputationBadge } from '@/components/buyer/ReputationBadge';
 import { ReviewSection } from '@/components/buyer/ReviewSection';
 import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
@@ -151,6 +152,7 @@ export default function ProductDetailScreen() {
               {t('buyer.product.viewFarmer')}
             </AppText>
           </Link>
+          <ReputationBadge reputation={item.reputation} />
         </Card>
 
         <Card className="gap-3">

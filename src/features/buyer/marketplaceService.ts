@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { api, assertApiConfigured, toApiError } from '@/services/api';
 
+import { farmerReputationSchema } from './reputation';
+
 import type {
   CategoryList,
   FarmerProfile,
@@ -26,6 +28,7 @@ const productSchema = z.object({
   images: z.array(z.string()),
   status: z.enum(['draft', 'active', 'out_of_stock']),
   ratingSummary: z.object({ average: z.number(), count: z.number().int() }).default({ average: 0, count: 0 }),
+  reputation: farmerReputationSchema.optional(),
   deleted: z.boolean().default(false),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -51,6 +54,7 @@ const farmerProfileSchema = z.object({
   photoURL: z.string().optional(),
   ratingSummary: z.object({ average: z.number(), count: z.number().int() }),
   productCount: z.number().int(),
+  reputation: farmerReputationSchema,
 });
 
 function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown): T {
@@ -114,6 +118,16 @@ export async function getFarmerProfile(farmerId: string): Promise<FarmerProfile>
   try {
     const response = await api.get(`/api/farmers/${farmerId}`);
     return parseOrThrow(farmerProfileSchema, response.data);
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function getFarmerReputation(farmerId: string) {
+  assertApiConfigured();
+  try {
+    const response = await api.get(`/api/reputation/${farmerId}`);
+    return farmerReputationSchema.parse(response.data);
   } catch (error) {
     throw toApiError(error);
   }

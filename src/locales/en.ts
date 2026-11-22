@@ -333,6 +333,13 @@ export const en = {
   'buyer.farmer.productCount': '{{count}} active products',
   'buyer.farmer.rating': '{{average}} from {{count}} rating(s)',
   'buyer.farmer.noRatings': 'No ratings yet',
+  'buyer.reputation.newFarmer': 'New farmer',
+  'buyer.reputation.score': 'Reputation {{score}}/100',
+  'buyer.reputation.rating': 'Rating component {{score}}% (weight {{weight}}%)',
+  'buyer.reputation.delivered': 'Delivered component {{score}}% (weight {{weight}}%)',
+  'buyer.reputation.cancelReject': 'Low cancellations/rejections {{score}}% (weight {{weight}}%)',
+  'buyer.reputation.counts':
+    'Reviews: {{reviews}}, delivered: {{delivered}}, cancelled: {{cancelled}}, rejected: {{rejected}}',
   'error.farmerNotFound': 'Farmer profile not found.',
 
   'buyer.cart.title': 'Cart',

@@ -5,6 +5,7 @@ import type { CategoryResponse, FarmerProfile, RatingSummary } from '../types/ma
 import type { ProductListResponse } from '../types/product';
 import type { MarketplaceQuery } from '../validators/marketplace';
 import { parseStoredProduct } from './product';
+import { getFarmerReputation } from './reputation';
 
 function productsCollection() {
   const { firestore } = getFirebaseAdmin();
@@ -97,6 +98,7 @@ export async function getPublicFarmerProfile(farmerId: string): Promise<FarmerPr
     displayName: typeof data.displayName === 'string' ? data.displayName : '',
     ratingSummary,
     productCount: activeProducts.size,
+    reputation: await getFarmerReputation(farmerId),
   };
 
   const district = data.district;

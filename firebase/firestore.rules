@@ -180,12 +180,15 @@ service cloud.firestore {
     }
 
     // ---------- Reviews ----------
+    // Reviews and the public reputation derived from them are backend-only.
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if hasRole('buyer')
-                    && hasTimestamps()
-                    && request.resource.data.buyerId == request.auth.uid;
-      allow update, delete: if isAdmin();
+      allow write: if false;
+    }
+
+    match /farmerReputation/{farmerId} {
+      allow read: if signedIn() || isAdmin();
+      allow write: if false;
     }
 
     // ---------- AI history (all writes go through the backend) ----------

@@ -1,3 +1,4 @@
+import type { FarmerReputation } from './reputation';
 import type { Product, ProductList, ProductUnit, RatingSummary } from '@/features/farmer/types';
 
 export type { Product, ProductList, ProductUnit, RatingSummary };
@@ -16,6 +17,7 @@ export type FarmerProfile = {
   photoURL?: string;
   ratingSummary: RatingSummary;
   productCount: number;
+  reputation: FarmerReputation;
 };
 
 export type MarketplaceSort = 'newest' | 'price_asc' | 'price_desc';

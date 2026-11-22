@@ -5,6 +5,7 @@ import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { setPushProvider } from './services/notifications';
 import type { PushProvider } from './types/notification';
+import { createAdminRouter } from './routes/admin';
 import { createAiRouter } from './routes/ai';
 import { createAnalyticsRouter } from './routes/analytics';
 import { createAuthRouter } from './routes/auth';
@@ -18,6 +19,7 @@ import { createMarketRouter } from './routes/market';
 import { createDeliveryRouter } from './routes/delivery';
 import { createOrdersRouter } from './routes/orders';
 import { createProductsRouter } from './routes/products';
+import { createReputationRouter } from './routes/reputation';
 import { createReviewsRouter } from './routes/reviews';
 import { createWeatherRouter } from './routes/weather';
 import { createWishlistRouter } from './routes/wishlist';
@@ -57,6 +59,8 @@ export function createApp(options: AppOptions = {}) {
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/weather', createWeatherRouter());
   app.use('/api/market', createMarketRouter());
+  app.use('/api/reputation', createReputationRouter());
+  app.use('/api/admin', createAdminRouter());
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -11,6 +11,7 @@ export type FarmerProfile = {
   photoURL?: string;
   ratingSummary: RatingSummary;
   productCount: number;
+  reputation: import('./reputation').FarmerReputation;
 };
 
 export type CategoryResponse = {

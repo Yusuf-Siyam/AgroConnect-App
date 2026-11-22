@@ -1,3 +1,4 @@
+import type { FarmerReputation } from '../buyer/reputation';
 import type { OrderStatus } from '../orders/types';
 
 export const PRODUCT_UNITS = ['kg', 'gram', 'mon', 'ton'] as const;
@@ -26,6 +27,7 @@ export type Product = {
   images: string[];
   status: ProductStatus;
   ratingSummary?: RatingSummary;
+  reputation?: FarmerReputation;
   deleted: boolean;
   createdAt: string;
   updatedAt: string;

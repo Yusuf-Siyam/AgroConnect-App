@@ -53,6 +53,11 @@ export type ProductListResponse = {
   offset: number;
 };
 
+/** Buyer-facing detail response with the seller's public reputation breakdown. */
+export type PublicProduct = Product & {
+  reputation: import('./reputation').FarmerReputation;
+};
+
 export type StockHistoryEntry = {
   id: string;
   productId: string;

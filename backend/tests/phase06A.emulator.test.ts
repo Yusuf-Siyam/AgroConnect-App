@@ -337,6 +337,7 @@ describe('Phase 06A emulator verification', () => {
       'photoURL',
       'productCount',
       'ratingSummary',
+      'reputation',
     ]);
     assert.equal(profile.displayName, 'Farmer Public Name');
     assert.equal(profile.district, 'Dhaka');

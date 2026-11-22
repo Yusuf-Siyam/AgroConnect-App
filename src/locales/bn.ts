@@ -335,6 +335,13 @@ export const bn: Record<TranslationKey, string> = {
   'buyer.farmer.productCount': '{{count}}টি সক্রিয় পণ্য',
   'buyer.farmer.rating': '{{count}}টি রেটিং থেকে {{average}}',
   'buyer.farmer.noRatings': 'এখনো রেটিং নেই',
+  'buyer.reputation.newFarmer': 'নতুন কৃষক',
+  'buyer.reputation.score': 'সুনাম {{score}}/১০০',
+  'buyer.reputation.rating': 'রেটিং উপাদান {{score}}% (ওজন {{weight}}%)',
+  'buyer.reputation.delivered': 'ডেলিভারি উপাদান {{score}}% (ওজন {{weight}}%)',
+  'buyer.reputation.cancelReject': 'কম বাতিল/প্রত্যাখ্যাত {{score}}% (ওজন {{weight}}%)',
+  'buyer.reputation.counts':
+    'রিভিউ: {{reviews}}, ডেলিভারি: {{delivered}}, বাতিল: {{cancelled}}, প্রত্যাখ্যাত: {{rejected}}',
   'error.farmerNotFound': 'কৃষকের প্রোফাইল পাওয়া যায়নি।',
 
   'buyer.cart.title': 'কার্ট',

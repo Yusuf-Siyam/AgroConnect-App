@@ -11,6 +11,7 @@ import type {
   ProductListResponse,
   ProductStatsResponse,
   ProductStatus,
+  PublicProduct,
   StockHistoryEntry,
 } from '../types/product';
 import type {
@@ -19,6 +20,7 @@ import type {
   StockAdjustmentInput,
   UpdateProductInput,
 } from '../validators/product';
+import { getFarmerReputation } from './reputation';
 
 type TimestampLike = { toDate?: () => Date };
 
@@ -137,12 +139,12 @@ export async function getProduct(productId: string): Promise<Product | null> {
 }
 
 /** Buyer-facing product detail: drafts, deleted and hidden products never leak. */
-export async function requirePublicProduct(productId: string): Promise<Product> {
+export async function requirePublicProduct(productId: string): Promise<PublicProduct> {
   const product = await getProduct(productId);
   if (!product || product.status !== 'active' || product.deleted) {
     throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found.');
   }
-  return product;
+  return { ...product, reputation: await getFarmerReputation(product.sellerId) };
 }
 
 export async function requireOwnedProduct(sellerId: string, productId: string): Promise<Product> {

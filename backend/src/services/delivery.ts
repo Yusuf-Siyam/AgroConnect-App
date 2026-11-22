@@ -11,6 +11,7 @@ import { getFirebaseAdmin } from '../config/firebase';
 import { HttpError } from '../middleware/error';
 import { assertAllowedOrderTransition, notifyOrderTransition } from '../services/orderStatus';
 import { createStatusEvent, getOrder, ordersCollection, serializeOrder } from '../services/order';
+import { recomputeFarmerReputationsForOrder } from '../services/reputation';
 import type {
   BuyerDelivery,
   DeliveryJob,
@@ -65,7 +66,10 @@ async function safeNotifyDeliveryStatus(
 ): Promise<void> {
   try {
     const order = await getOrder(orderId);
-    if (order) await notifyOrderTransition(order, to, 'transporter');
+    if (order) {
+      await notifyOrderTransition(order, to, 'transporter');
+      if (to === 'delivered') await recomputeFarmerReputationsForOrder(order);
+    }
   } catch (error) {
     console.error('[delivery] notification hook failed (non-fatal)', error);
   }
