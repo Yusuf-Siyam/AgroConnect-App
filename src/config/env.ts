@@ -15,11 +15,13 @@ const firebaseConfig = {
 };
 
 const useEmulator = process.env.EXPO_PUBLIC_USE_EMULATOR === 'true';
+const storageEnabled = process.env.EXPO_PUBLIC_STORAGE_ENABLED !== 'false';
 
 export const env = {
   apiBaseUrl,
   isApiConfigured: apiBaseUrl.length > 0,
   useEmulator,
+  storageEnabled,
   firebaseConfig,
   isFirebaseConfigured: Object.values(firebaseConfig).every((value) => value.length > 0),
 } as const;

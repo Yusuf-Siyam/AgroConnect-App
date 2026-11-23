@@ -43,7 +43,14 @@ describe('Firebase Admin configuration', () => {
   });
 
   it('fails lazily with a clear error when credentials are absent', () => {
-    const keys = ['FIREBASE_PROJECT_ID', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY'] as const;
+    const keys = [
+      'FIREBASE_PROJECT_ID',
+      'FIREBASE_CLIENT_EMAIL',
+      'FIREBASE_PRIVATE_KEY',
+      'FIREBASE_AUTH_EMULATOR_HOST',
+      'FIRESTORE_EMULATOR_HOST',
+      'FIREBASE_STORAGE_EMULATOR_HOST',
+    ] as const;
     const previous = keys.map((key) => process.env[key]);
     keys.forEach((key) => delete process.env[key]);
 

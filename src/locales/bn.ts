@@ -315,6 +315,8 @@ export const bn: Record<TranslationKey, string> = {
   'validation.batchExpiryOrder': 'মেয়াদ শেষের তারিখ উৎপাদনের তারিখের আগে হতে পারে না।',
   'error.imageType': 'শুধুমাত্র JPEG, PNG ও WebP ছবি সমর্থিত।',
   'error.imageSize': 'প্রতিটি ছবি ৫ MB বা তার চেয়ে ছোট হতে হবে।',
+  'error.storageUnavailable': 'এই সেটআপে ছবি আপলোড উপলব্ধ নয়',
+  'error.productImageRequiredActive': 'এই পণ্যটি সক্রিয় করার আগে অন্তত একটি ছবি যোগ করুন।',
   'error.productSaveFailed': 'পণ্যটি সংরক্ষণ করা যায়নি।',
   'error.productValidation': 'প্রবেশ করা পণ্যের তথ্য পরীক্ষা করুন।',
   'error.productNotFound': 'পণ্য পাওয়া যায়নি।',

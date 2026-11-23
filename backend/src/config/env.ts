@@ -11,6 +11,13 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().default(''),
   FIREBASE_STORAGE_BUCKET: z.string().default(''),
   FIREBASE_STORAGE_EMULATOR_HOST: z.string().default(''),
+  PRODUCT_IMAGE_REQUIRED: z.preprocess(
+    (value) => (value === '' || value === undefined ? 'false' : value),
+    z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+  ),
   OPEN_METEO_FORECAST_URL: z.string().url().default('https://api.open-meteo.com/v1/forecast'),
   OPEN_METEO_GEOCODING_URL: z
     .string()
@@ -62,6 +69,7 @@ export const env = {
     .filter(Boolean),
   firebaseStorageBucket: parsed.data.FIREBASE_STORAGE_BUCKET,
   firebaseStorageEmulatorHost: parsed.data.FIREBASE_STORAGE_EMULATOR_HOST,
+  productImageRequired: parsed.data.PRODUCT_IMAGE_REQUIRED,
   openMeteoForecastUrl: parsed.data.OPEN_METEO_FORECAST_URL,
   openMeteoGeocodingUrl: parsed.data.OPEN_METEO_GEOCODING_URL,
   weatherCacheTtlMs: parsed.data.WEATHER_CACHE_TTL_MS,

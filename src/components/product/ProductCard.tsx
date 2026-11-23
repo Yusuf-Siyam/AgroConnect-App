@@ -23,7 +23,11 @@ export function ProductCard({
       <View className="flex-row gap-3">
         {product.images[0] ? (
           <Image source={{ uri: product.images[0] }} className="h-20 w-20 rounded-xl bg-canvas" />
-        ) : null}
+        ) : (
+          <View className="h-20 w-20 items-center justify-center rounded-xl bg-canvas border border-border">
+            <AppText variant="caption">{t('common.noImage')}</AppText>
+          </View>
+        )}
         <View className="flex-1 gap-1">
           <AppText className="font-semibold">{locale === 'bn' ? product.name.bn : product.name.en}</AppText>
           <AppText variant="caption">

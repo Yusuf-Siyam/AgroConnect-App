@@ -20,6 +20,7 @@ import {
 } from '@/features/ai/aiService';
 import { ImagePermissionError, uploadDiagnosisImage, type ImageSource } from '@/features/ai/diagnosisUpload';
 import type { ChatMessage, Conversation, Diagnosis } from '@/features/ai/types';
+import { env } from '@/config/env';
 import { useTranslation, type TranslationKey } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -81,6 +82,10 @@ function DiseaseCheck() {
 
   async function pickAndDiagnose(source: ImageSource): Promise<void> {
     if (!profile?.uid) return;
+    if (!env.storageEnabled) {
+      setErrorKey('error.storageUnavailable');
+      return;
+    }
     setErrorKey(null);
     setBusy(true);
     setProgress(0);
@@ -133,7 +138,7 @@ function DiseaseCheck() {
             <Button
               label={t('ai.disease.camera')}
               variant="outline"
-              disabled={busy}
+              disabled={busy || !env.storageEnabled}
               onPress={() => void pickAndDiagnose('camera')}
             />
           </View>
@@ -141,11 +146,12 @@ function DiseaseCheck() {
             <Button
               label={t('ai.disease.gallery')}
               variant="outline"
-              disabled={busy}
+              disabled={busy || !env.storageEnabled}
               onPress={() => void pickAndDiagnose('gallery')}
             />
           </View>
         </View>
+        {!env.storageEnabled ? <AppText variant="caption" className="text-amber-700">{t('error.storageUnavailable')}</AppText> : null}
         {progress !== null ? (
           <AppText variant="caption">{t('ai.disease.uploading', { percent: Math.round(progress * 100) })}</AppText>
         ) : null}

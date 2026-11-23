@@ -313,6 +313,8 @@ export const en = {
   'validation.batchExpiryOrder': 'Expiry date cannot be before production date.',
   'error.imageType': 'Only JPEG, PNG and WebP images are supported.',
   'error.imageSize': 'Each image must be 5 MB or smaller.',
+  'error.storageUnavailable': 'Image upload is not available in this setup',
+  'error.productImageRequiredActive': 'Add at least one image before making this product active.',
   'error.productSaveFailed': 'The product could not be saved.',
   'error.productValidation': 'Check the entered product details.',
   'error.productNotFound': 'Product not found.',

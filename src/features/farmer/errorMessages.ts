@@ -26,6 +26,7 @@ const apiErrorKeys: Record<string, TranslationKey> = {
   NETWORK_ERROR: 'error.network',
   VALIDATION_ERROR: 'error.productValidation',
   INVALID_IMAGE_URL: 'error.imageType',
+  PRODUCT_IMAGE_REQUIRED: 'error.productImageRequiredActive',
   PRODUCT_NOT_FOUND: 'error.productNotFound',
   HARVEST_RECORD_NOT_FOUND: 'error.harvestNotFound',
   INVALID_HARVEST_DATE: 'error.harvestInvalidDate',

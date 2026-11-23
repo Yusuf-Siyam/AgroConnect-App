@@ -21,6 +21,7 @@ import {
 } from '@/features/farmer/schemas';
 import { createProduct, updateProduct } from '@/features/farmer/productService';
 import { PRODUCT_STATUSES, PRODUCT_UNITS, type Product } from '@/features/farmer/types';
+import { env } from '@/config/env';
 import { useTranslation, type TranslationKey } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -72,6 +73,10 @@ export function ProductForm({ product }: { product?: Product }) {
 
   const pickImages = async () => {
     if (!profile) return;
+    if (!env.storageEnabled) {
+      setUploadError('error.storageUnavailable');
+      return;
+    }
     setUploadError(null);
     try {
       const urls = await pickAndUploadProductImages(
@@ -212,9 +217,10 @@ export function ProductForm({ product }: { product?: Product }) {
             <Button
               label={t('farmer.products.addImages')}
               variant="outline"
-              disabled={images.length >= MAX_IMAGES}
+              disabled={!env.storageEnabled || images.length >= MAX_IMAGES}
               onPress={() => void pickImages()}
             />
+            {!env.storageEnabled ? <AppText variant="caption" className="text-amber-700">{t('error.storageUnavailable')}</AppText> : null}
           </Card>
 
           {saveError ? <AppText variant="error">{t(saveError)}</AppText> : null}

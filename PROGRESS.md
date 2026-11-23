@@ -580,3 +580,18 @@ Verification (TESTED): `npx tsc --noEmit --pretty false`; `npx expo lint --max-w
 - Tests: `backend/src/utils/dates.test.ts` (3) and `backend/tests/phase11-harvest.emulator.test.ts` (7) were added to the existing runners. The emulator suite covers CRUD, filters/pagination, invalid dates, foreign product links, owner isolation, buyer denial and direct client-write denial.
 
 Verification (TESTED): `npx tsc --noEmit --pretty false`; `./node_modules/.bin/tsc --noEmit --pretty false -p backend/tsconfig.json`; `npx expo lint --max-warnings 0`; `npm run check:i18n`; `npm run test:mobile` (38/38); `cd backend && npm test` (28/28); `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` (all suites including Phase 11 harvest 7/7); `git diff --check`. Real-device calendar UI behavior remains UNVERIFIED. No payment, Phase 12 or later feature was started.
+
+## Storage-optional mode (Spark/no-Storage prep) - complete (2026-11-23)
+
+Read-only storage audit (pre-implementation): product image upload (`src/features/farmer/imageUpload.ts`, `src/components/product/ProductForm.tsx`, farmer product screens/services/schemas); backend product image URL/storage assumptions (`backend/src/services/product.ts`, `backend/src/validators/product.ts`, backend env/firebase config); crop diagnosis upload (`src/features/ai/diagnosisUpload.ts`, `src/app/farmer/ai/index.tsx`); diagnosis backend Storage read/delete (`backend/src/services/diagnosis.ts`); mobile Firebase Storage init/emulator (`src/services/firebase.ts`, `src/config/env.ts`); rules/config (`firebase/storage.rules`, `firebase.json`); env/docs/tests touching Storage.
+
+Implemented:
+- `EXPO_PUBLIC_STORAGE_ENABLED` (default `true`) in `src/config/env.ts` + `.env.example`. When `false`, product image upload and crop-diagnosis upload buttons are disabled and show clear bn/en message “Image upload is not available in this setup”; the rest of each screen continues to work.
+- `PRODUCT_IMAGE_REQUIRED` (default `false`) in `backend/src/config/env.ts` + `backend/.env.example` with production comment. When `true`, active create/update requires >=1 valid image URL (`PRODUCT_IMAGE_REQUIRED`), drafts may have no image. Enforced in `backend/src/services/product.ts` via exported `assertImagesForActive`; mobile maps error in `src/features/farmer/errorMessages.ts`.
+- No-image neutral placeholders kept/added for product card, buyer product detail, and cart items.
+- Tests: `backend/src/services/product.test.ts` (3 scenarios: flag off active allowed; flag on active rejected; flag on draft allowed). Existing product-related suites pass.
+- `RUN.md`: added “Real Firebase on the Spark plan (no Storage)” with exact env values and explicit instruction that Spark deploy must not include `storage` rules (`--only firestore:rules,firestore:indexes`).
+
+Verification (TESTED): `npx tsc --noEmit --pretty false`; `./node_modules/.bin/tsc --noEmit --pretty false -p backend/tsconfig.json`; `npx eslint . --max-warnings 0`; `npm run check:i18n`; `npm run test:mobile` (38/38); `cd backend && npm test` (32/32 incl. 3 new product image tests); `PATH=/tmp/opencode/jdk-linux/bin:$PATH npm run test:emulators` all suites passed including Phase 05A/05B/09B existing product/diagnosis suites and Phase 11 suites. `git diff --check`.
+
+UNVERIFIED: real Spark Firebase project deploy/runtime; real-device camera/gallery/storage-disabled UX; production Storage-enabled behavior until `PRODUCT_IMAGE_REQUIRED=true` in that environment.

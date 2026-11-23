@@ -108,14 +108,21 @@ export default function CartScreen() {
               </AppText>
               {group.items.map((item: CartItem) => (
                 <View key={item.productId} className="gap-2 border-b border-line pb-3">
-                  <AppText className="font-semibold">
-                    {locale === 'bn' ? item.name.bn : item.name.en}
-                  </AppText>
-                  <AppText variant="caption">
-                    {formatNumber(item.unitPrice, locale)} /{' '}
-                    {t(`unit.${item.unit}` as TranslationKey)}
-                    {item.priceSource === 'emergency' && item.discountPercent ? ` · ${t('buyer.deals.discount', { value: item.discountPercent })}` : ''}
-                  </AppText>
+                  <View className="flex-row gap-3">
+                    <View className="h-14 w-14 items-center justify-center rounded-xl border border-line bg-canvas">
+                      <AppText variant="caption">{t('common.noImage')}</AppText>
+                    </View>
+                    <View className="flex-1 gap-1">
+                      <AppText className="font-semibold">
+                        {locale === 'bn' ? item.name.bn : item.name.en}
+                      </AppText>
+                      <AppText variant="caption">
+                        {formatNumber(item.unitPrice, locale)} /{' '}
+                        {t(`unit.${item.unit}` as TranslationKey)}
+                        {item.priceSource === 'emergency' && item.discountPercent ? ` · ${t('buyer.deals.discount', { value: item.discountPercent })}` : ''}
+                      </AppText>
+                    </View>
+                  </View>
                   <View className="flex-row items-center gap-3">
                     <Button
                       label={t('common.decrease')}

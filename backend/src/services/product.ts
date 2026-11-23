@@ -220,12 +220,28 @@ export async function getProductStats(sellerId: string): Promise<ProductStatsRes
   };
 }
 
+export function assertImagesForActive(
+  status: ProductStatus,
+  images: string[] | undefined,
+  required = env.productImageRequired,
+): void {
+  if (required && status === 'active' && (images?.length ?? 0) === 0) {
+    throw new HttpError(
+      400,
+      'PRODUCT_IMAGE_REQUIRED',
+      'At least one image is required when a product is active.',
+    );
+  }
+}
+
 export async function createProduct(
   sellerId: string,
   input: CreateProductInput,
 ): Promise<Product> {
   const productId = input.id ?? randomUUID();
   assertOwnedImages(input.images, sellerId, productId);
+  const status = statusForStock(input.status, input.stock);
+  assertImagesForActive(status, input.images);
 
   const reference = productsCollection().doc(productId);
   if ((await reference.get()).exists) {
@@ -238,7 +254,7 @@ export async function createProduct(
     ...fields,
     id: productId,
     sellerId,
-    status: statusForStock(input.status, input.stock),
+    status,
     deleted: false,
     createdAt: now,
     updatedAt: now,
@@ -256,15 +272,16 @@ export async function updateProduct(
   assertOwnedImages(input.images, sellerId, productId);
 
   const nextStock = input.stock ?? current.stock;
-  const nextStatus =
-    input.stock !== undefined ? statusForStock(input.status ?? current.status, nextStock) : input.status;
+  const nextStatus = statusForStock(input.status ?? current.status, nextStock);
+  const nextImages = input.images ?? current.images;
+  assertImagesForActive(nextStatus, nextImages);
 
   await productsCollection()
     .doc(productId)
     .set(
       {
         ...input,
-        ...(nextStatus ? { status: nextStatus } : {}),
+        status: nextStatus,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
