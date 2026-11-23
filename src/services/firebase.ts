@@ -49,6 +49,14 @@ export function getFirebase(): FirebaseServices {
   }
 
   if (!services) {
+    if (__DEV__) {
+      console.info('[firebase] initializing', {
+        projectId: env.firebaseConfig.projectId || '(missing)',
+        authDomain: env.firebaseConfig.authDomain || '(missing)',
+        useEmulator: env.useEmulator,
+        emulatorHost: env.useEmulator ? getEmulatorHost() : undefined,
+      });
+    }
     const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(env.firebaseConfig);
 
     let auth: Auth;

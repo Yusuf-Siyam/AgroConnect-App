@@ -9,6 +9,7 @@ const authErrorKeys: Record<AuthErrorCode, TranslationKey> = {
   'invalid-email': 'error.invalidEmail',
   network: 'error.network',
   'config-missing': 'auth.configMissingMessage',
+  'permission-denied': 'error.permissionDenied',
   unknown: 'error.generic',
 };
 

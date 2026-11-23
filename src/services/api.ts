@@ -19,7 +19,23 @@ export const api = createApiClient({
 
 api.interceptors.request.use(async (config) => {
   const token = await tokenProvider();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (__DEV__) {
+    console.info('[api] request', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      tokenPresent: Boolean(token),
+      hasAuthorizationHeader: Boolean(config.headers.Authorization),
+    });
+  }
+  if (!token && __DEV__) {
+    console.warn('[api] missing auth token', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+    });
+  }
   return config;
 });
 
@@ -31,10 +47,19 @@ export type ApiError = {
 export function toApiError(error: unknown): ApiError {
   if (isAxiosError(error)) {
     const data = error.response?.data as { error?: { code?: string; message?: string } } | undefined;
-    return {
+    const apiError = {
       code: data?.error?.code ?? (error.response ? `HTTP_${error.response.status}` : 'NETWORK_ERROR'),
       message: data?.error?.message ?? error.message,
     };
+    if (__DEV__) {
+      console.warn('[api] request failed', {
+        method: error.config?.method?.toUpperCase(),
+        url: error.config?.url,
+        status: error.response?.status,
+        code: apiError.code,
+      });
+    }
+    return apiError;
   }
 
   if (

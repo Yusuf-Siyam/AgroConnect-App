@@ -88,6 +88,7 @@ export const bn: Record<TranslationKey, string> = {
   'error.invalidEmail': 'একটি বৈধ ইমেইল ঠিকানা দিন।',
   'error.network': 'পরিষেবাটি পৌঁছানো যাচ্ছে না। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।',
   'error.generic': 'কিছু একটা ভুল হয়েছে। আবার চেষ্টা করুন।',
+  'error.permissionDenied': 'এই কাজের অনুমতি নেই। আবার সাইন ইন করুন বা সহায়তার সাথে যোগাযোগ করুন।',
   'error.apiNotConfigured': 'API বেস URL কনফিগার করা নেই। .env তে EXPO_PUBLIC_API_BASE_URL যোগ করুন।',
 
   'profile.title': 'আমার প্রোফাইল',

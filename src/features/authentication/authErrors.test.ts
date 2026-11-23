@@ -28,7 +28,14 @@ describe('auth error mapping', () => {
   it('maps network and emulator failures to the network message', () => {
     assert.equal(toAuthErrorCode({ code: 'auth/network-request-failed' }), 'network');
     assert.equal(toAuthErrorCode({ code: 'auth/emulator-config-failed' }), 'network');
+    assert.equal(toAuthErrorCode({ code: 'unavailable' }), 'network');
     assert.equal(authErrorKey('network'), 'error.network');
+  });
+
+  it('maps Firestore permission errors to a permission message', () => {
+    assert.equal(toAuthErrorCode({ code: 'permission-denied' }), 'permission-denied');
+    assert.equal(toAuthErrorCode({ code: 'firestore/permission-denied' }), 'permission-denied');
+    assert.equal(authErrorKey('permission-denied'), 'error.permissionDenied');
   });
 
   it('maps weak passwords without inventing a fake success', () => {

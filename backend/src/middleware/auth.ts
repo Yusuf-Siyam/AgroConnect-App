@@ -50,10 +50,30 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
     next();
   } catch (error) {
     if (error instanceof HttpError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[auth] request rejected', {
+          path: req.originalUrl,
+          code: error.code,
+          status: error.status,
+          message: error.message,
+        });
+      }
       next(error);
       return;
     }
 
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? String((error as { code?: unknown }).code ?? 'UNKNOWN')
+        : 'UNKNOWN';
+    const message = error instanceof Error ? error.message : String(error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[auth] token verification failed', {
+        path: req.originalUrl,
+        code,
+        message,
+      });
+    }
     // Never leak token-verification details to the client.
     next(new HttpError(401, 'UNAUTHORIZED', 'Invalid or expired ID token'));
   }

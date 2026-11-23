@@ -56,18 +56,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null);
   const userRef = useRef<User | null>(null);
   const authActionInProgressRef = useRef(false);
+  const tokenProviderRegisteredRef = useRef(false);
+
+  if (!tokenProviderRegisteredRef.current) {
+    setAuthTokenProvider(async () => {
+      const user = userRef.current;
+      if (!user) return null;
+      try {
+        return await user.getIdToken();
+      } catch (error) {
+        if (__DEV__)
+          console.warn('[auth] tokenProvider:getIdToken-failed', {
+            code: (error as { code?: string })?.code,
+          });
+        return null;
+      }
+    });
+    tokenProviderRegisteredRef.current = true;
+  }
 
   const loadProfile = useCallback(async (user: User): Promise<UserProfile> => {
     const { firestore } = getFirebase();
+    if (__DEV__) console.info('[auth] loadProfile:start', { uid: user.uid });
     const tokenResult = await user.getIdTokenResult(true);
     const claimRole = parseRole(tokenResult.claims.role);
     const reference = doc(firestore, 'users', user.uid);
     const snapshot = await getDoc(reference);
-    const stored = parseUserProfile(snapshot.data());
+    const raw = snapshot.data();
+    const stored = parseUserProfile(raw);
+    if (__DEV__)
+      console.info('[auth] loadProfile:doc', {
+        uid: user.uid,
+        exists: snapshot.exists(),
+        parsed: Boolean(stored),
+        claimRole: claimRole ?? null,
+      });
 
     if (stored) {
       const resolvedRole = claimRole ?? stored.role;
-      const resolved: UserProfile = { ...stored, role: resolvedRole, isVerified: stored.isVerified || resolvedRole === 'admin' };
+      const resolved: UserProfile = {
+        ...stored,
+        role: resolvedRole,
+        isVerified: stored.isVerified || resolvedRole === 'admin',
+      };
+      setProfile(resolved);
+      return resolved;
+    }
+
+    // If a profile doc exists but is malformed/incomplete, do not overwrite protected
+    // fields (role/isVerified/createdAt) because Firestore rules reject that.
+    if (snapshot.exists() && raw && typeof raw === 'object') {
+      const data = raw as Record<string, unknown>;
+      const resolvedRole = claimRole ?? parseRole(data.role) ?? 'farmer';
+      const resolved: UserProfile = {
+        uid: typeof data.uid === 'string' && data.uid ? data.uid : user.uid,
+        email: typeof data.email === 'string' || data.email === null ? (data.email as string | null) : (user.email ?? null),
+        displayName:
+          typeof data.displayName === 'string' && data.displayName.trim()
+            ? data.displayName
+            : (user.displayName ?? user.email?.split('@')[0] ?? ''),
+        role: resolvedRole,
+        isVerified: data.isVerified === true || resolvedRole === 'admin',
+        ...(typeof data.phoneNumber === 'string' && data.phoneNumber ? { phoneNumber: data.phoneNumber } : {}),
+        ...(typeof data.district === 'string' && data.district ? { district: data.district } : {}),
+        ...(data.preferredLanguage === 'bn' || data.preferredLanguage === 'en'
+          ? { preferredLanguage: data.preferredLanguage }
+          : {}),
+      };
       setProfile(resolved);
       return resolved;
     }
@@ -94,19 +149,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isVerified: false,
     };
 
-    await setDoc(
-      reference,
-      {
-        uid: created.uid,
-        email: created.email,
-        displayName: created.displayName,
-        role: created.role,
-        isVerified: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
+    try {
+      await setDoc(
+        reference,
+        {
+          uid: created.uid,
+          email: created.email,
+          displayName: created.displayName,
+          role: created.role,
+          isVerified: false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+      if (__DEV__) console.info('[auth] loadProfile:created-fallback', { uid: user.uid, role: fallbackRole });
+    } catch (error) {
+      if (__DEV__)
+        console.warn('[auth] loadProfile:create-fallback-error', {
+          uid: user.uid,
+          code: (error as { code?: string })?.code,
+        });
+      throw error;
+    }
 
     setProfile(created);
     return created;
@@ -151,8 +216,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(resolved);
           setStatus('authenticated');
         })
-        .catch(() => {
+        .catch((error) => {
           if (!active) return;
+          if (__DEV__)
+            console.warn('[auth] onAuthStateChanged:profile-load-failed', {
+              uid: user.uid,
+              code: (error as { code?: string })?.code,
+            });
           // Never leave an authenticated user without a role: the route guards
           // would bounce between the dashboard and /login.
           void failAuthentication();
@@ -165,14 +235,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [failAuthentication, loadProfile]);
 
-  useEffect(() => {
-    setAuthTokenProvider(async () => {
-      const user = userRef.current;
-      return user ? user.getIdToken() : null;
-    });
-
-    return () => setAuthTokenProvider(async () => null);
-  }, []);
+  // Token provider is registered synchronously during render so React Query
+  // hooks that mount on the same auth transition already have a token source.
 
   const wrap = useCallback(<T,>(operation: () => Promise<T>): Promise<T> => {
     setErrorCode(null);
@@ -204,6 +268,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setStatus('authenticated');
           return resolved;
         } catch (error) {
+          if (__DEV__)
+            console.warn('[auth] signIn:post-auth-failed', {
+              uid: user.uid,
+              code: (error as { code?: string })?.code,
+            });
           await failAuthentication();
           throw error;
         }
@@ -224,6 +293,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setStatus('authenticated');
           return resolved;
         } catch (error) {
+          if (__DEV__)
+            console.warn('[auth] signUp:post-auth-failed', {
+              uid: user.uid,
+              code: (error as { code?: string })?.code,
+            });
           await failAuthentication();
           throw error;
         }

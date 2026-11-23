@@ -23,8 +23,15 @@ function assertConfigured(): void {
 export async function signIn(email: string, password: string): Promise<User> {
   assertConfigured();
   const { auth } = getFirebase();
-  const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
-  return credential.user;
+  if (__DEV__) console.info('[auth] signIn:start', { email: email.trim() });
+  try {
+    const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+    if (__DEV__) console.info('[auth] signIn:firebase-success', { uid: credential.user.uid });
+    return credential.user;
+  } catch (error) {
+    if (__DEV__) console.warn('[auth] signIn:firebase-error', { code: (error as { code?: string })?.code });
+    throw error;
+  }
 }
 
 export async function register(values: RegisterValues): Promise<User> {
@@ -32,32 +39,51 @@ export async function register(values: RegisterValues): Promise<User> {
   const { auth, firestore } = getFirebase();
   const phoneNumber = values.phoneNumber?.trim();
 
-  const credential = await createUserWithEmailAndPassword(auth, values.email.trim(), values.password);
+  if (__DEV__) console.info('[auth] register:start', { email: values.email.trim(), role: values.role });
+  let credential;
+  try {
+    credential = await createUserWithEmailAndPassword(auth, values.email.trim(), values.password);
+    if (__DEV__) console.info('[auth] register:firebase-success', { uid: credential.user.uid });
+  } catch (error) {
+    if (__DEV__) console.warn('[auth] register:firebase-error', { code: (error as { code?: string })?.code });
+    throw error;
+  }
+
   await updateProfile(credential.user, { displayName: values.fullName.trim() });
 
-  await setDoc(
-    doc(firestore, 'users', credential.user.uid),
-    {
-      uid: credential.user.uid,
-      email: credential.user.email,
-      displayName: values.fullName.trim(),
-      ...(phoneNumber ? { phoneNumber } : {}),
-      role: values.role,
-      isVerified: false,
-      preferredLanguage: 'bn',
-      ...(values.role === 'transporter'
-        ? {
-            vehicle: {
-              type: values.vehicleType!.trim(),
-              registrationNumber: values.registrationNumber!.trim(),
-            },
-          }
-        : {}),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+  try {
+    await setDoc(
+      doc(firestore, 'users', credential.user.uid),
+      {
+        uid: credential.user.uid,
+        email: credential.user.email,
+        displayName: values.fullName.trim(),
+        ...(phoneNumber ? { phoneNumber } : {}),
+        role: values.role,
+        isVerified: false,
+        preferredLanguage: 'bn',
+        ...(values.role === 'transporter'
+          ? {
+              vehicle: {
+                type: values.vehicleType!.trim(),
+                registrationNumber: values.registrationNumber!.trim(),
+              },
+            }
+          : {}),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+    if (__DEV__) console.info('[auth] register:profile-created', { uid: credential.user.uid });
+  } catch (error) {
+    if (__DEV__)
+      console.warn('[auth] register:profile-create-error', {
+        uid: credential.user.uid,
+        code: (error as { code?: string })?.code,
+      });
+    throw error;
+  }
 
   return credential.user;
 }

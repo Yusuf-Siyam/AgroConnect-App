@@ -99,6 +99,13 @@ export function getFirebaseAdmin(): FirebaseAdminServices {
             });
     }
 
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[firebase-admin] initialized', {
+        projectId: app.options.projectId ?? process.env.FIREBASE_PROJECT_ID?.trim() ?? null,
+        emulator: isFirebaseEmulatorEnabled(),
+      });
+    }
+
     cached = {
       app,
       auth: getAuth(app),

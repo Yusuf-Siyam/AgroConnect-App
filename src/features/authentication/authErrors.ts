@@ -6,6 +6,7 @@ export const AUTH_ERROR_CODES = [
   'invalid-email',
   'network',
   'config-missing',
+  'permission-denied',
   'unknown',
 ] as const;
 
@@ -22,6 +23,10 @@ const firebaseCodeMap: Record<string, AuthErrorCode> = {
   'auth/network-request-failed': 'network',
   'auth/emulator-config-failed': 'network',
   'auth/config-missing': 'config-missing',
+  'permission-denied': 'permission-denied',
+  'firestore/permission-denied': 'permission-denied',
+  unavailable: 'network',
+  'firestore/unavailable': 'network',
 };
 
 function errorCode(error: unknown): string {
@@ -47,7 +52,8 @@ export function toAuthErrorCode(error: unknown): AuthErrorCode {
   if (code.includes('email-already-in-use')) return 'email-in-use';
   if (code.includes('weak-password')) return 'weak-password';
   if (code.includes('invalid-email')) return 'invalid-email';
-  if (code.includes('network') || code.includes('emulator')) return 'network';
+  if (code.includes('permission-denied')) return 'permission-denied';
+  if (code.includes('unavailable') || code.includes('network') || code.includes('emulator')) return 'network';
   if (code.includes('config-missing')) return 'config-missing';
 
   return 'unknown';

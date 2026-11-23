@@ -86,6 +86,7 @@ export const en = {
   'error.invalidEmail': 'Enter a valid email address.',
   'error.network': 'The service is unreachable. Check your connection and try again.',
   'error.generic': 'Something went wrong. Please try again.',
+  'error.permissionDenied': 'You do not have permission for this action. Please sign in again or contact support.',
   'error.apiNotConfigured': 'The API base URL is not configured. Add EXPO_PUBLIC_API_BASE_URL to .env.',
 
   'profile.title': 'My profile',
