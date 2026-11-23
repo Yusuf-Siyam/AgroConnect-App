@@ -1,8 +1,7 @@
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 
-import { getFirebase } from '@/services/firebase';
+import { signUpload, uploadToCloudinary } from '@/services/cloudinaryUpload';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -17,11 +16,11 @@ async function uriToBlob(uri: string): Promise<Blob> {
 }
 
 /**
- * Picks up to five JPEG/PNG/WebP images, compresses them, uploads them to
- * products/{uid}/{productId}/... and returns real Firebase Storage URLs.
+ * Picks images, compresses them, signs a Cloudinary upload through the backend,
+ * uploads directly to Cloudinary, and returns resulting secure URLs.
  */
 export async function pickAndUploadProductImages(
-  uid: string,
+  _uid: string,
   productId: string,
   limit: number,
   onProgress?: (value: UploadProgress) => void,
@@ -36,7 +35,6 @@ export async function pickAndUploadProductImages(
   if (result.canceled || !result.assets?.length) return [];
   if (result.assets.length > limit) throw new Error(`Select at most ${limit} images.`);
 
-  const { storage } = getFirebase();
   const uploaded: string[] = [];
 
   for (const [index, asset] of result.assets.entries()) {
@@ -58,26 +56,11 @@ export async function pickAndUploadProductImages(
       throw new Error('Compressed image is still larger than 5 MB.');
     }
 
-    const fileName = `${Date.now()}-${index + 1}.jpg`;
-    const imageRef = ref(storage, `products/${uid}/${productId}/${fileName}`);
-    const task = uploadBytesResumable(imageRef, blob, { contentType: 'image/jpeg' });
-
-    await new Promise<void>((resolve, reject) => {
-      task.on(
-        'state_changed',
-        (snapshot) => {
-          onProgress?.({
-            progress: snapshot.totalBytes ? snapshot.bytesTransferred / snapshot.totalBytes : 0,
-            total: result.assets.length,
-            index: index + 1,
-          });
-        },
-        reject,
-        () => resolve(),
-      );
+    const signed = await signUpload({ purpose: 'product', productId });
+    const resultUpload = await uploadToCloudinary(blob, signed, (progress) => {
+      onProgress?.({ progress, total: result.assets.length, index: index + 1 });
     });
-
-    uploaded.push(await getDownloadURL(task.snapshot.ref));
+    uploaded.push(resultUpload.secureUrl);
   }
 
   return uploaded;

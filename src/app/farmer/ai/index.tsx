@@ -20,7 +20,7 @@ import {
 } from '@/features/ai/aiService';
 import { ImagePermissionError, uploadDiagnosisImage, type ImageSource } from '@/features/ai/diagnosisUpload';
 import type { ChatMessage, Conversation, Diagnosis } from '@/features/ai/types';
-import { env } from '@/config/env';
+import { getUploadConfig } from '@/services/cloudinaryUpload';
 import { useTranslation, type TranslationKey } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -67,6 +67,13 @@ function DiseaseCheck() {
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [result, setResult] = useState<Diagnosis | null>(null);
 
+  const uploads = useQuery({
+    queryKey: ['uploads', 'config'],
+    queryFn: getUploadConfig,
+    staleTime: 60_000,
+  });
+  const uploadsEnabled = uploads.data?.enabled === true;
+
   const history = useQuery({
     queryKey: ['ai', 'diagnoses'],
     queryFn: () => listDiagnoses(),
@@ -82,8 +89,8 @@ function DiseaseCheck() {
 
   async function pickAndDiagnose(source: ImageSource): Promise<void> {
     if (!profile?.uid) return;
-    if (!env.storageEnabled) {
-      setErrorKey('error.storageUnavailable');
+    if (!uploadsEnabled) {
+      setErrorKey('error.uploadNotConfigured');
       return;
     }
     setErrorKey(null);
@@ -95,7 +102,7 @@ function DiseaseCheck() {
       setProgress(null);
       const crop = cropName.trim();
       const diagnosis = await submitDiagnosis({
-        imagePath: uploaded.imagePath,
+        image: uploaded.image,
         language: locale,
         ...(crop ? { cropName: crop } : {}),
       });
@@ -138,7 +145,7 @@ function DiseaseCheck() {
             <Button
               label={t('ai.disease.camera')}
               variant="outline"
-              disabled={busy || !env.storageEnabled}
+              disabled={busy || !uploadsEnabled}
               onPress={() => void pickAndDiagnose('camera')}
             />
           </View>
@@ -146,12 +153,12 @@ function DiseaseCheck() {
             <Button
               label={t('ai.disease.gallery')}
               variant="outline"
-              disabled={busy || !env.storageEnabled}
+              disabled={busy || !uploadsEnabled}
               onPress={() => void pickAndDiagnose('gallery')}
             />
           </View>
         </View>
-        {!env.storageEnabled ? <AppText variant="caption" className="text-amber-700">{t('error.storageUnavailable')}</AppText> : null}
+        {!uploadsEnabled ? <AppText variant="caption" className="text-amber-700">{t('error.uploadNotConfigured')}</AppText> : null}
         {progress !== null ? (
           <AppText variant="caption">{t('ai.disease.uploading', { percent: Math.round(progress * 100) })}</AppText>
         ) : null}

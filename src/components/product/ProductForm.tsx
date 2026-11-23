@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -21,9 +21,9 @@ import {
 } from '@/features/farmer/schemas';
 import { createProduct, updateProduct } from '@/features/farmer/productService';
 import { PRODUCT_STATUSES, PRODUCT_UNITS, type Product } from '@/features/farmer/types';
-import { env } from '@/config/env';
 import { useTranslation, type TranslationKey } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
+import { getUploadConfig } from '@/services/cloudinaryUpload';
 
 const MAX_IMAGES = 5;
 
@@ -53,6 +53,8 @@ export function ProductForm({ product }: { product?: Product }) {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [uploadError, setUploadError] = useState<TranslationKey | null>(null);
   const [saveError, setSaveError] = useState<TranslationKey | null>(null);
+  const uploads = useQuery({ queryKey: ['uploads', 'config'], queryFn: getUploadConfig, staleTime: 60_000 });
+  const uploadsEnabled = uploads.data?.enabled === true;
 
   const { control, handleSubmit, formState } = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -73,8 +75,8 @@ export function ProductForm({ product }: { product?: Product }) {
 
   const pickImages = async () => {
     if (!profile) return;
-    if (!env.storageEnabled) {
-      setUploadError('error.storageUnavailable');
+    if (!uploadsEnabled) {
+      setUploadError('error.uploadNotConfigured');
       return;
     }
     setUploadError(null);
@@ -87,9 +89,14 @@ export function ProductForm({ product }: { product?: Product }) {
       );
       setImages((current) => [...current, ...urls].slice(0, MAX_IMAGES));
     } catch (error) {
-      setUploadError(
-        error instanceof Error && error.message.includes('5 MB') ? 'error.imageSize' : 'error.imageType',
-      );
+      const code = (error as { code?: string }).code;
+      if (code === 'CLOUDINARY_NOT_CONFIGURED') {
+        setUploadError('error.uploadNotConfigured');
+      } else {
+        setUploadError(
+          error instanceof Error && error.message.includes('5 MB') ? 'error.imageSize' : 'error.imageType',
+        );
+      }
     } finally {
       setUploadProgress(null);
     }
@@ -217,10 +224,10 @@ export function ProductForm({ product }: { product?: Product }) {
             <Button
               label={t('farmer.products.addImages')}
               variant="outline"
-              disabled={!env.storageEnabled || images.length >= MAX_IMAGES}
+              disabled={!uploadsEnabled || images.length >= MAX_IMAGES}
               onPress={() => void pickImages()}
             />
-            {!env.storageEnabled ? <AppText variant="caption" className="text-amber-700">{t('error.storageUnavailable')}</AppText> : null}
+            {!uploadsEnabled ? <AppText variant="caption" className="text-amber-700">{t('error.uploadNotConfigured')}</AppText> : null}
           </Card>
 
           {saveError ? <AppText variant="error">{t(saveError)}</AppText> : null}

@@ -66,8 +66,7 @@ EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:4000
 EXPO_PUBLIC_FIREBASE_API_KEY=fake-api-key
 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-agroconnect.firebaseapp.com
 EXPO_PUBLIC_FIREBASE_PROJECT_ID=demo-agroconnect
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=demo-agroconnect.appspot.com
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=000000000000
+EXPO_PUBLIC_EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=000000000000
 EXPO_PUBLIC_FIREBASE_APP_ID=1:000000000000:web:0000000000000000000000
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=
 EXPO_PUBLIC_USE_EMULATOR=true
@@ -86,7 +85,6 @@ FIREBASE_PRIVATE_KEY=
 FIREBASE_STORAGE_BUCKET=demo-agroconnect.appspot.com
 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
-FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
 ```
 
 Leave the AI values empty for emulator-only testing. Service-account credentials are not required in emulator mode.
@@ -217,29 +215,27 @@ Pop-Location
 - **STEP 7 Offline mode:** DEFERRED by owner. No TanStack Query persistence, offline banner, write-block queue, or bundled guides added.
 - **STEP 8 Voice assistant:** DEFERRED by owner. No STT/TTS adapters, mic controls, or speech permissions added.
 
-## 7c. Real Firebase on the Spark plan (no Storage)
+## 7c. Real Firebase on the Spark plan (no Firebase Storage; Cloudinary images)
 
-Use this when testing against a real Firebase project on the free **Spark** plan. Cloud Storage is not available on Spark, so product image uploads and crop-diagnosis image uploads must be disabled in the app.
+Use this when testing against a real Firebase project on the free **Spark** plan. Firebase Auth/Firestore remain on Firebase. Product and crop-diagnosis images use Cloudinary (signed uploads from backend), so no Firebase Storage plan/rules are required.
 
 ### Exact env values
 
-`E: Trimester\AgroApp\.env` (mobile, public values only):
+`E:\13 Trimester\AgroApp\.env` (mobile, public values only):
 
 ```text
 EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:4000
 EXPO_PUBLIC_FIREBASE_API_KEY=<your-web-api-key>
 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=<your-project>.firebaseapp.com
 EXPO_PUBLIC_FIREBASE_PROJECT_ID=<your-project-id>
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=<your-project>.firebasestorage.app
 EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=<sender-id>
 EXPO_PUBLIC_FIREBASE_APP_ID=<app-id>
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=
-EXPO_PUBLIC_STORAGE_ENABLED=false
 EXPO_PUBLIC_USE_EMULATOR=false
 EXPO_PUBLIC_FIREBASE_EMULATOR_HOST=
 ```
 
-`E: Trimester\AgroAppackend\.env` (backend, never commit real secrets):
+`E:\13 Trimester\AgroApp\backend\.env` (backend, never commit real secrets):
 
 ```text
 PORT=4000
@@ -248,32 +244,41 @@ CORS_ORIGINS=http://localhost:8081,http://127.0.0.1:8081
 FIREBASE_PROJECT_ID=<your-project-id>
 FIREBASE_CLIENT_EMAIL=<service-account-email>
 FIREBASE_PRIVATE_KEY=<service-account-private-key>
-FIREBASE_STORAGE_BUCKET=<your-project>.firebasestorage.app
 PRODUCT_IMAGE_REQUIRED=false
 FIREBASE_AUTH_EMULATOR_HOST=
 FIRESTORE_EMULATOR_HOST=
-FIREBASE_STORAGE_EMULATOR_HOST=
+CLOUDINARY_CLOUD_NAME=<your-cloud-name>
+CLOUDINARY_API_KEY=<your-api-key>
+CLOUDINARY_API_SECRET=<your-api-secret>
 ```
 
 Notes:
 
-- `EXPO_PUBLIC_STORAGE_ENABLED=false` disables Storage upload UI in the app. Product image upload and crop-diagnosis image upload show a clear bn/en message and the upload button is disabled; the rest of each screen keeps working.
-- `PRODUCT_IMAGE_REQUIRED=false` is the default and is correct on Spark because products cannot upload images. In production with Storage enabled, set `PRODUCT_IMAGE_REQUIRED=true` so active products require at least one valid image URL; drafts may still have no image.
-- Keep Firebase Storage bucket config present only if your project config includes it; do not enable Storage features on Spark.
+- Cloudinary secrets are backend-only. Never put `CLOUDINARY_API_SECRET` in mobile `.env` or any `EXPO_PUBLIC_*` variable.
+- Mobile upload availability is backend-driven via `GET /api/uploads/config`. If Cloudinary is not configured, product/diagnosis upload UI shows a clear bn/en “not configured” message and the rest of the screen keeps working.
+- `PRODUCT_IMAGE_REQUIRED=false` is the default. When `true`, active products require at least one valid Cloudinary image URL owned by that farmer/product; drafts may still have no image.
+- Product images are public Cloudinary assets under `agroconnect/products/{uid}/{productId}`. Diagnosis images are uploaded as Cloudinary `authenticated` assets under `agroconnect/diagnoses/{uid}` and must be served through short-lived signed backend URLs; they are not public.
 
 ### Firebase deploy command on Spark
 
-On Spark, **do not deploy Storage rules**. Deploy only Firestore rules/indexes (and other non-Storage targets you intentionally use):
+On Spark, deploy Firestore only (no Storage rules/targets):
 
 ```powershell
 npx firebase deploy --only firestore:rules,firestore:indexes --project <your-project-id>
 ```
 
-Do **not** use `--only storage`, `--only firestore,storage`, or any deploy target that includes `storage` on a Spark project.
+Do **not** use `--only storage` or include `storage` in deploy targets.
+
+### Cloudinary setup (user creates values in Cloudinary console)
+
+1. Create/use a free Cloudinary account and copy Cloud Name, API Key, and API Secret from the Cloudinary console/dashboard.
+2. Put those values only in `backend/.env` as `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. Do not commit them.
+3. Keep backend running with those env vars. Mobile calls `POST /api/uploads/sign` for signed upload params; backend decides folder and asset type.
+4. UNVERIFIED (not run here): real Cloudinary upload/delete/signed-delivery behavior against your account; Cloudinary free-plan limits/enforcement for file size, format, quota, authenticated delivery, and rate limits.
 
 ## 7d. Manual buyer/farmer smoke test
 
-1. Open <http://127.0.0.1:4004> and confirm the Auth, Firestore and Storage emulators are active.
+1. Open <http://127.0.0.1:4004> and confirm the Auth and Firestore emulators are active.
 2. In the app, register a **farmer**, create a product, set available stock, and publish it as active.
 3. Log out and register a **buyer** (or use a separate browser profile). Open the marketplace, search/filter for the product, view its detail page, add it to the cart and wishlist, and open the checkout preview.
 4. Confirm the cart shows the current backend price and grouped farmer summary. Real order submission is available (Phase 07A), but no order can become `paid` until deferred Phase 07B.

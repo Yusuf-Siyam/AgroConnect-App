@@ -9,7 +9,6 @@ import {
   type Auth,
 } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
-import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
 import { Platform } from 'react-native';
 
 import { env } from '@/config/env';
@@ -18,7 +17,6 @@ export type FirebaseServices = {
   app: FirebaseApp;
   auth: Auth;
   firestore: Firestore;
-  storage: FirebaseStorage;
 };
 
 let services: FirebaseServices | undefined;
@@ -81,16 +79,10 @@ export function getFirebase(): FirebaseServices {
       connectFirestoreEmulator(firestore, emulatorHost, 8080);
     }
 
-    const storage = getStorage(app);
-    if (env.useEmulator) {
-      connectStorageEmulator(storage, emulatorHost, 9199);
-    }
-
     services = {
       app,
       auth,
       firestore,
-      storage,
     };
   }
 

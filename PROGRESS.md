@@ -645,3 +645,11 @@ UNVERIFIED: real Spark Firebase project deploy/runtime; real-device camera/galle
 - Firebase Storage cleanup in backend/harness: removed Storage from Admin service init/test assumptions, removed Storage emulator from `firebase.json`, removed `firebase/storage.rules`, removed storage from root emulator scripts and emulator runner expectations; added `backend/tests/phaseUploads.emulator.test.ts` for Cloudinary upload endpoint contracts. Updated Phase 05A/09B emulator tests to Cloudinary model. Old Firebase Storage-specific emulator assertions removed/replaced with Cloudinary test-double assertions; rationale: Firebase Storage no longer used for images.
 - Verification: **UNVERIFIED (not run)** by user override - no tsc/lint/tests/emulators/build executed.
 
+## Cloudinary migration - STEP 2 mobile/docs (UNVERIFIED, not run)
+
+- Mobile uploads: replaced Firebase Storage product upload with compress + backend `POST /api/uploads/sign` (purpose `product`) + direct Cloudinary signed upload with progress; replaced diagnosis upload with purpose `diagnosis` authenticated Cloudinary upload and submits diagnosis image asset metadata to backend.
+- Removed Firebase Storage client usage from mobile runtime: `src/services/firebase.ts` no longer initializes Storage/emulator; removed storage env assumptions from mobile config/examples. Upload availability is backend-driven via `GET /api/uploads/config`; when disabled/not configured, product and diagnosis screens show clear bn/en message and keep rest of screen working.
+- Added `src/services/cloudinaryUpload.ts` for config/sign/upload helpers. Updated AI/product UI/services/types for Cloudinary diagnosis asset contract. Updated i18n keys (`error.uploadNotConfigured`) in bn/en.
+- Docs/config updated: `.env.example`, `backend/.env.example`, `README.md`, `RUN.md`, `firebase.json` scripts/config reflect Cloudinary flow and no Firebase Storage rules/emulator on Spark path. `PROGRESS.md` updated.
+- Verification: **UNVERIFIED (not run)** by user override - no tsc/lint/test:mobile/backend tests/check:i18n/emulators/build executed.
+

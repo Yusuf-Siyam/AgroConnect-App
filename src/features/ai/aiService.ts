@@ -39,7 +39,7 @@ export function deleteAiConversation(conversationId: string): Promise<void> {
 }
 
 export function submitDiagnosis(input: {
-  imagePath: string;
+  image: Diagnosis['image'];
   language: 'bn' | 'en';
   cropName?: string;
 }): Promise<Diagnosis> {

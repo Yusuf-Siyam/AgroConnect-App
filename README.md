@@ -84,7 +84,7 @@ React Native, Expo, TypeScript, Expo Router, NativeWind, Zustand, TanStack Query
 Node.js, Express.js, TypeScript, Firebase Admin SDK, REST API.
 
 ### Firebase
-Authentication, Cloud Firestore, Storage, Cloud Messaging (FCM), Firestore Security Rules.
+Authentication, Cloud Firestore, Cloud Messaging (FCM), Firestore Security Rules. Product/diagnosis images use Cloudinary signed uploads (backend-signed; secrets backend-only).
 
 ### External Services
 
@@ -104,7 +104,7 @@ One mobile application with four role-based dashboards.
 
 ```text
 React Native App  ->  Express REST API  ->  Firebase / External Services
-   (Expo Router)       (Zod, auth,           (Auth, Firestore, Storage,
+   (Expo Router)       (Zod, auth,           (Auth, Firestore, Cloudinary,
                         rate limiting)         FCM, Gemini, Maps, Payments)
 ```
 
@@ -368,7 +368,7 @@ Adapt the structure when necessary, without creating unnecessary complexity.
 
 **Phase 01 adaptation:** Expo Router routes live in `src/app/` (the Expo SDK 58 default), with the remaining mobile code under `src/`. The backend lives in `backend/src/`. Empty folders contain `.gitkeep` files until their phases are implemented.
 
-**Phase 02 additions:** Firebase client initialization and push-token helpers live in `src/services/`. The Admin SDK initializer lives in `backend/src/config/firebase.ts`. Security Rules and their Firebase CLI configuration live in `firebase/firestore.rules`, `firebase/storage.rules`, and `firebase.json`.
+**Phase 02 additions:** Firebase client initialization and push-token helpers live in `src/services/`. The Admin SDK initializer lives in `backend/src/config/firebase.ts`. Firestore Rules and Firebase CLI config live in `firebase/firestore.rules` and `firebase.json`. Firebase Storage rules were removed for the Spark/Cloudinary image flow.
 
 **Phase 03 additions:** Auth forms and profile parsing live in `src/features/authentication/`; session state is provided by `src/providers/AuthProvider.tsx`. Backend verification is in `backend/src/middleware/auth.ts`, profile endpoints in `backend/src/routes/auth.ts`, and secure admin provisioning in `backend/src/scripts/provision-admin.ts`. Rule-based role screens live under the `farmer`, `buyer`, `transporter`, and `admin` routes.
 
@@ -435,7 +435,7 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 **Result:** clean, runnable mobile and backend projects.
 
 ### Phase 02 - Firebase Integration
-- [x] Configure Firebase, Authentication, Firestore, Storage, FCM
+- [x] Configure Firebase, Authentication, Firestore, FCM (Firebase Storage replaced by Cloudinary for images)
 - [x] Set up Firebase Admin SDK
 - [x] Create Security Rules
 
@@ -503,10 +503,10 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 ### Phase 09 - AI Integration
 - [x] Isolated Gemini REST provider and farming-only assistant (`POST /api/ai/chat`) with Bangla default, bounded history, one retry and clear not-configured errors
 - [x] Owner-only conversation history with pagination and per-user daily/per-minute chat quotas
-- [x] Crop photo camera/gallery capture, compression, owner-only Storage upload with progress (`cropDiagnoses/{uid}/{diagnosisId}/...`)
+- [x] Crop photo camera/gallery capture, compression, backend-signed Cloudinary upload with progress; diagnosis assets stored as authenticated Cloudinary assets
 - [x] Configurable disease classifier endpoint with strict type/size/path checks and separate daily quota
 - [x] Confidence bands (uncertain/possible/likely), clearer-photo guidance for uncertain results and a fixed advisory disclaimer on every result
-- [x] Diagnosis history with delete (including image removal), Firestore/Storage rules, indexes and emulator tests with provider doubles
+- [x] Diagnosis history with delete (including Cloudinary asset removal attempt after commit), Firestore rules/indexes and emulator tests with provider doubles
 - [x] Farmer AI tab with disease check + assistant, loading/error/limit states and Bangla/English copy
 
 **Result:** Phase 09 complete. All AI calls go through the backend; no model or key is bundled in the mobile app. Real Gemini/classifier responses remain UNVERIFIED until the owner supplies credentials. See `RUN.md` for configuration and no-key testing.
@@ -661,7 +661,7 @@ Next Phase:
 ### Prerequisites
 - Node.js (current LTS) and npm
 - Git
-- Firebase project (Authentication, Firestore, Storage, Cloud Messaging enabled)
+- Firebase project (Authentication, Firestore, Cloud Messaging enabled); Cloudinary account for image uploads
 - Android Studio and/or Xcode for device builds
 
 ### Environment Variables (placeholders only, never commit real values)
@@ -673,7 +673,6 @@ EXPO_PUBLIC_API_BASE_URL=
 EXPO_PUBLIC_FIREBASE_API_KEY=
 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
 EXPO_PUBLIC_FIREBASE_PROJECT_ID=
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
 EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 EXPO_PUBLIC_FIREBASE_APP_ID=
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=       # restrict by app and API in Google Cloud
@@ -691,10 +690,13 @@ FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
 # Optional: defaults to <FIREBASE_PROJECT_ID>.appspot.com
-FIREBASE_STORAGE_BUCKET=
 # Local emulators only; leave empty for a real project
 FIREBASE_AUTH_EMULATOR_HOST=
 FIRESTORE_EMULATOR_HOST=
+# Cloudinary image uploads (backend-only; leave empty to disable uploads)
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 GEMINI_API_KEY=
 DISEASE_MODEL_ENDPOINT=
 DISEASE_MODEL_API_KEY=
@@ -743,10 +745,10 @@ The backend exposes `GET /api/health` and a consistent JSON 404/error format. Af
 
 ### Phase 02 setup (Firebase)
 
-1. Create a Firebase project and enable **Authentication**, **Cloud Firestore**, **Cloud Storage**, and **Cloud Messaging**.
+1. Create a Firebase project and enable **Authentication**, **Cloud Firestore**, and **Cloud Messaging**. Product/diagnosis images use Cloudinary (no Firebase Storage required).
 2. Register a **web app** in that project; copy its config values into the root `.env` as `EXPO_PUBLIC_FIREBASE_*` (the Firebase JS SDK uses this web-style config on native too).
-3. Create a least-privilege service account in Firebase **Settings → Service accounts**. Store the downloaded JSON outside the repository and copy its `project_id`, `client_email`, and `private_key` into `backend/.env` (the supported method in this phase). Keep `FIREBASE_STORAGE_BUCKET` empty unless a non-default bucket is used.
-4. Deploy the rules with the Firebase CLI (external tool, not a project script): `firebase use --add <project-id>`, then `firebase deploy --only firestore:rules,firestore:indexes,storage`. The source of truth is `firebase/firestore.rules` and `firebase/storage.rules`, wired through `firebase.json`.
+3. Create a least-privilege service account in Firebase **Settings → Service accounts**. Store the downloaded JSON outside the repository and copy its `project_id`, `client_email`, and `private_key` into `backend/.env`. Add Cloudinary backend env vars only if image uploads are enabled; keep secrets server-only.
+4. Deploy Firestore rules/indexes with the Firebase CLI: `firebase use --add <project-id>`, then `firebase deploy --only firestore:rules,firestore:indexes`. The source of truth is `firebase/firestore.rules` and `firebase/firestore.indexes.json`, wired through `firebase.json`. Do not deploy Storage rules on Spark/Cloudinary flow.
 5. Admin access is a server-assigned custom claim (`admin: true`). Never add admins through public registration or client-side code.
 6. FCM: `expo-notifications` is installed and configured via the app config plugin with a `default` Android channel. Remote push requires a development/production build (not Expo Go on Android, SDK 53+). Configure Android FCM V1 credentials per <https://docs.expo.dev/push-notifications/fcm-credentials.md> and iOS APNs credentials via Expo EAS. Set `extra.eas.projectId` in the app config when the EAS project exists so Expo push tokens can be issued; no placeholder ID is committed.
 
@@ -773,7 +775,7 @@ Verification performed in this repository: mobile `npm run typecheck`, `npm run 
 - Loading, error, and empty states use `StateView`; profile mutations show a real loading/error state with retry. No simulated data or mock success responses were added.
 - This phase needs no new credentials. Verification: mobile `npm run typecheck`, `npm run lint`, `npx expo-doctor` (20/20), and web/iOS/Android exports. Visual review on physical devices is **UNVERIFIED** in this environment.
 
-### Local Firebase emulator verification (Auth + Firestore + Storage)
+### Local Firebase emulator verification (Auth + Firestore)
 
 The Firebase CLI is a root dev dependency. Install Java 21+ (required by the current Firestore emulator), then install both dependency trees. Windows/PowerShell users should follow [RUN.md](RUN.md) for exact commands and platform-specific host settings:
 
@@ -788,27 +790,29 @@ Start the emulators for interactive use:
 npm run emulators
 ```
 
-This starts Auth on `127.0.0.1:9099`, Firestore on `127.0.0.1:8080`, Storage on `127.0.0.1:9199`, and the Emulator Suite UI on <http://127.0.0.1:4004> (4004 avoids the backend's default port 4000). The project is `demo-agroconnect` from `.firebaserc`; Firestore loads `firebase/firestore.rules` and indexes from `firebase/firestore.indexes.json`, and Storage loads `firebase/storage.rules` through `firebase.json`.
+This starts Auth on `127.0.0.1:9099`, Firestore on `127.0.0.1:8080`, and the Emulator Suite UI on <http://127.0.0.1:4004`> (4004 avoids the backend's default port 4000). The project is `demo-agroconnect` from `.firebaserc`; Firestore loads `firebase/firestore.rules` and indexes from `firebase/firestore.indexes.json` through `firebase.json`.
 
-Run the automated Phase 3 checks (emulators start and stop automatically):
+Run the automated emulator checks (emulators start and stop automatically):
 
 ```bash
 npm run test:emulators
 ```
 
-The suite uses real emulator tokens and real HTTP calls. Phase 3 covers registration/login, a valid token returning 200 from `GET /api/auth/me`, 401 for missing/invalid tokens, 403 for a non-admin token on `GET /api/auth/admin-status`, trusted Admin SDK claim propagation, rejection of public admin creation, and Firestore rules denial for unauthorized reads/writes. Phase 05A additionally verifies buyer 403s, Zod validation, product ownership, image-URL ownership, pagination/search/status filtering/soft delete, signed-in active-product reads, backend-only Firestore writes, and owner-only Storage uploads. Phase 05B verifies Zod validation on every new endpoint, product ownership, negative-stock rejection, stock-history entries, pending-only order transitions, stock re-checks, no payment/delivery fields written by accept/reject, analytics from real orders/payments, read-only market history, and weather caching/fallback against a local fake provider. Phase 06A verifies buyer-only marketplace access, hidden drafts/out-of-stock products, category/price/district/unit/search filters, sorting, pagination, and privacy-safe farmer profiles. Phase 06B verifies buyer-only cart/wishlist/review access, Zod validation, live cart prices, stock/min-order checks, own/inactive product blocks, multiple-farmer carts, wishlist duplicate prevention, delivered-order review eligibility, one review per buyer/product, and transactional product/farmer rating aggregates.
+The suite uses real emulator tokens and real HTTP calls. It covers Auth/role/rules checks, product/order/market/buyer flows, and Cloudinary upload contract checks using test doubles (no real Cloudinary calls). Image upload tests no longer use Firebase Storage emulator; they verify backend-signed Cloudinary params, ownership, and diagnosis asset handling through injected doubles.
 
-For manual mobile/backend testing against the emulators, set `EXPO_PUBLIC_USE_EMULATOR=true` in the root `.env` and restart Expo. The client connects Auth, Firestore and Storage to emulators **only** when this value is exactly `true`; real-project `.env` files must leave it empty or set it to `false`. The client selects `127.0.0.1` on web/iOS and `10.0.2.2` on Android; set `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST` to override it for a physical device. Set these in `backend/.env` (no service account is needed in emulator mode):
+For manual mobile/backend testing against the emulators, set `EXPO_PUBLIC_USE_EMULATOR=true` in the root `.env` and restart Expo. The client connects Auth and Firestore emulators **only** when this value is exactly `true`; real-project `.env` files must leave it empty or set it to `false`. The client selects `127.0.0.1` on web/iOS and `10.0.2.2` on Android; set `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST` to override it for a physical device. Set these in `backend/.env` (no service account is needed in emulator mode):
 
 `backend/.env`:
 
 ```text
 FIREBASE_PROJECT_ID=demo-agroconnect
-FIREBASE_STORAGE_BUCKET=demo-agroconnect.appspot.com
 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
-FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199
 CORS_ORIGINS=http://localhost:8081,http://127.0.0.1:8081
+# Optional Cloudinary image uploads (backend-only secrets):
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 ```
 
 Root `.env`, when the mobile app also calls the local backend:
@@ -822,9 +826,9 @@ Use `http://10.0.2.2:4000` as `EXPO_PUBLIC_API_BASE_URL` on an Android emulator.
 ### Phase 05A setup (Products)
 
 1. The farmer dashboard, products list, product form and image picker are available under `/farmer`. The dashboard calls `GET /api/products/stats`; no counts are hard-coded.
-2. Product images are compressed on device and uploaded to `products/{uid}/{productId}/...`. Storage rules allow owner writes only, accept JPEG/PNG/WebP, and cap files at 5 MB. The backend rejects image URLs outside the authenticated farmer's UID/product path.
+2. Product images are compressed on device, signed by backend `POST /api/uploads/sign` (purpose `product`, farmer-owned product id), and uploaded directly to Cloudinary. Backend validates Cloudinary URLs as `https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/...` inside the owner product folder. Diagnosis images use purpose `diagnosis`, authenticated Cloudinary assets, and backend-signed delivery URLs.
 3. Firestore product documents are written only through the backend. Signed-in users can read `active` products; owners and admins can also read their drafts. `GET /api/products` supports `search`, `status`, `limit` and `offset`.
-4. Deploy indexes with the rules: `npx firebase deploy --only firestore:rules,firestore:indexes,storage`.
+4. Deploy Firestore indexes/rules: `npx firebase deploy --only firestore:rules,firestore:indexes`.
 
 ### Phase 05B setup (Orders, stock, analytics, weather, market)
 
@@ -850,7 +854,7 @@ The file must be a non-empty array of `{ "crop", "district", "date" (YYYY-MM-DD)
 ```bash
 npx firebase login
 npx firebase use --add <your-firebase-project-id>
-npx firebase deploy --only firestore:rules,firestore:indexes,storage
+npx firebase deploy --only firestore:rules,firestore:indexes
 ```
 
 3. Enable Email/Password sign-in, add authorized domains, and provision admins only with `cd backend && npm run admin:provision -- <firebase-uid>`. Live Firebase behavior remains unverified until these real credentials and project settings are supplied.

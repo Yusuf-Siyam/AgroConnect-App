@@ -37,10 +37,20 @@ export type CropDiseaseResult = {
 
 export type DiagnosisStatus = 'uncertain' | 'possible' | 'likely';
 
+export type DiagnosisImageAsset = {
+  provider: 'cloudinary';
+  publicId: string;
+  resourceType: 'image';
+  deliveryType: 'authenticated';
+  version?: number;
+  format?: string;
+};
+
 export type Diagnosis = {
   id: string;
   userId: string;
-  imagePath: string;
+  image: DiagnosisImageAsset;
+  imageUrl: string;
   cropName?: string;
   confidence: number;
   status: DiagnosisStatus;
