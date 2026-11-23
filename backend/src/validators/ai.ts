@@ -21,9 +21,20 @@ export const conversationIdParamSchema = z
   .object({ conversationId: z.string().trim().min(1).max(128) })
   .strict();
 
+const cloudinaryImageSchema = z
+  .object({
+    provider: z.literal('cloudinary'),
+    publicId: z.string().trim().min(1).max(300),
+    resourceType: z.literal('image'),
+    deliveryType: z.literal('authenticated'),
+    version: z.number().int().positive().optional(),
+    format: z.string().trim().min(1).max(20).optional(),
+  })
+  .strict();
+
 export const diagnoseSchema = z
   .object({
-    imagePath: z.string().trim().min(1).max(500),
+    image: cloudinaryImageSchema,
     cropName: z.string().trim().min(1).max(100).optional(),
     language: aiLanguageSchema.optional(),
   })

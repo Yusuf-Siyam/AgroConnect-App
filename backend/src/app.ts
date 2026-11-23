@@ -25,6 +25,7 @@ import { createProductBatchesRouter } from './routes/productBatches';
 import { createProductsRouter } from './routes/products';
 import { createReputationRouter } from './routes/reputation';
 import { createReviewsRouter } from './routes/reviews';
+import { createUploadsRouter } from './routes/uploads';
 import { createWeatherRouter } from './routes/weather';
 import { createWishlistRouter } from './routes/wishlist';
 import { healthRouter } from './routes/health';
@@ -63,6 +64,7 @@ export function createApp(options: AppOptions = {}) {
   app.use('/api/delivery', createDeliveryRouter());
   app.use('/api/chat', createChatRouter());
   app.use('/api/notifications', createNotificationsRouter());
+  app.use('/api/uploads', createUploadsRouter());
   app.use('/api/ai', createAiRouter(options.aiTextProvider, options.cropDiseaseClassifier));
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/weather', createWeatherRouter());

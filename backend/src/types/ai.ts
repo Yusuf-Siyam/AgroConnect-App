@@ -47,8 +47,17 @@ export type CropDiseaseResult = {
   alternatives: string[];
 };
 
+export type DiagnosisImageAsset = {
+  provider: 'cloudinary';
+  publicId: string;
+  resourceType: 'image';
+  deliveryType: 'authenticated';
+  version?: number;
+  format?: string;
+};
+
 export type CropDiseaseInput = {
-  imagePath: string;
+  image: DiagnosisImageAsset;
   imageData: Buffer;
   mimeType: string;
   cropName?: string;
@@ -64,7 +73,8 @@ export type DiagnosisStatus = 'uncertain' | 'possible' | 'likely';
 export type Diagnosis = {
   id: string;
   userId: string;
-  imagePath: string;
+  image: DiagnosisImageAsset;
+  imageUrl: string;
   cropName?: string;
   confidence: number;
   status: DiagnosisStatus;

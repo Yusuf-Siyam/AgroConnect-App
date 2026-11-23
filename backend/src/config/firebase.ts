@@ -1,7 +1,6 @@
 import { cert, getApp, getApps, initializeApp, type App } from 'firebase-admin/app';
 import { getAuth, type Auth } from 'firebase-admin/auth';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
-import { getStorage, type Storage } from 'firebase-admin/storage';
 
 import { env } from './env';
 
@@ -15,14 +14,12 @@ export type FirebaseAdminConfig = {
   projectId: string;
   clientEmail: string;
   privateKey: string;
-  storageBucket: string;
 };
 
 export type FirebaseAdminServices = {
   app: App;
   auth: Auth;
   firestore: Firestore;
-  storage: Storage;
 };
 
 let cached: FirebaseAdminServices | undefined;
@@ -49,7 +46,6 @@ export function parseFirebaseAdminConfig(
     clientEmail: input.FIREBASE_CLIENT_EMAIL?.trim() ?? '',
     // .env files commonly store the PEM with escaped newlines on one line.
     privateKey: (input.FIREBASE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n').trim(),
-    storageBucket: input.FIREBASE_STORAGE_BUCKET?.trim() || `${projectId}.appspot.com`,
   };
 }
 
@@ -61,8 +57,7 @@ export function isFirebaseAdminConfigured(): boolean {
 export function isFirebaseEmulatorEnabled(): boolean {
   return Boolean(
     process.env.FIREBASE_AUTH_EMULATOR_HOST?.trim() ||
-      process.env.FIRESTORE_EMULATOR_HOST?.trim() ||
-      process.env.FIREBASE_STORAGE_EMULATOR_HOST?.trim(),
+      process.env.FIRESTORE_EMULATOR_HOST?.trim(),
   );
 }
 
@@ -83,14 +78,12 @@ export function getFirebaseAdmin(): FirebaseAdminServices {
           ? getApp()
           : initializeApp({
               projectId,
-              storageBucket: env.firebaseStorageBucket || `${projectId}.appspot.com`,
             });
     } else {
       const config = parseFirebaseAdminConfig({
         FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
         FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL,
         FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY,
-        FIREBASE_STORAGE_BUCKET: env.firebaseStorageBucket,
       });
 
       app =
@@ -103,7 +96,6 @@ export function getFirebaseAdmin(): FirebaseAdminServices {
                 privateKey: config.privateKey,
               }),
               projectId: config.projectId,
-              storageBucket: config.storageBucket,
             });
     }
 
@@ -111,7 +103,6 @@ export function getFirebaseAdmin(): FirebaseAdminServices {
       app,
       auth: getAuth(app),
       firestore: getFirestore(app),
-      storage: getStorage(app),
     };
   }
 

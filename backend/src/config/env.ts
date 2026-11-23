@@ -9,8 +9,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().max(65535).default(4000),
   CORS_ORIGINS: z.string().default(''),
-  FIREBASE_STORAGE_BUCKET: z.string().default(''),
-  FIREBASE_STORAGE_EMULATOR_HOST: z.string().default(''),
+  CLOUDINARY_CLOUD_NAME: z.string().default(''),
+  CLOUDINARY_API_KEY: z.string().default(''),
+  CLOUDINARY_API_SECRET: z.string().default(''),
   PRODUCT_IMAGE_REQUIRED: z.preprocess(
     (value) => (value === '' || value === undefined ? 'false' : value),
     z
@@ -67,8 +68,9 @@ export const env = {
   corsOrigins: parsed.data.CORS_ORIGINS.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
-  firebaseStorageBucket: parsed.data.FIREBASE_STORAGE_BUCKET,
-  firebaseStorageEmulatorHost: parsed.data.FIREBASE_STORAGE_EMULATOR_HOST,
+  cloudinaryCloudName: parsed.data.CLOUDINARY_CLOUD_NAME,
+  cloudinaryApiKey: parsed.data.CLOUDINARY_API_KEY,
+  cloudinaryApiSecret: parsed.data.CLOUDINARY_API_SECRET,
   productImageRequired: parsed.data.PRODUCT_IMAGE_REQUIRED,
   openMeteoForecastUrl: parsed.data.OPEN_METEO_FORECAST_URL,
   openMeteoGeocodingUrl: parsed.data.OPEN_METEO_GEOCODING_URL,

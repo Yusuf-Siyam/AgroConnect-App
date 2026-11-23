@@ -16,25 +16,18 @@ import {
   setDoc,
   type Firestore,
 } from 'firebase/firestore';
-import {
-  connectStorageEmulator,
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadString,
-  type FirebaseStorage,
-} from 'firebase/storage';
 
 import type { FirebaseAdminServices } from '../src/config/firebase';
+import { createCloudinaryTestService } from '../src/services/cloudinary.testDouble';
+import { resetCloudinaryService, setCloudinaryService } from '../src/services/cloudinary';
 import type { ProductPayload } from '../../src/features/farmer/schemas';
 
 const PROJECT_ID = 'demo-agroconnect';
 const AUTH_HOST = '127.0.0.1:9099';
 const FIRESTORE_HOST = '127.0.0.1';
 const FIRESTORE_PORT = 8080;
-const STORAGE_HOST = '127.0.0.1';
-const STORAGE_PORT = 9199;
 const STORAGE_BUCKET = 'demo-agroconnect.appspot.com';
+const CLOUD_NAME = 'test-cloud';
 
 const firebaseConfig = {
   apiKey: 'emulator-api-key',
@@ -44,7 +37,7 @@ const firebaseConfig = {
   storageBucket: STORAGE_BUCKET,
 };
 
-type Client = { app: FirebaseApp; auth: Auth; firestore: Firestore; storage: FirebaseStorage };
+type Client = { app: FirebaseApp; auth: Auth; firestore: Firestore };
 type TestUser = { client: Client; uid: string; email: string; token: string };
 
 let server: Server;
@@ -63,9 +56,7 @@ function makeClient(name: string): Client {
   connectAuthEmulator(auth, `http://${AUTH_HOST}`, { disableWarnings: true });
   const firestore = getFirestore(app);
   connectFirestoreEmulator(firestore, FIRESTORE_HOST, FIRESTORE_PORT);
-  const storage = getStorage(app, `gs://${STORAGE_BUCKET}`);
-  connectStorageEmulator(storage, STORAGE_HOST, STORAGE_PORT);
-  return { app, auth, firestore, storage };
+  return { app, auth, firestore };
 }
 
 async function registerUser(label: string, role: 'farmer' | 'buyer'): Promise<TestUser> {
@@ -100,6 +91,10 @@ function fetchAs(path: string, token?: string, init?: RequestInit): Promise<Resp
   });
 }
 
+function ownedImageUrl(uid: string, productId: string): string {
+  return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/v1/agroconnect/products/${uid}/${productId}/photo.jpg`;
+}
+
 function productPayload(overrides: Partial<ProductPayload> = {}): ProductPayload {
   const id = overrides.id ?? randomUUID();
   const images = overrides.images ?? [ownedImageUrl(farmer.uid, id)];
@@ -121,10 +116,6 @@ function productPayload(overrides: Partial<ProductPayload> = {}): ProductPayload
   };
 }
 
-function ownedImageUrl(uid: string, productId: string): string {
-  return `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/products%2F${uid}%2F${productId}%2Fphoto.jpg?alt=media`;
-}
-
 function hasCode(error: unknown, code: string): boolean {
   return (
     typeof error === 'object' &&
@@ -135,7 +126,7 @@ function hasCode(error: unknown, code: string): boolean {
 }
 
 function isPermissionDenied(error: unknown): boolean {
-  return hasCode(error, 'permission-denied') || hasCode(error, 'storage/unauthorized');
+  return hasCode(error, 'permission-denied');
 }
 
 async function errorCode(response: Response): Promise<string> {
@@ -144,10 +135,12 @@ async function errorCode(response: Response): Promise<string> {
 
 before(async () => {
   process.env.FIREBASE_PROJECT_ID = PROJECT_ID;
-  process.env.FIREBASE_STORAGE_BUCKET = STORAGE_BUCKET;
   process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_HOST;
   process.env.FIRESTORE_EMULATOR_HOST = `${FIRESTORE_HOST}:${FIRESTORE_PORT}`;
-  process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${STORAGE_HOST}:${STORAGE_PORT}`;
+  process.env.CLOUDINARY_CLOUD_NAME = CLOUD_NAME;
+  process.env.CLOUDINARY_API_KEY = 'test-key';
+  process.env.CLOUDINARY_API_SECRET = 'test-secret';
+  setCloudinaryService(createCloudinaryTestService({ deleted: [], failDelete: false, cloudName: CLOUD_NAME }));
 
   const { createApp } = await import('../src/app.js');
   const { getFirebaseAdmin } = await import('../src/config/firebase.js');
@@ -161,6 +154,7 @@ before(async () => {
 });
 
 after(async () => {
+  resetCloudinaryService();
   for (const app of clientApps.splice(0)) await deleteApp(app);
   if (admin) await deleteAdminApp(admin.app);
   if (server) {
@@ -194,7 +188,7 @@ describe('Phase 05A product emulator verification', () => {
     assert.equal(await errorCode(badStock), 'VALIDATION_ERROR');
   });
 
-  it('creates products, enforces ownership and verifies Storage image URLs', async () => {
+  it('creates products, enforces ownership and verifies Cloudinary image URLs', async () => {
     otherFarmer = await registerUser('farmer-b', 'farmer');
     const payload = productPayload();
 
@@ -219,6 +213,11 @@ describe('Phase 05A product emulator verification', () => {
     });
     assert.equal(foreignImage.status, 400);
     assert.equal(await errorCode(foreignImage), 'INVALID_IMAGE_URL');
+
+    assert.equal(ownsProductImageUrl(ownedImageUrl(farmer.uid, payload.id), farmer.uid, payload.id), true);
+    assert.equal(ownsProductImageUrl(ownedImageUrl(otherFarmer.uid, payload.id), farmer.uid, payload.id), false);
+    assert.equal(ownsProductImageUrl('https://evil.example/image/upload/v1/agroconnect/products/x/y/z.jpg', farmer.uid, payload.id), false);
+    assert.equal(ownsProductImageUrl(`https://res.cloudinary.com/other-cloud/image/upload/v1/agroconnect/products/${farmer.uid}/${payload.id}/photo.jpg`, farmer.uid, payload.id), false);
 
     const foreignEdit = await fetchAs(`/api/products/${product.id}`, otherFarmer.token, {
       method: 'PATCH',
@@ -300,34 +299,5 @@ describe('Phase 05A product emulator verification', () => {
 
     const anonymous = makeClient(`anonymous-${randomUUID()}`);
     await assert.rejects(getDoc(doc(anonymous.firestore, 'products', activeId)), isPermissionDenied);
-  });
-
-  it('applies Storage rules and accepts real owner upload URLs', async () => {
-    const productId = randomUUID();
-    const ownerPath = `products/${farmer.uid}/${productId}/photo.jpg`;
-    await uploadString(ref(farmer.client.storage, ownerPath), 'fake-jpeg-bytes', 'raw', {
-      contentType: 'image/jpeg',
-    });
-
-    const url = await getDownloadURL(ref(farmer.client.storage, ownerPath));
-    assert.equal(ownsProductImageUrl(url, farmer.uid, productId), true, url);
-    assert.equal(ownsProductImageUrl(url, otherFarmer.uid, productId), false);
-
-    const foreignPath = `products/${farmer.uid}/${productId}/foreign.jpg`;
-    await assert.rejects(
-      uploadString(ref(otherFarmer.client.storage, foreignPath), 'fake-jpeg-bytes', 'raw', {
-        contentType: 'image/jpeg',
-      }),
-      isPermissionDenied,
-    );
-
-    const wrongTypePath = `products/${farmer.uid}/${productId}/notes.txt`;
-    await assert.rejects(
-      uploadString(ref(farmer.client.storage, wrongTypePath), 'text', 'raw', { contentType: 'text/plain' }),
-      isPermissionDenied,
-    );
-
-    const publicRead = await getDownloadURL(ref(buyer.client.storage, ownerPath));
-    assert.equal(publicRead.includes(ownerPath.replaceAll('/', '%2F')), true);
   });
 });

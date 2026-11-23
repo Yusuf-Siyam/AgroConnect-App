@@ -25,6 +25,7 @@ const testFiles = [
   'backend/tests/phase11-batch.emulator.test.ts',
   'backend/tests/phase11-emergency.emulator.test.ts',
   'backend/tests/phase11-group.emulator.test.ts',
+  'backend/tests/phaseUploads.emulator.test.ts',
 ];
 
 for (const testFile of testFiles) {

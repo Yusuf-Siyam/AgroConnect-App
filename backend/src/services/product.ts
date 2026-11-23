@@ -20,6 +20,7 @@ import type {
   StockAdjustmentInput,
   UpdateProductInput,
 } from '../validators/product';
+import { getCloudinaryService } from './cloudinary';
 import { getFarmerReputation } from './reputation';
 
 type TimestampLike = { toDate?: () => Date };
@@ -67,46 +68,14 @@ export function parseStoredProduct(data: unknown): Product {
 }
 
 /**
- * A client may only attach images stored under its own UID and product id.
- * The URL check is repeated server-side because Storage rules protect uploads,
- * not arbitrary strings submitted in a product document.
+ * A client may only attach Cloudinary images owned by this farmer and product.
+ * The check is repeated server-side because signed uploads protect uploads,
+ * not arbitrary URLs submitted in a product document.
  */
 export function ownsProductImageUrl(url: string, sellerId: string, productId: string): boolean {
   try {
-    const parsed = new URL(url);
-    const emulatorHost = env.firebaseStorageEmulatorHost;
-    const isLocalEmulatorUrl = Boolean(
-      emulatorHost && parsed.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(parsed.hostname),
-    );
-    if (parsed.protocol !== 'https:' && !isLocalEmulatorUrl) return false;
-    if (
-      !isLocalEmulatorUrl &&
-      !/^(firebasestorage\.googleapis\.com|storage\.googleapis\.com)$/i.test(parsed.hostname)
-    ) {
-      return false;
-    }
-
-    let objectPath: string;
-    if (parsed.hostname === 'storage.googleapis.com') {
-      objectPath = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
-      if (env.firebaseStorageBucket && !objectPath.startsWith(`${env.firebaseStorageBucket}/`)) {
-        return false;
-      }
-      if (env.firebaseStorageBucket) {
-        objectPath = objectPath.slice(env.firebaseStorageBucket.length + 1);
-      }
-    } else {
-      const encodedPath = parsed.pathname.split('/o/')[1];
-      if (!encodedPath) return false;
-      objectPath = decodeURIComponent(encodedPath);
-      const bucketMatch = parsed.pathname.match(/\/b\/([^/]+)\/o\//);
-      if (env.firebaseStorageBucket && bucketMatch?.[1] !== env.firebaseStorageBucket) {
-        return false;
-      }
-    }
-
-    const prefix = `products/${sellerId}/${productId}/`;
-    return objectPath.startsWith(prefix) && objectPath.length > prefix.length;
+    getCloudinaryService().parseOwnedDeliveryUrl(url, sellerId, 'product', productId);
+    return true;
   } catch {
     return false;
   }
@@ -118,7 +87,7 @@ function assertOwnedImages(images: string[] | undefined, sellerId: string, produ
     throw new HttpError(
       400,
       'INVALID_IMAGE_URL',
-      'Every image URL must belong to this farmer and product in Firebase Storage.',
+      'Every image URL must belong to this farmer and product in Cloudinary.',
     );
   }
 }

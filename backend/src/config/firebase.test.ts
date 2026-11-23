@@ -10,22 +10,12 @@ const validEnv = {
 };
 
 describe('Firebase Admin configuration', () => {
-  it('normalizes the private key and derives the default storage bucket', () => {
+  it('normalizes the private key', () => {
     const config = parseFirebaseAdminConfig(validEnv);
 
     assert.equal(config.projectId, 'agroconnect-test');
     assert.equal(config.clientEmail, 'admin@agroconnect-test.iam.gserviceaccount.com');
     assert.equal(config.privateKey, 'line-1\nline-2');
-    assert.equal(config.storageBucket, 'agroconnect-test.appspot.com');
-  });
-
-  it('keeps an explicitly configured storage bucket', () => {
-    const config = parseFirebaseAdminConfig({
-      ...validEnv,
-      FIREBASE_STORAGE_BUCKET: 'agroconnect-custom.appspot.com',
-    });
-
-    assert.equal(config.storageBucket, 'agroconnect-custom.appspot.com');
   });
 
   it('lists every missing required variable in one error', () => {
@@ -49,7 +39,6 @@ describe('Firebase Admin configuration', () => {
       'FIREBASE_PRIVATE_KEY',
       'FIREBASE_AUTH_EMULATOR_HOST',
       'FIRESTORE_EMULATOR_HOST',
-      'FIREBASE_STORAGE_EMULATOR_HOST',
     ] as const;
     const previous = keys.map((key) => process.env[key]);
     keys.forEach((key) => delete process.env[key]);
