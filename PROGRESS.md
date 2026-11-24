@@ -653,3 +653,35 @@ UNVERIFIED: real Spark Firebase project deploy/runtime; real-device camera/galle
 - Docs/config updated: `.env.example`, `backend/.env.example`, `README.md`, `RUN.md`, `firebase.json` scripts/config reflect Cloudinary flow and no Firebase Storage rules/emulator on Spark path. `PROGRESS.md` updated.
 - Verification: **UNVERIFIED (not run)** by user override - no tsc/lint/test:mobile/backend tests/check:i18n/emulators/build executed.
 
+## Gemini vision plant-photo advisory - STEP 0 read-only audit (2026-11-24, docs only)
+
+Baseline before any change: read `README.md`, `PROGRESS.md`, `RUN.md` and `git log` (HEAD `a665726`). No feature code was changed in this step. The shell had no `java` on `PATH`; a Temurin JDK 21 was downloaded and extracted only under `/tmp/opencode/jdk21` (outside the repository) so the required full emulator suite can run in later steps.
+
+### Current plant-photo flow (read-only)
+
+- `backend/src/routes/ai.ts`: `POST /api/ai/diagnose` is farmer-only, rate-limited, Zod-validated and calls `assertDiseaseConfigured()` before `createDiagnosis()`. `GET /api/ai/diagnoses`, `GET /api/ai/diagnoses/:id` and `DELETE /api/ai/diagnoses/:id` are owner-only history endpoints.
+- `backend/src/validators/ai.ts`: the request accepts a Cloudinary authenticated image asset (`provider/publicId/resourceType/deliveryType/version/format`), optional `cropName`, and optional `bn|en` language. No new image-input contract is needed for a Gemini backend adapter.
+- `backend/src/services/diagnosis.ts`: verifies Cloudinary folder ownership, derives the diagnosis id from `agroconnect/diagnoses/{uid}/{diagnosisId}/...`, consumes per-user quota, downloads the authenticated asset through `cloudinary.readAsset()`, validates MIME type and 5 MB size, then calls the injected `CropDiseaseClassifier`. It maps numeric confidence to `uncertain|possible|likely`, hides the label when uncertain, optionally requests Gemini text guidance, and stores `cropDiagnoses/{id}` with `userId`, `image`, `cropName`, internal `confidence`, `status`, `result`, `advisoryNotice`, optional `guidance`, `language` and timestamps.
+- `backend/src/providers/diseaseClassifier.ts`: the only real classifier adapter posts inline base64 image bytes plus MIME/crop name to an owner-supplied `DISEASE_MODEL_ENDPOINT`; it strictly Zod-validates `{label, confidence, alternatives[]}`. This verified-model adapter pattern must be preserved for a future external provider.
+- `backend/src/providers/gemini.ts`: existing text-only Gemini adapter uses `POST https://generativelanguage.googleapis.com/v1beta/interactions` with `x-goog-api-key`, `Api-Revision: 2026-05-20`, `model`, `system_instruction`, `input` and `generation_config.max_output_tokens`; it applies timeout, one retry and safe error mapping. No Gemini SDK is installed; backend REST through `fetch` is the established pattern.
+- `src/app/farmer/ai/index.tsx` and `src/features/ai/*`: camera/gallery pick, compress, signed Cloudinary upload with progress, then `POST /api/ai/diagnose`. The result card currently renders a confidence band, model label/alternatives, guidance and history; this wording must become **AI photo suggestion**, explicitly unverified, with no percentage or “confirmed/diagnosed” claims.
+
+### Official Gemini documentation checked (2026-11-24)
+
+- `https://aistudio.google.com/docs/image-understanding.md`: Gemini accepts inline base64 image data as an interaction input item `{type: "image", data, mime_type}`; File API URIs are the other documented path. Supported MIME types include `image/png`, `image/jpeg`, `image/webp`, `image/heic`, `image/heif`. Inline bytes count toward a 20 MB total request limit; a Files API path exists for larger/reused files. Because diagnosis images are already downloaded server-side through signed Cloudinary delivery, inline base64 is the smallest verified option and avoids passing a signed Cloudinary URL to a third party.
+- `https://aistudio.google.com/docs/structured-output.md`: Gemini accepts `response_format: {type: "text", mime_type: "application/json", schema}` on the Interactions REST endpoint; the model JSON is returned in `output_text` and must still be validated in application code. The docs note that structured outputs are suitable for structured classification/extraction.
+- `https://aistudio.google.com/docs/models.md`: model codes and availability change; no model name is hardcoded in this audit. A separate owner-supplied vision model env value is preferred over assuming the current text model accepts image input.
+- `https://aistudio.google.com/llms.txt`: the current docs index states Interactions API is the default and `generateContent` is legacy; clean Markdown pages are available by appending `.md`. API keys must stay server-side.
+- Installed support in repo: `backend/package.json` has no `@google/genai`/Gemini SDK; the existing REST adapter makes no new dependency necessary. Real Gemini calls are never made by tests.
+
+### Decisions and gaps for STEP 1/2
+
+- Feature is an **unverified AI photo suggestion**, not a diagnosis. Existing internal route/collection names remain for compatibility, but user-facing copy and stored advisory fields will say “suggestion”, “possible” and “unverified”; no percentage confidence, “confirmed” or “diagnosed” wording.
+- Add `DISEASE_PROVIDER=none|gemini|external` with `none` as the default. `none` returns `AI_NOT_CONFIGURED` without calling any provider; `gemini` uses a new `PlantPhotoAdvisor` Gemini vision adapter; `external` keeps the existing `CropDiseaseClassifier` adapter behind a thin advisor for a future verified classifier. The old classifier adapter is not deleted.
+- Use a separate `GEMINI_VISION_MODEL` env value for image-capable model selection; keep `GEMINI_API_KEY` server-side. No key, model, image bytes or response body is logged.
+- Gemini output uses an explicit JSON schema and is parsed with strict Zod. The model reports a bounded uncertainty band (`unclear|possible|likely`), not a calibrated numeric confidence; internal numeric values may be derived only for existing status compatibility and are never displayed as percentages.
+- A server-side chemical/dose guard rejects numeric dose patterns and unsafe chemical instructions before any text is stored or displayed; it appends a label/extension-officer disclaimer. No chemical name or dosage is authored by the app.
+- Cloudinary authenticated download, magic-byte MIME checks, size checks and existing per-user/rate limits are reused. Server-side EXIF removal is **not implemented** because no heavy image dependency is added; mobile re-encoding is used but its metadata behavior remains UNVERIFIED.
+- `npm run ai:check-vision` will be a configuration-only check (presence/shape of provider/key/model), never a real Gemini request. Tests will inject advisor doubles only.
+- Do not start Phase 12, deferred Phase 07B, or deferred Phase 11 Steps 6/7/8. Real Gemini account behavior and Bangladesh-crop accuracy remain UNVERIFIED by task definition.
+
