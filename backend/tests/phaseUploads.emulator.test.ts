@@ -10,6 +10,7 @@ import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth } from 'fi
 import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { createApp } from '../src/app.js';
+import { env } from '../src/config/env.js';
 import type { FirebaseAdminServices } from '../src/config/firebase.js';
 import { createCloudinaryTestService } from '../src/services/cloudinary.testDouble.js';
 import { resetCloudinaryService, setCloudinaryService } from '../src/services/cloudinary.js';
@@ -116,10 +117,16 @@ describe('Cloudinary upload endpoints', () => {
       name: process.env.CLOUDINARY_CLOUD_NAME,
       key: process.env.CLOUDINARY_API_KEY,
       secret: process.env.CLOUDINARY_API_SECRET,
+      envName: env.cloudinaryCloudName,
+      envKey: env.cloudinaryApiKey,
+      envSecret: env.cloudinaryApiSecret,
     };
     process.env.CLOUDINARY_CLOUD_NAME = '';
     process.env.CLOUDINARY_API_KEY = '';
     process.env.CLOUDINARY_API_SECRET = '';
+    env.cloudinaryCloudName = '';
+    env.cloudinaryApiKey = '';
+    env.cloudinaryApiSecret = '';
     resetCloudinaryService();
     try {
       const res = await fetchAs('/api/uploads/sign', farmer.token, {
@@ -135,6 +142,9 @@ describe('Cloudinary upload endpoints', () => {
       process.env.CLOUDINARY_CLOUD_NAME = prev.name;
       process.env.CLOUDINARY_API_KEY = prev.key;
       process.env.CLOUDINARY_API_SECRET = prev.secret;
+      env.cloudinaryCloudName = prev.envName;
+      env.cloudinaryApiKey = prev.envKey;
+      env.cloudinaryApiSecret = prev.envSecret;
       setCloudinaryService(createCloudinaryTestService(state));
     }
   });

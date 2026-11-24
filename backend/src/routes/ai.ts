@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 
+import { assertPhotoAdviceConfigured } from '../config/photoAdvice';
 import { authenticate, requireRole } from '../middleware/auth';
 import { HttpError } from '../middleware/error';
 import { createRateLimiter } from '../middleware/rateLimit';
 import { createCropDiseaseClassifier } from '../providers/diseaseClassifier';
 import { createGeminiTextProvider } from '../providers/gemini';
+import { createPhotoAdvisor } from '../providers/photoAdvisor';
 import { toAiHttpError } from '../providers/aiErrors';
 import {
   chatWithFarmer,
@@ -14,14 +16,13 @@ import {
   listConversations,
 } from '../services/aiChat';
 import {
-  assertDiseaseConfigured,
   createDiagnosis,
   deleteDiagnosis,
   getDiagnosis,
   listDiagnoses,
 } from '../services/diagnosis';
 import { validationMessage } from '../validators/validation';
-import type { AiTextProvider, CropDiseaseClassifier } from '../types/ai';
+import type { AiTextProvider, CropDiseaseClassifier, PlantPhotoAdvisor } from '../types/ai';
 import {
   chatSchema,
   conversationIdParamSchema,
@@ -56,6 +57,7 @@ function asyncRoute(
 export function createAiRouter(
   provider: AiTextProvider = createGeminiTextProvider(),
   classifier: CropDiseaseClassifier = createCropDiseaseClassifier(),
+  photoAdvisor: PlantPhotoAdvisor = createPhotoAdvisor(classifier),
 ): Router {
   const router = Router();
   router.use(createRateLimiter({ windowMs: 60_000, max: 60 }));
@@ -98,9 +100,9 @@ export function createAiRouter(
   router.post(
     '/diagnose',
     asyncRoute(async (req, res) => {
-      assertDiseaseConfigured();
+      assertPhotoAdviceConfigured();
       const input = parseOrThrow(diagnoseSchema, req.body);
-      res.status(201).json(await createDiagnosis(req.auth!.uid, input, classifier, provider));
+      res.status(201).json(await createDiagnosis(req.auth!.uid, input, photoAdvisor, provider));
     }),
   );
 

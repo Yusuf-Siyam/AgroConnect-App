@@ -66,7 +66,8 @@ export function createCloudinaryTestService(state: CloudinaryTestState): Cloudin
       return `https://res.cloudinary.com/${state.cloudName}/image/${asset.deliveryType}${v}/${asset.publicId}${ext}?sig=test`;
     },
     async readAsset(_asset) {
-      return { data: Buffer.from('fake-image'), mimeType: 'image/jpeg' };
+      // Minimal JPEG magic bytes; this is a test double, not a real image.
+      return { data: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]), mimeType: 'image/jpeg' };
     },
     async deleteAsset(asset) {
       if (state.failDelete) throw new Error('simulated cloudinary delete failure');

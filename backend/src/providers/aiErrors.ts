@@ -30,7 +30,8 @@ export function toAiHttpError(error: unknown): {
   message: string;
 } {
   if (error instanceof AiProviderError) {
-    const statusCode = error.code === 'AI_NOT_CONFIGURED' ? 503 : 502;
+    const statusCode =
+      error.code === 'AI_NOT_CONFIGURED' ? 503 : error.code === 'AI_RATE_LIMITED' ? 429 : 502;
     return { statusCode, code: error.code, message: error.message };
   }
 

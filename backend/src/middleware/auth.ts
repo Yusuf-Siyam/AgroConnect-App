@@ -54,7 +54,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
         console.warn('[auth] request rejected', {
           path: req.originalUrl,
           code: error.code,
-          status: error.status,
+          status: error.statusCode,
           message: error.message,
         });
       }

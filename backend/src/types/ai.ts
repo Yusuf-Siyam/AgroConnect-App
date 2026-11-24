@@ -47,6 +47,32 @@ export type CropDiseaseResult = {
   alternatives: string[];
 };
 
+export type DiseaseProvider = 'none' | 'gemini' | 'external';
+export type PhotoAdviceSource = 'gemini_vision' | 'external_classifier';
+export type PhotoUncertainty = 'unclear' | 'possible' | 'likely';
+
+/** Output contract for an unverified AI photo suggestion. */
+export type PlantPhotoAdvice = {
+  source: PhotoAdviceSource;
+  observation: string;
+  possibleCauses: string[];
+  careSteps: string[];
+  uncertainty: PhotoUncertainty;
+  /** Internal compatibility metadata; never displayed as a percentage. */
+  confidence?: number;
+  verified: false;
+  notice: string;
+};
+
+export type PlantPhotoAdviceInput = CropDiseaseInput & {
+  language: AiLanguage;
+};
+
+/** Injected only by tests; production uses Gemini or the existing classifier adapter. */
+export interface PlantPhotoAdvisor {
+  suggest(input: PlantPhotoAdviceInput): Promise<PlantPhotoAdvice>;
+}
+
 export type DiagnosisImageAsset = {
   provider: 'cloudinary';
   publicId: string;
@@ -80,6 +106,8 @@ export type Diagnosis = {
   status: DiagnosisStatus;
   result: CropDiseaseResult;
   advisoryNotice: string;
+  source: PhotoAdviceSource;
+  verified: boolean;
   guidance?: string;
   language: AiLanguage;
   createdAt: string;

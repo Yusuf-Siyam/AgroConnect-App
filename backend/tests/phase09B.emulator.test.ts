@@ -131,10 +131,12 @@ function classifierResult(label: string, confidence: number): CropDiseaseResult 
 }
 
 function resetEnv(): void {
+  process.env.DISEASE_PROVIDER = 'external';
   process.env.DISEASE_MODEL_ENDPOINT = 'https://classifier.example.test/diagnose';
   process.env.DISEASE_MODEL_API_KEY = 'test-classifier-key';
   process.env.GEMINI_API_KEY = '';
   process.env.GEMINI_MODEL = '';
+  process.env.GEMINI_VISION_MODEL = '';
   process.env.AI_DAILY_DIAGNOSIS_LIMIT = '3';
   process.env.AI_DIAGNOSES_PER_MINUTE = '100';
   process.env.CLOUDINARY_CLOUD_NAME = CLOUD_NAME;
@@ -228,7 +230,7 @@ describe('Phase 09B disease detection emulator verification', () => {
     const bands = [
       { confidence: 0.2, status: 'uncertain', label: 'Secret disease name' },
       { confidence: 0.6, status: 'possible', label: 'Possible blight' },
-      { confidence: 0.95, status: 'likely', label: 'Confirmed rust' },
+      { confidence: 0.95, status: 'likely', label: 'Leaf rust' },
     ];
 
     for (const band of bands) {
@@ -242,13 +244,15 @@ describe('Phase 09B disease detection emulator verification', () => {
       const body = await response.json();
       assert.equal(body.status, band.status);
       assert.equal(body.confidence, band.confidence);
-      assert.equal(body.advisoryNotice, 'This is advisory, not a guaranteed diagnosis.');
+      assert.match(body.advisoryNotice, /unverified ai photo suggestion/i);
+      assert.equal(body.source, 'external_classifier');
+      assert.equal(body.verified, false);
       if (band.status === 'uncertain') {
         assert.doesNotMatch(body.result.label, /secret/i);
         assert.match(body.result.label, /clearer photo/i);
         assert.deepEqual(body.result.alternatives, []);
       } else {
-        assert.equal(body.result.label, band.label);
+        assert.equal(body.result.label, `Possible issue: ${band.label}`);
       }
     }
   });
@@ -290,10 +294,11 @@ describe('Phase 09B disease detection emulator verification', () => {
       const withGemini = await (
         await diagnose(user, diagnosisImage(user), { cropName: 'Potato', language: 'en' })
       ).json();
-      assert.equal(withGemini.guidance, 'Advisory tips only.');
+      assert.match(String(withGemini.guidance), /^Advisory tips only\./);
+      assert.match(String(withGemini.guidance), /unverified ai photo suggestion/i);
       assert.equal(guidanceCalls.length, 1);
-      assert.match(guidanceCalls[0]!.systemInstruction, /never claim a guaranteed diagnosis/i);
-      assert.match(guidanceCalls[0]!.systemInstruction, /follow the label/i);
+      assert.match(guidanceCalls[0]!.systemInstruction, /never claim a confirmed diagnosis/i);
+      assert.match(guidanceCalls[0]!.systemInstruction, /read the label/i);
     } finally {
       process.env.GEMINI_API_KEY = '';
       process.env.GEMINI_MODEL = '';

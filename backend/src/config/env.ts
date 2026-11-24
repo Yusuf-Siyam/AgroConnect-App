@@ -3,7 +3,12 @@ import path from 'node:path';
 import { config } from 'dotenv';
 import { z } from 'zod';
 
-config({ path: path.resolve(process.cwd(), '.env') });
+// Works from both src/config and dist/config in this CommonJS backend.
+const backendEnvPath = path.resolve(__dirname, '../../.env');
+
+// Load backend/.env reliably regardless of process.cwd(), but do not override
+// values already provided by the environment.
+config({ path: backendEnvPath, override: false });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -30,6 +35,8 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default(''),
   GEMINI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(15_000),
   GEMINI_RETRIES: z.coerce.number().int().min(0).max(1).default(1),
+  GEMINI_VISION_MODEL: z.string().default(''),
+  DISEASE_PROVIDER: z.enum(['none', 'gemini', 'external']).default('none'),
   AI_DAILY_MESSAGE_LIMIT: z.coerce.number().int().positive().max(10_000).default(50),
   AI_MESSAGES_PER_MINUTE: z.coerce.number().int().positive().max(100).default(10),
   AI_DAILY_DIAGNOSIS_LIMIT: z.coerce.number().int().positive().max(10_000).default(20),
@@ -80,6 +87,8 @@ export const env = {
   geminiModel: parsed.data.GEMINI_MODEL,
   geminiRequestTimeoutMs: parsed.data.GEMINI_REQUEST_TIMEOUT_MS,
   geminiRetries: parsed.data.GEMINI_RETRIES,
+  geminiVisionModel: parsed.data.GEMINI_VISION_MODEL,
+  diseaseProvider: parsed.data.DISEASE_PROVIDER,
   aiDailyMessageLimit: parsed.data.AI_DAILY_MESSAGE_LIMIT,
   aiMessagesPerMinute: parsed.data.AI_MESSAGES_PER_MINUTE,
   aiDiagnosisDailyLimit: parsed.data.AI_DAILY_DIAGNOSIS_LIMIT,

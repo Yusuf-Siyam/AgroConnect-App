@@ -2,24 +2,30 @@ import { z } from 'zod';
 
 import { env } from '../config/env';
 import { getFirebaseAdmin } from '../config/firebase';
+import {
+  assertPhotoAdviceConfigured,
+  confidenceForUncertainty,
+  PHOTO_ADVICE_NOTICE,
+} from '../config/photoAdvice';
 import { HttpError } from '../middleware/error';
-import { AiNotConfiguredError } from '../providers/aiErrors';
 import type {
   AiLanguage,
   AiTextProvider,
-  CropDiseaseClassifier,
   CropDiseaseResult,
   Diagnosis,
   DiagnosisImageAsset,
   DiagnosisList,
   DiagnosisStatus,
+  PlantPhotoAdvice,
+  PlantPhotoAdvisor,
 } from '../types/ai';
 import type { DiagnoseInput, PaginationInput } from '../validators/ai';
 
 import { consumeAiQuota } from './aiQuota';
 import { getCloudinaryService } from './cloudinary';
 
-export const ADVISORY_NOTICE = 'This is advisory, not a guaranteed diagnosis.';
+export const ADVISORY_NOTICE = PHOTO_ADVICE_NOTICE;
+const UNCLEAR_LABEL = 'Unclear photo - please upload a clearer photo';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -46,6 +52,8 @@ const storedDiagnosisSchema = z.object({
   status: z.enum(['uncertain', 'possible', 'likely']),
   result: storedResultSchema,
   advisoryNotice: z.string(),
+  source: z.enum(['gemini_vision', 'external_classifier']).default('external_classifier'),
+  verified: z.boolean().default(false),
   guidance: z.string().optional(),
   language: z.enum(['bn', 'en']),
   createdAt: z.string(),
@@ -81,6 +89,8 @@ function serializeDiagnosis(id: string, data: unknown): Diagnosis {
     status: parsed.status,
     result: parsed.result,
     advisoryNotice: parsed.advisoryNotice,
+    source: parsed.source,
+    verified: parsed.verified,
     language: parsed.language,
     createdAt: parsed.createdAt,
     updatedAt: parsed.updatedAt,
@@ -107,8 +117,8 @@ function guidancePrompt(language: AiLanguage, label: string, cropName?: string):
   const crop = cropName ?? 'the crop in the photo';
   const instruction =
     language === 'bn'
-      ? 'বাংলায় সংক্ষিপ্ত পরামর্শ দিন: লক্ষণ, প্রতিরোধ, সার ও সেচের টিপস।'
-      : 'Give brief advisory tips in English: symptoms, prevention, fertilizer and irrigation.';
+      ? 'বাংলায় সংক্ষিপ্ত অযাচাইকৃত পরামর্শ দিন: লক্ষণ, প্রতিরোধ, সার ও সেচের টিপস। রাসায়নিকের নাম বা মাত্রা দেবেন না।'
+      : 'Give brief unverified advisory tips in English: symptoms, prevention, fertilizer and irrigation. Do not give chemical names or doses.';
   return `${instruction} Possible issue: ${label}. Crop: ${crop}. ${ADVISORY_NOTICE}`;
 }
 
@@ -125,15 +135,31 @@ async function optionalGuidance(
       language,
       systemInstruction: [
         'You are the AgroConnect farming assistant.',
-        'Give only practical, advisory farming tips: symptoms, prevention, fertilizer and irrigation.',
-        'Never claim a guaranteed diagnosis.',
-        'For chemicals, tell the farmer to follow the label and ask a local agricultural extension officer.',
+        'Give only practical, unverified advisory farming tips: symptoms, prevention, fertilizer and irrigation.',
+        'Never claim a confirmed diagnosis, certainty or a percentage.',
+        'Never give chemical names or doses; tell the farmer to read the label and ask a local agricultural extension officer.',
         ADVISORY_NOTICE,
       ].join(' '),
     });
   } catch {
     return undefined;
   }
+}
+
+function hasMatchingMagicBytes(data: Buffer, mimeType: string): boolean {
+  if (mimeType === 'image/jpeg') return data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
+  if (mimeType === 'image/png') {
+    return (
+      data.length >= 8 &&
+      data[0] === 0x89 &&
+      data.toString('ascii', 1, 4) === 'PNG' &&
+      data.toString('ascii', 4, 8) === '\r\n\x1a\n'
+    );
+  }
+  if (mimeType === 'image/webp') {
+    return data.length >= 12 && data.toString('ascii', 0, 4) === 'RIFF' && data.toString('ascii', 8, 12) === 'WEBP';
+  }
+  return false;
 }
 
 async function fetchDiagnosisImage(image: DiagnosisImageAsset): Promise<{ imageData: Buffer; mimeType: string }> {
@@ -143,13 +169,26 @@ async function fetchDiagnosisImage(image: DiagnosisImageAsset): Promise<{ imageD
   if (data.byteLength <= 0 || data.byteLength > MAX_IMAGE_BYTES) {
     throw new HttpError(400, 'IMAGE_TOO_LARGE', 'The image must be 5 MB or smaller.');
   }
+  if (!hasMatchingMagicBytes(data, mimeType)) {
+    throw new HttpError(400, 'INVALID_IMAGE_FORMAT', 'The image bytes do not match the declared image type.');
+  }
   return { imageData: data, mimeType };
+}
+
+function statusForAdvice(advice: PlantPhotoAdvice): DiagnosisStatus {
+  if (advice.uncertainty === 'unclear') return 'uncertain';
+  return advice.uncertainty;
+}
+
+function formatCareSteps(steps: string[]): string | undefined {
+  const cleaned = steps.map((step) => step.trim()).filter(Boolean).slice(0, 4);
+  return cleaned.length > 0 ? cleaned.map((step, index) => `${index + 1}. ${step}`).join('\n') : undefined;
 }
 
 export async function createDiagnosis(
   userId: string,
   input: DiagnoseInput,
-  classifier: CropDiseaseClassifier,
+  advisor: PlantPhotoAdvisor,
   textProvider: AiTextProvider,
 ): Promise<Diagnosis> {
   const cloudinary = getCloudinaryService();
@@ -158,36 +197,45 @@ export async function createDiagnosis(
   await consumeAiQuota(userId, 'diagnose');
 
   const { imageData, mimeType } = await fetchDiagnosisImage(input.image);
-  const rawResult = await classifier.classify({
+  const language = input.language ?? 'bn';
+  const advice = await advisor.suggest({
     image: input.image,
     imageData,
     mimeType,
+    language,
     ...(input.cropName ? { cropName: input.cropName } : {}),
   });
-  const result: CropDiseaseResult = {
-    label: rawResult.label.trim().slice(0, 200),
-    confidence: rawResult.confidence,
-    alternatives: rawResult.alternatives.map((item) => item.trim().slice(0, 200)).slice(0, 10),
-  };
-  const status = confidenceStatus(result.confidence);
+
+  const status = statusForAdvice(advice);
+  const confidence = advice.confidence ?? confidenceForUncertainty(advice.uncertainty);
   const publicResult: CropDiseaseResult =
     status === 'uncertain'
-      ? { label: 'Uncertain - please upload a clearer photo', confidence: result.confidence, alternatives: [] }
-      : result;
-  const language = input.language ?? 'bn';
-  const guidance =
-    status === 'uncertain'
-      ? undefined
-      : await optionalGuidance(language, publicResult.label, input.cropName, textProvider);
+      ? { label: UNCLEAR_LABEL, confidence, alternatives: [] }
+      : {
+          label: `Possible issue: ${advice.observation}`,
+          confidence,
+          alternatives: advice.possibleCauses,
+        };
+
+  let guidance = formatCareSteps(advice.careSteps);
+  if (!guidance && status !== 'uncertain' && advice.source === 'external_classifier') {
+    guidance = await optionalGuidance(language, advice.observation, input.cropName, textProvider);
+  }
+  if (guidance && status !== 'uncertain') {
+    guidance = `${guidance}\n${advice.notice}`;
+  }
+
   const now = new Date().toISOString();
   const record = {
     userId,
     image: input.image,
     ...(input.cropName ? { cropName: input.cropName } : {}),
-    confidence: result.confidence,
+    confidence,
     status,
     result: publicResult,
-    advisoryNotice: ADVISORY_NOTICE,
+    advisoryNotice: advice.notice,
+    source: advice.source,
+    verified: false,
     ...(guidance ? { guidance } : {}),
     language,
     createdAt: now,
@@ -198,7 +246,7 @@ export async function createDiagnosis(
   const ref = firestore.collection('cropDiagnoses').doc(diagnosisId);
   const existing = await ref.get();
   if (existing.exists) {
-    throw new HttpError(409, 'DIAGNOSIS_DUPLICATE', 'This diagnosis already exists.');
+    throw new HttpError(409, 'DIAGNOSIS_DUPLICATE', 'This suggestion already exists.');
   }
   await ref.set(record);
   return serializeDiagnosis(ref.id, record);
@@ -238,13 +286,4 @@ export async function deleteDiagnosis(userId: string, diagnosisId: string): Prom
   }
 }
 
-export function assertDiseaseConfigured(): void {
-  const endpoint = process.env.DISEASE_MODEL_ENDPOINT?.trim() ?? '';
-  const apiKey = process.env.DISEASE_MODEL_API_KEY?.trim() ?? '';
-  if (!endpoint || !apiKey) {
-    throw new AiNotConfiguredError(
-      'Disease classifier',
-      'Set DISEASE_MODEL_ENDPOINT and DISEASE_MODEL_API_KEY on the backend.',
-    );
-  }
-}
+export const assertDiseaseConfigured = assertPhotoAdviceConfigured;

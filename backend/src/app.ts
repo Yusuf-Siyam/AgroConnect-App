@@ -34,6 +34,7 @@ import { healthRouter } from './routes/health';
 export type AppOptions = {
   aiTextProvider?: Parameters<typeof createAiRouter>[0];
   cropDiseaseClassifier?: Parameters<typeof createAiRouter>[1];
+  plantPhotoAdvisor?: Parameters<typeof createAiRouter>[2];
   /** Push provider is injected only by tests; production uses FCM. */
   pushProvider?: PushProvider;
 };
@@ -65,7 +66,7 @@ export function createApp(options: AppOptions = {}) {
   app.use('/api/chat', createChatRouter());
   app.use('/api/notifications', createNotificationsRouter());
   app.use('/api/uploads', createUploadsRouter());
-  app.use('/api/ai', createAiRouter(options.aiTextProvider, options.cropDiseaseClassifier));
+  app.use('/api/ai', createAiRouter(options.aiTextProvider, options.cropDiseaseClassifier, options.plantPhotoAdvisor));
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/weather', createWeatherRouter());
   app.use('/api/market', createMarketRouter());
