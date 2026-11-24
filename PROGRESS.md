@@ -685,3 +685,39 @@ Baseline before any change: read `README.md`, `PROGRESS.md`, `RUN.md` and `git l
 - `npm run ai:check-vision` will be a configuration-only check (presence/shape of provider/key/model), never a real Gemini request. Tests will inject advisor doubles only.
 - Do not start Phase 12, deferred Phase 07B, or deferred Phase 11 Steps 6/7/8. Real Gemini account behavior and Bangladesh-crop accuracy remain UNVERIFIED by task definition.
 
+## Gemini vision plant-photo advisory - STEP 1/2 completion (2026-11-24)
+
+### STEP 1 - backend (commit `baed595`)
+
+- Added `DISEASE_PROVIDER=none|gemini|external` (default `none`) and `GEMINI_VISION_MODEL` to backend env config. `none` returns `AI_NOT_CONFIGURED` without any provider call.
+- Added `PlantPhotoAdvisor`/`PlantPhotoAdvice` types, `photoAdvice` configuration helpers, a Gemini Interactions REST vision adapter and an external-classifier advisor that preserves `CropDiseaseClassifier` for a future verified model.
+- Gemini requests send inline Cloudinary-downloaded bytes as `{type:"image",data,mime_type}`, a strict advisory system instruction, `response_format` JSON schema with `additionalProperties:false`, and bounded `unclear|possible|likely` output. Responses are parsed from `output_text`, validated with strict Zod, checked by a server-side chemical/dose guard, and stored with `source:"gemini_vision"`, `verified:false`, disclaimer and internal-only status metadata.
+- Reused Cloudinary signed delivery, folder ownership, 5 MB limit and added JPEG/PNG/WebP magic-byte validation. Provider timeouts, transient retries, 429 mapping, quotas, rate limits and not-configured errors are covered by unit/emulator tests with doubles only.
+- Added `npm run ai:check-vision` (configuration-only; no API call), backend unit tests and a new photo-advice emulator suite. No key, image byte, signed URL or response body is logged.
+
+### STEP 2 - mobile and docs
+
+- Farmer AI tab now says **AI photo suggestion** everywhere; result/history copy no longer shows percentage confidence or diagnosis claims. Unclear photos ask for a clearer photo and every result points to a local agriculture extension officer.
+- Added a persisted one-time farmer consent acknowledgement using AsyncStorage, with per-uid keys and tests. Photo controls stay disabled until consent is loaded and accepted.
+- Added bn/en consent, advisory, not-configured and invalid-format copy; added source/verified fields to mobile types for compatibility.
+- Updated `README.md` and `RUN.md` with Gemini provider setup, `ai:check-vision`, output wording, owner responsibilities and an explicit UNVERIFIED list.
+
+### Verification
+
+- Root `npx tsc --noEmit`: **PASS**.
+- Backend `npx tsc --noEmit -p backend/tsconfig.json`: **PASS**. This also required replacing `import.meta.url` in the CommonJS env loader with `__dirname` and correcting an auth diagnostic log field to `statusCode`.
+- `npx expo lint`: **PASS**.
+- `npm run test:mobile`: **PASS** (42 tests, including the new consent tests).
+- Backend `npm test`: **PASS** (40 tests, including the new Gemini vision adapter tests).
+- `npm run check:i18n`: **PASS**.
+- `npm run ai:check-vision`: **PASS** for `none`, and configuration-only checks with dummy `gemini`/`external` values; no real provider request was made.
+- Full `npm run test:emulators` with Temurin JDK 21 under `/tmp/opencode/jdk21`: **PASS**. All suites passed, including the new photo-advice suite (5/5). The suite loads the local Firestore rules and verifies that intended role/owner permissions are enforced and direct client writes are denied; no rules were deployed.
+- `npx firebase deploy --only firestore:rules --project demo-agroconnect --dry-run`: **NOT RUN TO COMPLETION** because the CLI requires Firebase authentication (`Failed to authenticate, have you run firebase login?`). No deploy was attempted; local emulator rule enforcement above is the available verification.
+
+### Not verified by task definition
+
+- No real Gemini request, account/model availability, structured-output acceptance by the owner-chosen model, or Bangladesh-crop quality/safety check was run.
+- No `.env`, key, user image or secret was opened, printed or committed.
+- Server-side EXIF removal was not added; metadata behavior of mobile re-encoding remains UNVERIFIED.
+- Phase 12, deferred Phase 07B and deferred Phase 11 Steps 6/7/8 were not started.
+

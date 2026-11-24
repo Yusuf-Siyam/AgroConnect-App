@@ -9,9 +9,17 @@ const MAX_DIMENSION = 1600;
 
 export type UploadProgress = { progress: number; total: number; index: number };
 
+export class UploadValidationError extends Error {
+  code: 'UPLOAD_IMAGE_TYPE' | 'UPLOAD_IMAGE_SIZE' | 'UPLOAD_IMAGE_LIMIT' | 'UPLOAD_READ_FAILED';
+  constructor(code: UploadValidationError['code'], message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 async function uriToBlob(uri: string): Promise<Blob> {
   const response = await fetch(uri);
-  if (!response.ok) throw new Error('Unable to read the selected image.');
+  if (!response.ok) throw new UploadValidationError('UPLOAD_READ_FAILED', 'Unable to read the selected image.');
   return response.blob();
 }
 
@@ -25,35 +33,38 @@ export async function pickAndUploadProductImages(
   limit: number,
   onProgress?: (value: UploadProgress) => void,
 ): Promise<string[]> {
+  if (limit <= 0) return [];
+
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsMultipleSelection: true,
     selectionLimit: limit,
-    quality: 0.8,
+    quality: 0.85,
   });
 
   if (result.canceled || !result.assets?.length) return [];
-  if (result.assets.length > limit) throw new Error(`Select at most ${limit} images.`);
+  if (result.assets.length > limit) {
+    throw new UploadValidationError('UPLOAD_IMAGE_LIMIT', `Select at most ${limit} images.`);
+  }
 
   const uploaded: string[] = [];
 
   for (const [index, asset] of result.assets.entries()) {
     const mimeType = asset.mimeType?.toLowerCase();
     if (!mimeType || !ALLOWED_MIME_TYPES.has(mimeType)) {
-      throw new Error('Only JPEG, PNG and WebP images are supported.');
+      throw new UploadValidationError('UPLOAD_IMAGE_TYPE', 'Only JPEG, PNG and WebP images are supported.');
     }
     if (asset.fileSize && asset.fileSize > MAX_IMAGE_BYTES) {
-      throw new Error('Each image must be 5 MB or smaller.');
+      throw new UploadValidationError('UPLOAD_IMAGE_SIZE', 'Each image must be 5 MB or smaller.');
     }
 
-    const compressed = await manipulateAsync(
-      asset.uri,
-      [{ resize: { width: MAX_DIMENSION } }],
-      { compress: 0.8, format: SaveFormat.JPEG },
-    );
+    const compressed = await manipulateAsync(asset.uri, [{ resize: { width: MAX_DIMENSION } }], {
+      compress: 0.82,
+      format: SaveFormat.JPEG,
+    });
     const blob = await uriToBlob(compressed.uri);
     if (blob.size > MAX_IMAGE_BYTES) {
-      throw new Error('Compressed image is still larger than 5 MB.');
+      throw new UploadValidationError('UPLOAD_IMAGE_SIZE', 'Each image must be 5 MB or smaller.');
     }
 
     const signed = await signUpload({ purpose: 'product', productId });

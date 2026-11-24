@@ -89,11 +89,12 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
 
 Leave the AI values empty for emulator-only testing. Service-account credentials are not required in emulator mode.
 
-### AI configuration (Phase 09)
+### AI configuration (Phase 09 and unverified AI photo suggestions)
 
 Add these to `backend\.env` only when the owner has real credentials. Never put a key in `.env` for the mobile app (`EXPO_PUBLIC_*`) or commit either `.env` file:
 
 ```text
+# Farming assistant (text only)
 GEMINI_API_KEY=
 GEMINI_MODEL=
 GEMINI_REQUEST_TIMEOUT_MS=
@@ -103,6 +104,10 @@ AI_MESSAGES_PER_MINUTE=
 AI_HISTORY_LIMIT=
 AI_PROMPT_MAX_CHARS=
 AI_MAX_OUTPUT_TOKENS=
+
+# AI photo suggestions: none | gemini | external
+DISEASE_PROVIDER=
+GEMINI_VISION_MODEL=
 DISEASE_MODEL_ENDPOINT=
 DISEASE_MODEL_API_KEY=
 DISEASE_REQUEST_TIMEOUT_MS=
@@ -110,9 +115,18 @@ AI_DAILY_DIAGNOSIS_LIMIT=
 AI_DIAGNOSES_PER_MINUTE=
 ```
 
-`GEMINI_MODEL` is the exact model code chosen by the owner; the repository does not pick one. `DISEASE_MODEL_ENDPOINT` must be an http(s) URL that accepts `POST { image: { data: base64, mimeType }, cropName }` and returns `{ label, confidence, alternatives: [] }`. No API key or model code is shipped in the mobile build.
+- `GEMINI_MODEL` is the exact model code chosen by the owner for the text assistant; the repository does not pick one.
+- `DISEASE_PROVIDER` defaults to `none`, which disables photo suggestions. Use `gemini` with `GEMINI_VISION_MODEL` set to an image-capable model code and `GEMINI_API_KEY`, or `external` with `DISEASE_MODEL_ENDPOINT` and `DISEASE_MODEL_API_KEY`. The existing classifier adapter is preserved for a future verified model.
+- `DISEASE_MODEL_ENDPOINT` must be an http(s) URL that accepts `POST { image: { data: base64, mimeType }, cropName }` and returns `{ label, confidence, alternatives: [] }`.
+- No API key or model code is shipped in the mobile build. The mobile app reads no Gemini environment variables.
 
-**Testing with no keys:** leave `GEMINI_API_KEY`/`GEMINI_MODEL` and `DISEASE_MODEL_ENDPOINT`/`DISEASE_MODEL_API_KEY` empty, sign in as a farmer, open the **AI** tab and send a question or submit a crop photo. The app shows “AI is not configured on the server yet…” and the backend returns `503 AI_NOT_CONFIGURED`. Emulator tests never contact a real provider: they inject test doubles.
+Run `npm run ai:check-vision` after editing `backend\.env`. It reports the selected provider and whether the required values are present, and it **never** calls Gemini or an external model.
+
+**Output wording:** photo results are always **AI photo suggestions**, never diagnoses. Gemini returns an `unclear|possible|likely` uncertainty band, never a percentage. The backend rejects numeric doses, chemical names and product instructions before saving. Each result is stored with `source: "gemini_vision"` (or `external_classifier`), `verified: false` and an extension-officer disclaimer. A farmer must acknowledge a one-time consent screen before taking or choosing a photo.
+
+**Testing with no keys:** leave the AI values empty, sign in as a farmer, open the **AI** tab and send a question. For photo suggestions with `DISEASE_PROVIDER=none`, the app shows “AI photo suggestions are not enabled on the server yet…” and the backend returns `503 AI_NOT_CONFIGURED`. Emulator and unit tests never contact a real provider: they inject test doubles.
+
+**UNVERIFIED (not run) for AI photo suggestions:** real Gemini account/model availability and image behavior; structured-output acceptance by the chosen model; quality or safety of suggestions for Bangladesh crops; real Cloudinary download/signed-delivery behavior with a live photo; and mobile camera/gallery behavior on a physical device. `npm run ai:check-vision` checks configuration only. No real Gemini request is made by any automated test. Server-side EXIF removal is not implemented; the app relies on mobile re-encoding and the 5 MB/magic-byte checks, whose metadata behavior remains UNVERIFIED.
 
 ### Host by target
 

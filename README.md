@@ -142,13 +142,13 @@ Marketplace, categories, search and filters, product details, farmer profiles, c
 Registration, vehicle information, available delivery jobs, accept/reject jobs, pickup confirmation, GPS tracking, delivery status, earnings and commission.
 
 ### E. AI Features
-1. Plant disease detection from leaf images.
+1. Unverified AI photo suggestions from leaf images.
 2. Bangla and English AI farming assistant.
-3. Disease symptoms and prevention guidance.
+3. Non-chemical symptom and care guidance.
 4. Fertilizer and irrigation guidance.
 5. Crop price prediction (**only with sufficient historical data**).
 
-> AI results are **advisory, not guaranteed diagnoses**. Low-confidence results must be shown as uncertain.
+> AI photo suggestions are **unverified, not diagnoses**. The UI must never show a percentage confidence, “confirmed”, or “diagnosed”; unclear results must ask for a clearer photo and all results must point to a local agriculture extension officer.
 
 ### F. Logistics
 Distance-based pricing, weight-based pricing, local unit conversion, pickup and drop-off locations, live tracking during active delivery, delivery confirmation.
@@ -508,8 +508,9 @@ Do not use fake APIs, hardcoded production data, or mock success responses. If c
 - [x] Confidence bands (uncertain/possible/likely), clearer-photo guidance for uncertain results and a fixed advisory disclaimer on every result
 - [x] Diagnosis history with delete (including Cloudinary asset removal attempt after commit), Firestore rules/indexes and emulator tests with provider doubles
 - [x] Farmer AI tab with disease check + assistant, loading/error/limit states and Bangla/English copy
+- [x] Unverified Gemini vision photo suggestions behind `DISEASE_PROVIDER=none|gemini|external` (default `none`), strict JSON/Zod validation, server-side chemical/dose guard, signed Cloudinary byte validation, one-time farmer consent, and no percentage confidence in the mobile UI
 
-**Result:** Phase 09 complete. All AI calls go through the backend; no model or key is bundled in the mobile app. Real Gemini/classifier responses remain UNVERIFIED until the owner supplies credentials. See `RUN.md` for configuration and no-key testing.
+**Result:** Phase 09 complete. All AI calls go through the backend; no model or key is bundled in the mobile app. Real Gemini/classifier responses remain UNVERIFIED until the owner supplies credentials. See `RUN.md` for configuration, `npm run ai:check-vision` and no-key testing.
 
 ### Phase 10 - Communication
 - [x] Backend-owned deterministic chats, realtime message history and text-only validation
@@ -698,6 +699,11 @@ CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 GEMINI_API_KEY=
+# Text assistant model
+GEMINI_MODEL=
+# AI photo suggestions: none | gemini | external (default none)
+DISEASE_PROVIDER=
+GEMINI_VISION_MODEL=
 DISEASE_MODEL_ENDPOINT=
 DISEASE_MODEL_API_KEY=
 BKASH_APP_KEY=

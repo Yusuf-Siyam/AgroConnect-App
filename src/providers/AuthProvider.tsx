@@ -49,6 +49,35 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+let authTokenProviderRegistered = false;
+
+/**
+ * Register before the first render so same-tick API requests can read the
+ * current Firebase ID token. The provider reads Firebase's currentUser at call
+ * time; no token or user object is captured here.
+ */
+function registerAuthTokenProviderOnce(): void {
+  if (authTokenProviderRegistered) return;
+  setAuthTokenProvider(async () => {
+    if (!env.isFirebaseConfigured) return null;
+    try {
+      const { auth } = getFirebase();
+      const user = auth.currentUser;
+      if (!user) return null;
+      return await user.getIdToken();
+    } catch (error) {
+      if (__DEV__)
+        console.warn('[auth] tokenProvider:getIdToken-failed', {
+          code: (error as { code?: string })?.code,
+        });
+      return null;
+    }
+  });
+  authTokenProviderRegistered = true;
+}
+
+registerAuthTokenProviderOnce();
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>(env.isFirebaseConfigured ? 'loading' : 'unauthenticated');
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
@@ -56,24 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null);
   const userRef = useRef<User | null>(null);
   const authActionInProgressRef = useRef(false);
-  const tokenProviderRegisteredRef = useRef(false);
-
-  if (!tokenProviderRegisteredRef.current) {
-    setAuthTokenProvider(async () => {
-      const user = userRef.current;
-      if (!user) return null;
-      try {
-        return await user.getIdToken();
-      } catch (error) {
-        if (__DEV__)
-          console.warn('[auth] tokenProvider:getIdToken-failed', {
-            code: (error as { code?: string })?.code,
-          });
-        return null;
-      }
-    });
-    tokenProviderRegisteredRef.current = true;
-  }
 
   const loadProfile = useCallback(async (user: User): Promise<UserProfile> => {
     const { firestore } = getFirebase();

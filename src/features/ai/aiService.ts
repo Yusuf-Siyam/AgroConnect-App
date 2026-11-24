@@ -71,7 +71,8 @@ export function aiErrorKey(code?: string): TranslationKey {
     case 'IMAGE_NOT_FOUND':
       return 'ai.error.imageNotFound';
     case 'INVALID_IMAGE_TYPE':
-      return 'ai.error.invalidType';
+    case 'INVALID_IMAGE_FORMAT':
+      return 'ai.error.invalidFormat';
     case 'IMAGE_TOO_LARGE':
       return 'ai.error.tooLarge';
     case 'INVALID_IMAGE_PATH':

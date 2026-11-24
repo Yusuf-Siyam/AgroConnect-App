@@ -20,6 +20,14 @@ export function FarmerTabs() {
       <Tabs.Screen name="orders" options={{ title: t('farmer.tab.orders') }} />
       <Tabs.Screen name="ai" options={{ title: t('farmer.tab.ai') }} />
       <Tabs.Screen name="more" options={{ title: t('farmer.tab.more') }} />
+      <Tabs.Screen name="analytics" options={{ href: null }} />
+      <Tabs.Screen name="batches" options={{ href: null }} />
+      <Tabs.Screen name="emergency" options={{ href: null }} />
+      <Tabs.Screen name="groups" options={{ href: null }} />
+      <Tabs.Screen name="harvest" options={{ href: null }} />
+      <Tabs.Screen name="inventory" options={{ href: null }} />
+      <Tabs.Screen name="market" options={{ href: null }} />
+      <Tabs.Screen name="weather" options={{ href: null }} />
     </Tabs>
   );
 }

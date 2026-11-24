@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/common/AppText';
@@ -19,6 +19,10 @@ import {
   submitDiagnosis,
 } from '@/features/ai/aiService';
 import { ImagePermissionError, uploadDiagnosisImage, type ImageSource } from '@/features/ai/diagnosisUpload';
+import {
+  acceptPhotoSuggestionConsent,
+  hasPhotoSuggestionConsent,
+} from '@/features/ai/photoSuggestionConsent';
 import type { ChatMessage, Conversation, Diagnosis } from '@/features/ai/types';
 import { getUploadConfig } from '@/services/cloudinaryUpload';
 import { useTranslation, type TranslationKey } from '@/i18n';
@@ -66,6 +70,41 @@ function DiseaseCheck() {
   const [busy, setBusy] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [result, setResult] = useState<Diagnosis | null>(null);
+  const [consentState, setConsentState] = useState<{ uid: string; accepted: boolean } | null>(null);
+  const [consentSaving, setConsentSaving] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
+
+  const uid = profile?.uid;
+  const consentLoaded = Boolean(uid && consentState?.uid === uid);
+  const consented = Boolean(uid && consentState?.uid === uid && consentState.accepted);
+
+  useEffect(() => {
+    if (!uid) return;
+    let active = true;
+    void hasPhotoSuggestionConsent(uid)
+      .then((saved) => {
+        if (active) setConsentState({ uid, accepted: saved });
+      })
+      .catch(() => {
+        if (active) setConsentState({ uid, accepted: false });
+      });
+    return () => {
+      active = false;
+    };
+  }, [uid]);
+
+  async function acceptConsent(): Promise<void> {
+    if (!uid) return;
+    setConsentSaving(true);
+    setConsentError(null);
+    try {
+      const saved = await acceptPhotoSuggestionConsent(uid);
+      if (saved) setConsentState({ uid, accepted: true });
+      else setConsentError('ai.consent.storageError');
+    } finally {
+      setConsentSaving(false);
+    }
+  }
 
   const uploads = useQuery({
     queryKey: ['uploads', 'config'],
@@ -88,7 +127,7 @@ function DiseaseCheck() {
   });
 
   async function pickAndDiagnose(source: ImageSource): Promise<void> {
-    if (!profile?.uid) return;
+    if (!uid || !consented) return;
     if (!uploadsEnabled) {
       setErrorKey('error.uploadNotConfigured');
       return;
@@ -97,7 +136,7 @@ function DiseaseCheck() {
     setBusy(true);
     setProgress(0);
     try {
-      const uploaded = await uploadDiagnosisImage(profile.uid, source, setProgress);
+      const uploaded = await uploadDiagnosisImage(uid, source, setProgress);
       if (!uploaded) return;
       setProgress(null);
       const crop = cropName.trim();
@@ -120,7 +159,8 @@ function DiseaseCheck() {
               : 'ai.permission.galleryDeniedForever',
         );
       } else {
-        setErrorKey(aiErrorKey(codeOf(error)));
+        const code = codeOf(error);
+        setErrorKey(code === 'AI_NOT_CONFIGURED' ? 'ai.error.photoNotConfigured' : aiErrorKey(code));
       }
     } finally {
       setProgress(null);
@@ -130,6 +170,20 @@ function DiseaseCheck() {
 
   return (
     <View className="gap-4">
+      {uid && consentLoaded && !consented ? (
+        <Card className="gap-2">
+          <AppText variant="subtitle">{t('ai.consent.title')}</AppText>
+          <AppText variant="caption">{t('ai.consent.body')}</AppText>
+          <AppText variant="caption">{t('ai.consent.privacy')}</AppText>
+          {consentError ? <AppText variant="error">{t(consentError as TranslationKey)}</AppText> : null}
+          <Button
+            label={t('ai.consent.accept')}
+            loading={consentSaving}
+            onPress={() => void acceptConsent()}
+          />
+        </Card>
+      ) : null}
+
       <Card className="gap-3">
         <AppText variant="subtitle">{t('ai.disease.title')}</AppText>
         <AppText variant="caption">{t('ai.disease.subtitle')}</AppText>
@@ -139,13 +193,14 @@ function DiseaseCheck() {
           value={cropName}
           onChangeText={setCropName}
           maxLength={100}
+          editable={consented}
         />
         <View className="flex-row gap-2">
           <View className="flex-1">
             <Button
               label={t('ai.disease.camera')}
               variant="outline"
-              disabled={busy || !uploadsEnabled}
+              disabled={busy || !uploadsEnabled || !consented}
               onPress={() => void pickAndDiagnose('camera')}
             />
           </View>
@@ -153,7 +208,7 @@ function DiseaseCheck() {
             <Button
               label={t('ai.disease.gallery')}
               variant="outline"
-              disabled={busy || !uploadsEnabled}
+              disabled={busy || !uploadsEnabled || !consented}
               onPress={() => void pickAndDiagnose('gallery')}
             />
           </View>
@@ -214,9 +269,7 @@ function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
   return (
     <Card className="gap-2">
       <AppText variant="subtitle">{t('ai.disease.resultTitle')}</AppText>
-      <AppText variant="label">
-        {t(statusKey)} · {t('ai.disease.confidence', { percent: Math.round(diagnosis.confidence * 100) })}
-      </AppText>
+      <AppText variant="label">{t(statusKey)}</AppText>
       {diagnosis.status !== 'uncertain' ? <AppText>{diagnosis.result.label}</AppText> : null}
       {diagnosis.result.alternatives.length > 0 ? (
         <AppText variant="caption">

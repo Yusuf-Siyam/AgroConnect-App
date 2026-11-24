@@ -56,6 +56,10 @@ export type Diagnosis = {
   status: DiagnosisStatus;
   result: CropDiseaseResult;
   advisoryNotice: string;
+  /** Older records fall back to the external classifier label. */
+  source?: 'gemini_vision' | 'external_classifier';
+  /** Older records are still displayed as unverified suggestions. */
+  verified?: boolean;
   guidance?: string;
   language: AiLanguage;
   createdAt: string;

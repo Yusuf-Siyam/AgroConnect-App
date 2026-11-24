@@ -16,7 +16,12 @@ export const productFormSchema = z.object({
     .trim()
     .refine((value) => Number.isInteger(Number(value)) && Number(value) >= 0, 'validation.stockInvalid'),
   minOrderQty: z.string().trim().refine((value) => Number(value) > 0, 'validation.quantityPositive'),
-  harvestDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.dateInvalid'),
+  harvestDate: z
+    .string()
+    .trim()
+    .min(1, 'validation.required')
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.dateInvalid')
+    .refine((value) => !Number.isNaN(new Date(`${value}T00:00:00.000Z`).getTime()), 'validation.dateInvalid'),
   district: z.string().trim().min(1, 'validation.required'),
   variety: z.string().trim().min(1, 'validation.required'),
   status: z.enum(PRODUCT_STATUSES, { error: 'validation.required' }),
