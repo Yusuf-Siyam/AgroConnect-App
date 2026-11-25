@@ -721,3 +721,93 @@ Baseline before any change: read `README.md`, `PROGRESS.md`, `RUN.md` and `git l
 - Server-side EXIF removal was not added; metadata behavior of mobile re-encoding remains UNVERIFIED.
 - Phase 12, deferred Phase 07B and deferred Phase 11 Steps 6/7/8 were not started.
 
+## Gemini text assistant diagnostic fix (2026-11-24)
+
+- Live diagnosis found two root causes: `GEMINI_MODEL=gemini-flash-latest` returned HTTP 503 (“high demand”), and the configured Interactions adapter parsed `output_text`, which the raw REST response does not contain; raw text is returned in `steps[].content[].text`. The owner-suggested `gemini-2.5-flash` returned HTTP 404 (“no longer available to new users”) for this key.
+- The text adapter now uses the supported `v1beta/models/{model}:generateContent` REST shape, which completed the same prompt in under 1 second with `gemini-3.5-flash-lite`, while the Interactions endpoint took 30–45 seconds. This is a text-assistant-only change; the unverified photo advisor was left untouched.
+- Failed requests now log the model, HTTP status and redacted upstream `code`/`status`/`message`; no key, prompt body or raw response is logged. 404/401/403/429/5xx map to distinct safe error codes and localized farmer messages instead of one opaque provider error.
+- `npm run ai:check-text` is a manual, real Gemini diagnostic. Automated tests still inject fetch doubles and never contact a provider. No `.env`, key or secret was printed or committed.
+
+### Verification
+
+- Root `npx tsc --noEmit`: **PASS**.
+- Backend typecheck via `npx tsc -p backend/tsconfig.json --noEmit`: **PASS**. The backend-local `npm run typecheck` could not start in this environment because its bundled TypeScript launcher could not resolve `@typescript/typescript-linux-x64`; the same tsconfig passed with the root TypeScript binary.
+- `npx expo lint`: **PASS**.
+- `npm run test:mobile`: **PASS** (45 tests, including the new AI error mapping tests).
+- Backend `npm test`: **PASS** (47 tests, including the new Gemini text provider tests).
+- `npm run check:i18n`: **PASS**.
+- `npm run ai:check-text`: **PASS** with a real Gemini call using the configured `gemini-3.5-flash-lite` model; no key, prompt or raw response was printed.
+- Full `npm run test:emulators` with Temurin JDK 21 under `/tmp/opencode/jdk21`: **PASS** (all 19 suites, 127 tests). No rules were deployed.
+
+## Gemini vision parser/config completion (2026-11-24)
+
+- Verified the live model list with the configured key (value never printed). Image-dedicated models (`gemini-2.5-flash-image`, `gemini-3.1-flash-lite-image`, `gemini-3.1-flash-image`) returned free-tier quota 0; `gemini-4-*` and `gemini-3.1-pro-preview` also returned quota 0; `gemini-2.5-pro` returned 404 for new users. `gemini-3.5-flash-lite` completed a real inline-image Interactions request with HTTP 200 in about 55 seconds and returned the strict JSON schema. It is now the documented `GEMINI_VISION_MODEL` value in `backend/.env.example` and `RUN.md`; no secret was added to the repository and `backend/.env` was not committed.
+- `backend/src/providers/geminiVision.ts` no longer depends on SDK-only `output_text`. `extractResponseText()` now reads raw Interactions `steps[].content[].text`, plus `candidates[].content.parts[].text` and legacy `output_text`. The existing strict Zod schema, uncertainty band, safety guard and disclaimer are unchanged; no diagnosis is fabricated.
+- Image input is validated before any request (non-empty buffer, 5 MB inline cap, JPEG/PNG/WebP only). Failed requests log only model, HTTP status and redacted upstream code/status/message. 429/401/403/404/5xx map to stable safe error codes, 5xx/timeouts/network failures retry once, and `store: false` is sent so the image is not retained by the Interactions API.
+- Added backend-only `GEMINI_VISION_TIMEOUT_MS` (default 90s, max 120s) so the ~55s image request does not inherit the 15s chat timeout. The chat provider and mobile code were not changed.
+- `backend/src/scripts/checkVision.ts` now makes one real Gemini image request with a built-in 1x1 PNG, or with `AI_CHECK_IMAGE_PATH` when supplied, and prints only operational metadata plus a short observation preview. External-provider checks remain configuration-only.
+- Added 9 focused vision tests covering raw `steps` parsing, legacy formats, malformed/unsupported responses, strict schema and unsafe advice, invalid image inputs, transient retry, error-code mapping, timeout and missing config.
+
+Verification: root `npx tsc --noEmit`, `npx tsc -p backend/tsconfig.json --noEmit`, `npx expo lint --max-warnings 0`, backend `npm test` (50/50) and `git diff --check` all passed. A real inline-image request with `gemini-3.5-flash-lite` succeeded (HTTP 200) during model verification. The final `npm run ai:check-vision` run did **not** complete: Gemini returned transient HTTP 503 `service_unavailable` (“high demand”) on both attempts for every image model tried. The app flow is therefore still UNVERIFIED at the final check; rerun the diagnostic when the provider recovers before telling the owner that photo suggestions work. No key, prompt body, image bytes or secret was printed.
+
+## AI photo flow - inline image and `AI_NOT_CONFIGURED` fix (2026-11-24)
+
+### Root cause
+
+`npm run ai:check-vision` starts a fresh process and reads the current `backend/.env`. The API server reads the same file only once when its process starts, and the photo-advice helpers were additionally reading raw `process.env` values at call time. An API process started before `DISEASE_PROVIDER`/`GEMINI_VISION_MODEL` were set (or started from the stale `backend/dist` build that predates the AI routes) therefore throws `AI_NOT_CONFIGURED`, while the separate diagnostic succeeds. The original process was no longer running when this was investigated, so its exact stale value could not be inspected; the code paths and env-loading behavior that produce the mismatch are confirmed and are reproduced by the new tests. No auth or config check was weakened.
+
+### Changes
+
+- Unified all AI config reads through the single parsed `env` snapshot from `backend/src/config/env.ts` (`photoAdvice.ts`, `geminiVision.ts`, `checkVision.ts`, diagnosis config checks). Added `AI_CHECK_IMAGE_PATH` to the env schema/example.
+- Added secret-free `photoAdviceStatus()` to `/api/health` and authenticated `GET /api/ai/status`, plus a startup log with provider/key/model-presence booleans. This makes a stale process or wrong `.env` detectable without exposing values.
+- Diagnosis no longer requires Cloudinary or permanent image storage. Mobile picks a photo, decodes it with the SDK 58 contextual `ImageManipulator.manipulate(uri, { maxWidth, maxHeight })` load options, saves one compressed JPEG with `base64: true`, and POSTs `{ provider: 'inline', mimeType, data }`. The backend validates base64, size and JPEG/PNG/WebP magic bytes, derives a user-scoped deterministic ID from the image hash, stores only metadata, and skips Cloudinary delivery/delete for inline records. Legacy Cloudinary assets remain readable for history.
+- Raised only the `/api/ai/diagnose` JSON body parser to 7 MB (other routes stay at 1 MB) and raised only `submitDiagnosis()`'s client timeout to 120 seconds. Authentication, farmer role checks, per-user quota, strict config gating and provider safety checks are unchanged.
+- Regenerated the ignored `backend/dist` output so `npm start` no longer serves the pre-AI build.
+
+### Verification
+
+- Backend `npm test`: **PASS (60/60)**, including new config, inline validator/decoder, diagnosis service, authenticated status route and larger-diagnose-body tests.
+- `npm run test:mobile`: **PASS (48/48)**, including new inline base64 payload tests.
+- Root `npx tsc --noEmit`: **PASS**.
+- `npx tsc -p backend/tsconfig.json --noEmit`: **PASS**. The backend-local `npm run typecheck` still cannot launch here because its TypeScript 7 package cannot resolve `@typescript/typescript-linux-x64`; the same tsconfig passes with the root TypeScript binary.
+- `npx expo lint --max-warnings 0`: **PASS**.
+- Backend build via root `npx tsc -p backend/tsconfig.json`: **PASS**; regenerated `backend/dist` contains `/api/ai/status`.
+- `git diff --check`: **PASS**.
+- Expo SDK 58 docs rechecked directly: `ImageManipulator.manipulate(source, options)` uses `ImageLoadOptions.maxWidth/maxHeight`, `renderAsync()` and `saveAsync({ compress, format, base64 })`; `ImagePicker.mediaTypes: ['images']` is current.
+- `npm run ai:check-vision`: three reruns returned transient Gemini HTTP 503 `service_unavailable` (“high demand”) with two retries each. An earlier real inline-image request with this model succeeded; no fake result was produced and no key, prompt or image bytes were printed. Rerun when Gemini recovers.
+
+Manual verification after restarting the API: `/api/health` must show `provider: "gemini"`, `photoAdviceConfigured: true`, `geminiApiKeyPresent: true`, `geminiVisionModelPresent: true`; then sign in as a farmer and submit a real crop photo from camera/gallery. No commit or push was made.
+
+## AI busy/error flow - bounded retries and safe mobile retry (2026-11-25)
+
+### Root cause and evidence
+
+- Traced the full path: `src/app/farmer/ai/index.tsx` → `submitDiagnosis()` → `POST /api/ai/diagnose` → `createPhotoAdvisor()`/diagnosis service → `backend/src/providers/geminiVision.ts` → Gemini `v1beta/interactions`. The mobile text “AI service is busy right now” was the localized `AI_PROVIDER_UNAVAILABLE` code returned after Gemini replied HTTP 503 `service_unavailable`.
+- The live upstream detail was `gemini-3.5-flash-lite is currently experiencing high demand, spikes in demand are usually temporary. Please try again later.` This is a provider-side temporary overload, not a wrong key or missing model: `GET /v1beta/models/gemini-3.5-flash-lite` returned HTTP 200 and lists `generateContent`. Direct photo probes against `interactions` and corrected `generateContent` both returned the same 503. No key or model value was printed and no model was silently switched.
+- The earlier `AI_NOT_CONFIGURED` was caused by a stale running API/env snapshot and an old ignored `backend/dist` build; it is now detectable through secret-free `/api/health` flags and authenticated `/api/ai/status`, and `backend/dist` was regenerated.
+
+### Changes
+
+- `backend/src/providers/geminiVision.ts` / `geminiVision.test.ts`: bounded retry loop for 429/500/502/503/504, 1s/2s/4s exponential backoff with 0–500ms jitter (8s cap), `Retry-After` (delta-seconds or HTTP date) override, per-attempt abort timeout, one shared wall-clock deadline, strict retry count, permanent-error short-circuit, image validation, strict advice schema/safety guard, and redacted internal logging of the original upstream code/status/message. No key, prompt or image bytes are logged and raw provider responses never reach mobile.
+- `backend/src/providers/aiErrors.ts`: stable safe codes for temporary overload (`AI_PROVIDER_UNAVAILABLE`), rate limit (`AI_RATE_LIMITED`), config, unsupported model, invalid image, auth and timeout; each maps to an HTTP status and retryable flag.
+- `backend/src/config/env.ts` / `backend/.env.example` / `RUN.md`: added `GEMINI_VISION_RETRIES` (default 2, hard cap 3 retries / 4 attempts) and `GEMINI_VISION_TOTAL_TIMEOUT_MS` (default 110s), with validation that the total is at least `GEMINI_VISION_TIMEOUT_MS` (default 90s). The existing `DISEASE_PROVIDER=gemini`, `GEMINI_VISION_MODEL=gemini-3.5-flash-lite`, `store: false`, auth/role/quota checks and advisory-only wording are unchanged.
+- `backend/src/routes/ai.ts`, `backend/src/utils/inFlight.ts` / `inFlight.test.ts`: same-process duplicate request coalescing keyed by authenticated user plus image fingerprint, so double taps do not create two Gemini calls.
+- `src/app/farmer/ai/index.tsx`, `src/features/ai/diagnosisRequest.ts` / `.test.ts`, `aiErrors.ts` / `.test.ts`, `aiService.ts`: mobile single-flight guard, selected photo retained after temporary failures, manual “Retry with this photo” action shown only for retryable errors, duplicate tap prevention, and backend-code → safe localized message mapping. Diagnosis photos remain inline base64 in memory; no permanent image storage or Cloudinary dependency was added to the new flow.
+- `src/locales/en.ts` / `bn.ts` and `backend/package.json` / root `package.json`: bilingual retry/image/timeout copy and test-script registration.
+
+### Retry limits
+
+429/500/502/503/504 only; default 2 retries with a configurable hard cap of 3 (at most 4 provider requests). Backoff is 1s/2s/4s exponential plus 0–500ms jitter, capped at 8s, and replaced by `Retry-After` when the provider supplies it. One 110s total budget covers all attempts and waits; each attempt is capped by the 90s per-attempt timeout. 400/401/403/404 and other permanent errors are never retried. Exhausted retries return a clear temporary-unavailable code, and a deadline exhaustion returns a clear timeout code; neither returns a fabricated suggestion.
+
+### Verification
+
+- Backend `npm test`: **PASS (65/65)**, including 503 retry success/exhaustion, 429, 400, timeout, invalid image, no-config and in-flight duplicate tests.
+- Mobile `npm run test:mobile`: **PASS (52/52)**, including backend→mobile error mapping and duplicate-request tests. `npm run check:i18n`: **PASS (98 TSX files)**.
+- Root `npx tsc --noEmit`: **PASS**. `npx tsc -p backend/tsconfig.json --noEmit` and the emit build: **PASS**; ignored `backend/dist` regenerated. `npx expo lint --max-warnings 0`: **PASS**.
+- `npx expo export --platform all --output-dir /tmp/opencode/agroapp-export`: **PASS** for web, iOS and Android.
+- `npm run ai:check-vision` with the new retry policy: **NOT SUCCESSFUL**. Attempt 1 and attempt 2 both returned real Gemini HTTP 503 `service_unavailable` with `Retry-After: 30s` and the same high-demand detail; the third attempt stayed inside the 110s budget and the script ended with the safe message `The Gemini photo advisor timed out. Please try again.` No fake success was generated and no secret was printed.
+
+### Remaining blocker
+
+A real Gemini crop-photo suggestion is still **UNVERIFIED** because the configured model was returning 503 high-demand responses at the time of the final live check. The code now retries the exact temporary condition, preserves the original error detail in redacted server logs, and gives mobile an accurate retryable error while keeping the selected photo. Rerun `npm run ai:check-vision` when Gemini recovers; after restarting the API, confirm `/api/health` shows `provider: "gemini"`, `photoAdviceConfigured: true`, `geminiApiKeyPresent: true`, `geminiVisionModelPresent: true`, then submit a real photo from the farmer AI tab. No commit or push was made.
+

@@ -107,7 +107,11 @@ AI_MAX_OUTPUT_TOKENS=
 
 # AI photo suggestions: none | gemini | external
 DISEASE_PROVIDER=
-GEMINI_VISION_MODEL=
+GEMINI_VISION_MODEL=gemini-3.5-flash-lite
+GEMINI_VISION_TIMEOUT_MS=
+GEMINI_VISION_RETRIES=
+GEMINI_VISION_TOTAL_TIMEOUT_MS=
+AI_CHECK_IMAGE_PATH=
 DISEASE_MODEL_ENDPOINT=
 DISEASE_MODEL_API_KEY=
 DISEASE_REQUEST_TIMEOUT_MS=
@@ -115,18 +119,30 @@ AI_DAILY_DIAGNOSIS_LIMIT=
 AI_DIAGNOSES_PER_MINUTE=
 ```
 
-- `GEMINI_MODEL` is the exact model code chosen by the owner for the text assistant; the repository does not pick one.
-- `DISEASE_PROVIDER` defaults to `none`, which disables photo suggestions. Use `gemini` with `GEMINI_VISION_MODEL` set to an image-capable model code and `GEMINI_API_KEY`, or `external` with `DISEASE_MODEL_ENDPOINT` and `DISEASE_MODEL_API_KEY`. The existing classifier adapter is preserved for a future verified model.
+- `GEMINI_MODEL` is the exact model code chosen by the owner for the text assistant; the repository does not pick one by default. During live debugging on 2026-11-24, `gemini-flash-latest` returned HTTP 503 and `gemini-2.5-flash` returned HTTP 404 (“no longer available to new users”); `gemini-3.5-flash-lite` completed a real text request. Confirm availability again before changing this value.
+- The text assistant uses the documented, still-supported `generateContent` REST endpoint because the Interactions endpoint took 30–45 seconds for the same prompt on this account. Backend logs record the HTTP status and redacted upstream error fields; keys and request bodies are never logged.
+- `DISEASE_PROVIDER` defaults to `none`, which disables photo suggestions. Use `gemini` with `GEMINI_VISION_MODEL` set to an image-capable model code and `GEMINI_API_KEY`, or `external` with `DISEASE_MODEL_ENDPOINT` and `DISEASE_MODEL_API_KEY`. The existing classifier adapter is preserved for a future verified model. `gemini-3.5-flash-lite` is present in the live model list, supports `generateContent`, and completed a real inline-image Interactions request on 2026-11-24; the observed call took about 55 seconds, so `GEMINI_VISION_TIMEOUT_MS` defaults to 90 seconds and is independent of the 15-second chat timeout. Both the Interactions and `generateContent` endpoints later returned 503 “high demand” for this exact model, which is a provider capacity issue, not a missing key or unsupported model.
+- Temporary image-provider failures (429/500/502/503/504) get at most `GEMINI_VISION_RETRIES` retries (default 2, hard cap 3, so at most 4 attempts) with exponential backoff, jitter and `Retry-After` support. `GEMINI_VISION_TOTAL_TIMEOUT_MS` (default 110s) is the wall-clock budget for all attempts and waits; it must be at least `GEMINI_VISION_TIMEOUT_MS` and at most the app's 120s request timeout. Permanent 400/401/403/404 errors are never retried. Concurrent identical taps are coalesced in one API process, and the mobile screen reuses its selected photo for a manual retry.
 - `DISEASE_MODEL_ENDPOINT` must be an http(s) URL that accepts `POST { image: { data: base64, mimeType }, cropName }` and returns `{ label, confidence, alternatives: [] }`.
 - No API key or model code is shipped in the mobile build. The mobile app reads no Gemini environment variables.
 
-Run `npm run ai:check-vision` after editing `backend\.env`. It reports the selected provider and whether the required values are present, and it **never** calls Gemini or an external model.
+Run `npm run ai:check-vision` after editing `backend\.env`. With `DISEASE_PROVIDER=gemini` it now makes real inline-image request(s) through the same advisor and retry policy used by `/api/ai/diagnose`; set `AI_CHECK_IMAGE_PATH` to check a real crop photo instead of the built-in 1x1 PNG. It prints only operational metadata, never the key, prompt body or raw response. For `DISEASE_PROVIDER=external` it remains configuration-only. If the image diagnostic reports `AI_PROVIDER_UNAVAILABLE` with upstream `service_unavailable`, Gemini is temporarily overloaded; retry later rather than changing the model or adding a fake response. Backend logs keep the HTTP status, attempt number, retry decision and redacted upstream fields internally; no key, image or prompt body is logged. Run `npm run ai:check-text` only when you intentionally want a real Gemini request with the configured assistant key/model; it prints no key, prompt body or raw response, and provider failures are logged with the HTTP status and redacted upstream fields.
+
+**Restart the backend after any AI env change.** The API reads `backend\.env` once when its process starts; `npm run ai:check-vision` is a separate fresh process, so it can succeed while an older still-running API returns `AI_NOT_CONFIGURED`. After restarting with `npm run dev` (or rebuilding and using `npm start`), check:
+
+```powershell
+curl.exe http://127.0.0.1:4000/api/health
+```
+
+The response includes secret-free `ai` flags. For Gemini, expect `"provider":"gemini"`, `"photoAdviceConfigured":true`, `"geminiApiKeyPresent":true` and `"geminiVisionModelPresent":true`. No key or model value is exposed. The same snapshot is available at authenticated `GET /api/ai/status`.
+
+For a phone smoke test, sign in as a farmer, open **AI → Disease check**, accept the one-time consent, then take or choose a real crop photo. The app sends the compressed image inline to `/api/ai/diagnose`; no Cloudinary upload or signed URL is needed. A suggestion can take 30–90 seconds. Temporary failures show a translated “temporarily unavailable”, rate-limit or timeout message and keep the selected photo so **Retry with this photo** can send it again without picking a new image; repeated taps cannot start a second request. If the buttons are disabled or the screen says suggestions are not configured, recheck the `/api/health` flags and restart the API process before changing credentials.
 
 **Output wording:** photo results are always **AI photo suggestions**, never diagnoses. Gemini returns an `unclear|possible|likely` uncertainty band, never a percentage. The backend rejects numeric doses, chemical names and product instructions before saving. Each result is stored with `source: "gemini_vision"` (or `external_classifier`), `verified: false` and an extension-officer disclaimer. A farmer must acknowledge a one-time consent screen before taking or choosing a photo.
 
 **Testing with no keys:** leave the AI values empty, sign in as a farmer, open the **AI** tab and send a question. For photo suggestions with `DISEASE_PROVIDER=none`, the app shows “AI photo suggestions are not enabled on the server yet…” and the backend returns `503 AI_NOT_CONFIGURED`. Emulator and unit tests never contact a real provider: they inject test doubles.
 
-**UNVERIFIED (not run) for AI photo suggestions:** real Gemini account/model availability and image behavior; structured-output acceptance by the chosen model; quality or safety of suggestions for Bangladesh crops; real Cloudinary download/signed-delivery behavior with a live photo; and mobile camera/gallery behavior on a physical device. `npm run ai:check-vision` checks configuration only. No real Gemini request is made by any automated test. Server-side EXIF removal is not implemented; the app relies on mobile re-encoding and the 5 MB/magic-byte checks, whose metadata behavior remains UNVERIFIED.
+**UNVERIFIED for AI photo suggestions:** quality or safety of suggestions for Bangladesh crops; behavior on a real infected crop photo rather than the tiny verification image; and mobile camera/gallery behavior on a physical device. Current diagnosis images are sent inline as base64, processed in memory and never stored; Cloudinary assets are read only for old diagnosis history. `npm run ai:check-vision` makes real Gemini request(s) with bounded retries for the Gemini provider; automated unit tests still use fakes and never contact a provider. Server-side EXIF removal is not implemented; the app relies on mobile re-encoding and the 5 MB/magic-byte checks, whose metadata behavior remains UNVERIFIED.
 
 ### Host by target
 
