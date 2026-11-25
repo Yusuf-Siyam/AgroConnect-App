@@ -37,7 +37,8 @@ export type CropDiseaseResult = {
 
 export type DiagnosisStatus = 'uncertain' | 'possible' | 'likely';
 
-export type DiagnosisImageAsset = {
+/** Legacy Cloudinary asset, kept only for reading old diagnosis history. */
+export type CloudinaryDiagnosisImage = {
   provider: 'cloudinary';
   publicId: string;
   resourceType: 'image';
@@ -45,6 +46,16 @@ export type DiagnosisImageAsset = {
   version?: number;
   format?: string;
 };
+
+/** Current diagnosis image: sent once as base64 and never uploaded for storage. */
+export type InlineDiagnosisImage = {
+  provider: 'inline';
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+  /** Raw base64 bytes, without a data-URI prefix. */
+  data: string;
+};
+
+export type DiagnosisImageAsset = CloudinaryDiagnosisImage | InlineDiagnosisImage;
 
 export type Diagnosis = {
   id: string;

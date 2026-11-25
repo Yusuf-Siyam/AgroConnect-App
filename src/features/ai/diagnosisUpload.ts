@@ -1,26 +1,28 @@
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
-import { signUpload, uploadToCloudinary } from '@/services/cloudinaryUpload';
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+import { buildInlineImage, codedError, normalizeMimeType } from './diagnosisImage';
+import type { DiagnosisImageAsset } from './types';
 
 export type ImageSource = 'camera' | 'gallery';
-
-export type DiagnosisImageAsset = {
-  provider: 'cloudinary';
-  publicId: string;
-  resourceType: 'image';
-  deliveryType: 'authenticated';
-  version?: number;
-  format?: string;
-};
 
 export class ImagePermissionError extends Error {
   constructor(public readonly source: ImageSource, public readonly canAskAgain: boolean) {
     super(source === 'camera' ? 'Camera permission denied' : 'Photo permission denied');
     this.name = 'ImagePermissionError';
+  }
+}
+
+export { base64ByteLength, buildInlineImage, normalizeMimeType } from './diagnosisImage';
+
+/** The picker may return HEIC/AVIF; ImageManipulator converts it to JPEG. */
+export function assertPickedImage(asset: Pick<ImagePicker.ImagePickerAsset, 'type' | 'mimeType'>): void {
+  if (asset.type && asset.type !== 'image') {
+    throw codedError('INVALID_IMAGE_TYPE', 'Only photos can be reviewed');
+  }
+  const mimeType = normalizeMimeType(asset.mimeType);
+  if (mimeType && !mimeType.startsWith('image/')) {
+    throw codedError('INVALID_IMAGE_TYPE', 'Unsupported image type');
   }
 }
 
@@ -37,51 +39,38 @@ async function ensurePermission(source: ImageSource): Promise<void> {
   if (!status.granted) throw new ImagePermissionError('gallery', status.canAskAgain);
 }
 
-async function uriToBlob(uri: string): Promise<Blob> {
-  const response = await fetch(uri);
-  if (!response.ok) throw new Error('Unable to read the selected image.');
-  return response.blob();
-}
-
-export async function uploadDiagnosisImage(
-  _uid: string,
+/**
+ * Pick and normalize one photo to the backend's inline JPEG payload.
+ * No signed Cloudinary upload, permanent asset, or storage URL is involved.
+ */
+export async function prepareDiagnosisImage(
   source: ImageSource,
-  onProgress?: (fraction: number) => void,
-): Promise<{ image: DiagnosisImageAsset } | null> {
+): Promise<{ image: DiagnosisImageAsset; uri: string } | null> {
   await ensurePermission(source);
 
   const result =
     source === 'camera'
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
 
   if (result.canceled || !result.assets?.length) return null;
 
   const asset = result.assets[0]!;
-  const mimeType = asset.mimeType?.toLowerCase() ?? '';
-  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
-    throw Object.assign(new Error('Unsupported image type'), { code: 'INVALID_IMAGE_TYPE' });
+  assertPickedImage(asset);
+
+  // SDK 58 contextual API: decode with bounds, then save once as compressed JPEG.
+  const context = ImageManipulator.manipulate(asset.uri, { maxWidth: 1600, maxHeight: 1600 });
+  const rendered = await context.renderAsync();
+  const saved = await rendered.saveAsync({ compress: 0.8, format: SaveFormat.JPEG, base64: true });
+  if (!saved.base64) {
+    throw codedError('INVALID_IMAGE_DATA', 'Unable to read the selected image.');
   }
 
-  const compressed = await manipulateAsync(asset.uri, [{ resize: { width: 1600 } }], {
-    compress: 0.8,
-    format: SaveFormat.JPEG,
-  });
-  const blob = await uriToBlob(compressed.uri);
-  if (blob.size > MAX_IMAGE_BYTES) {
-    throw Object.assign(new Error('Compressed image is still too large'), { code: 'IMAGE_TOO_LARGE' });
-  }
-
-  const signed = await signUpload({ purpose: 'diagnosis' });
-  const uploaded = await uploadToCloudinary(blob, signed, onProgress);
   return {
-    image: {
-      provider: 'cloudinary',
-      publicId: uploaded.publicId,
-      resourceType: 'image',
-      deliveryType: 'authenticated',
-      version: uploaded.version,
-      format: uploaded.format,
-    },
+    image: buildInlineImage(saved.base64, 'image/jpeg'),
+    uri: saved.uri,
   };
 }
+
+// Kept as an explicit alias for any existing imports; it no longer uploads.
+export const uploadDiagnosisImage = prepareDiagnosisImage;

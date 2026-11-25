@@ -13,22 +13,26 @@ import {
   deleteAiConversation,
   deleteDiagnosis,
   getAiConversation,
+  getAiPhotoStatus,
+  isRetryableAiError,
   listAiConversations,
   listDiagnoses,
   sendAiMessage,
   submitDiagnosis,
 } from '@/features/ai/aiService';
-import { ImagePermissionError, uploadDiagnosisImage, type ImageSource } from '@/features/ai/diagnosisUpload';
+import { createExclusiveRunner } from '@/features/ai/diagnosisRequest';
+import { ImagePermissionError, prepareDiagnosisImage, type ImageSource } from '@/features/ai/diagnosisUpload';
 import {
   acceptPhotoSuggestionConsent,
   hasPhotoSuggestionConsent,
 } from '@/features/ai/photoSuggestionConsent';
 import type { ChatMessage, Conversation, Diagnosis } from '@/features/ai/types';
-import { getUploadConfig } from '@/services/cloudinaryUpload';
 import { useTranslation, type TranslationKey } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
 
 type Section = 'disease' | 'assistant';
+type SelectedImage = Awaited<ReturnType<typeof prepareDiagnosisImage>>;
+type AiScreenError = { key: TranslationKey; retryable: boolean };
 
 function codeOf(error: unknown): string | undefined {
   if (typeof error === 'object' && error !== null && 'code' in error) {
@@ -66,9 +70,10 @@ function DiseaseCheck() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [cropName, setCropName] = useState('');
-  const [progress, setProgress] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [runner] = useState(() => createExclusiveRunner<void>(setBusy));
+  const [error, setError] = useState<AiScreenError | null>(null);
+  const [selectedImage, setSelectedImage] = useState<SelectedImage>(null);
   const [result, setResult] = useState<Diagnosis | null>(null);
   const [consentState, setConsentState] = useState<{ uid: string; accepted: boolean } | null>(null);
   const [consentSaving, setConsentSaving] = useState(false);
@@ -106,12 +111,12 @@ function DiseaseCheck() {
     }
   }
 
-  const uploads = useQuery({
-    queryKey: ['uploads', 'config'],
-    queryFn: getUploadConfig,
+  const photoStatus = useQuery({
+    queryKey: ['ai', 'photo-status'],
+    queryFn: getAiPhotoStatus,
     staleTime: 60_000,
   });
-  const uploadsEnabled = uploads.data?.enabled === true;
+  const photoEnabled = photoStatus.data?.photoAdviceConfigured === true;
 
   const history = useQuery({
     queryKey: ['ai', 'diagnoses'],
@@ -126,45 +131,54 @@ function DiseaseCheck() {
     },
   });
 
-  async function pickAndDiagnose(source: ImageSource): Promise<void> {
+  async function pickAndDiagnose(source: ImageSource | 'retry'): Promise<void> {
     if (!uid || !consented) return;
-    if (!uploadsEnabled) {
-      setErrorKey('error.uploadNotConfigured');
+    if (!photoEnabled) {
+      setError({ key: 'ai.error.photoNotConfigured', retryable: false });
       return;
     }
-    setErrorKey(null);
-    setBusy(true);
-    setProgress(0);
+    if (source === 'retry' && !selectedImage) return;
+
+    setError(null);
     try {
-      const uploaded = await uploadDiagnosisImage(uid, source, setProgress);
-      if (!uploaded) return;
-      setProgress(null);
-      const crop = cropName.trim();
-      const diagnosis = await submitDiagnosis({
-        image: uploaded.image,
-        language: locale,
-        ...(crop ? { cropName: crop } : {}),
+      await runner.run(async () => {
+        let prepared = source === 'retry' ? selectedImage : null;
+        if (source !== 'retry') {
+          prepared = await prepareDiagnosisImage(source);
+          if (!prepared) return;
+          setSelectedImage(prepared);
+        }
+        if (!prepared) return;
+
+        const crop = cropName.trim();
+        const diagnosis = await submitDiagnosis({
+          image: prepared.image,
+          language: locale,
+          ...(crop ? { cropName: crop } : {}),
+        });
+        setResult(diagnosis);
+        void queryClient.invalidateQueries({ queryKey: ['ai', 'diagnoses'] });
       });
-      setResult(diagnosis);
-      void queryClient.invalidateQueries({ queryKey: ['ai', 'diagnoses'] });
     } catch (error) {
       if (error instanceof ImagePermissionError) {
-        setErrorKey(
-          error.source === 'camera'
-            ? error.canAskAgain
-              ? 'ai.permission.cameraDenied'
-              : 'ai.permission.cameraDeniedForever'
-            : error.canAskAgain
-              ? 'ai.permission.galleryDenied'
-              : 'ai.permission.galleryDeniedForever',
-        );
+        setError({
+          key:
+            error.source === 'camera'
+              ? error.canAskAgain
+                ? 'ai.permission.cameraDenied'
+                : 'ai.permission.cameraDeniedForever'
+              : error.canAskAgain
+                ? 'ai.permission.galleryDenied'
+                : 'ai.permission.galleryDeniedForever',
+          retryable: false,
+        });
       } else {
         const code = codeOf(error);
-        setErrorKey(code === 'AI_NOT_CONFIGURED' ? 'ai.error.photoNotConfigured' : aiErrorKey(code));
+        setError({
+          key: code === 'AI_NOT_CONFIGURED' ? 'ai.error.photoNotConfigured' : aiErrorKey(code),
+          retryable: isRetryableAiError(code),
+        });
       }
-    } finally {
-      setProgress(null);
-      setBusy(false);
     }
   }
 
@@ -200,7 +214,7 @@ function DiseaseCheck() {
             <Button
               label={t('ai.disease.camera')}
               variant="outline"
-              disabled={busy || !uploadsEnabled || !consented}
+              disabled={busy || !photoEnabled || !consented}
               onPress={() => void pickAndDiagnose('camera')}
             />
           </View>
@@ -208,19 +222,27 @@ function DiseaseCheck() {
             <Button
               label={t('ai.disease.gallery')}
               variant="outline"
-              disabled={busy || !uploadsEnabled || !consented}
+              disabled={busy || !photoEnabled || !consented}
               onPress={() => void pickAndDiagnose('gallery')}
             />
           </View>
         </View>
-        {!uploadsEnabled ? <AppText variant="caption" className="text-amber-700">{t('error.uploadNotConfigured')}</AppText> : null}
-        {progress !== null ? (
-          <AppText variant="caption">{t('ai.disease.uploading', { percent: Math.round(progress * 100) })}</AppText>
+        {photoStatus.isError ? (
+          <AppText variant="error">{t(aiErrorKey(codeOf(photoStatus.error)))}</AppText>
         ) : null}
-        {busy && progress === null ? (
-          <AppText variant="caption">{t('ai.disease.analyzing')}</AppText>
+        {!photoEnabled && !photoStatus.isPending ? (
+          <AppText variant="caption" className="text-amber-700">{t('ai.error.photoNotConfigured')}</AppText>
         ) : null}
-        {errorKey ? <AppText variant="error">{t(errorKey as TranslationKey)}</AppText> : null}
+        {busy ? <AppText variant="caption">{t('ai.disease.analyzing')}</AppText> : null}
+        {error ? <AppText variant="error">{t(error.key)}</AppText> : null}
+        {error?.retryable && selectedImage ? (
+          <Button
+            label={t('ai.disease.retry')}
+            variant="outline"
+            disabled={busy}
+            onPress={() => void pickAndDiagnose('retry')}
+          />
+        ) : null}
       </Card>
 
       {result ? <DiagnosisCard diagnosis={result} /> : null}

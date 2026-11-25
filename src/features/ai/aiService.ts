@@ -1,5 +1,4 @@
 import { api, assertApiConfigured, toApiError } from '@/services/api';
-import type { TranslationKey } from '@/i18n';
 
 import type {
   ChatResult,
@@ -23,7 +22,9 @@ export function sendAiMessage(input: {
   language: 'bn' | 'en';
   conversationId?: string;
 }): Promise<ChatResult> {
-  return request(() => api.post<ChatResult>('/api/ai/chat', input));
+  // The backend may retry a transient Gemini failure, so allow longer than the
+  // global API timeout for this one request.
+  return request(() => api.post<ChatResult>('/api/ai/chat', input, { timeout: 60_000 }));
 }
 
 export function listAiConversations(limit = 20, offset = 0): Promise<ConversationList> {
@@ -38,12 +39,27 @@ export function deleteAiConversation(conversationId: string): Promise<void> {
   return request(() => api.delete<void>(`/api/ai/conversations/${conversationId}`));
 }
 
+export type AiPhotoStatus = {
+  provider: 'none' | 'gemini' | 'external' | 'invalid';
+  photoAdviceConfigured: boolean;
+  geminiApiKeyPresent: boolean;
+  geminiVisionModelPresent: boolean;
+  externalConfigured: boolean;
+};
+
+/** Secret-free flags from the running server, not from the client bundle. */
+export function getAiPhotoStatus(): Promise<AiPhotoStatus> {
+  return request(() => api.get<AiPhotoStatus>('/api/ai/status'));
+}
+
 export function submitDiagnosis(input: {
   image: Diagnosis['image'];
   language: 'bn' | 'en';
   cropName?: string;
 }): Promise<Diagnosis> {
-  return request(() => api.post<Diagnosis>('/api/ai/diagnose', input));
+  // A real Gemini image request can take close to a minute; keep the app from
+  // timing out before the backend's 90s vision timeout completes.
+  return request(() => api.post<Diagnosis>('/api/ai/diagnose', input, { timeout: 120_000 }));
 }
 
 export function listDiagnoses(limit = 20, offset = 0): Promise<DiagnosisList> {
@@ -54,34 +70,4 @@ export function deleteDiagnosis(diagnosisId: string): Promise<void> {
   return request(() => api.delete<void>(`/api/ai/diagnoses/${diagnosisId}`));
 }
 
-/** Backend error codes are never shown raw; the UI uses translated copy. */
-export function aiErrorKey(code?: string): TranslationKey {
-  switch (code) {
-    case 'AI_NOT_CONFIGURED':
-      return 'ai.error.notConfigured';
-    case 'AI_DAILY_MESSAGE_LIMIT_REACHED':
-    case 'AI_DAILY_DIAGNOSIS_LIMIT_REACHED':
-      return 'ai.error.limitReached';
-    case 'AI_RATE_LIMITED':
-      return 'ai.error.rateLimited';
-    case 'AI_PROVIDER_TIMEOUT':
-      return 'ai.error.timeout';
-    case 'AI_PROVIDER_ERROR':
-      return 'ai.error.provider';
-    case 'IMAGE_NOT_FOUND':
-      return 'ai.error.imageNotFound';
-    case 'INVALID_IMAGE_TYPE':
-    case 'INVALID_IMAGE_FORMAT':
-      return 'ai.error.invalidFormat';
-    case 'IMAGE_TOO_LARGE':
-      return 'ai.error.tooLarge';
-    case 'INVALID_IMAGE_PATH':
-      return 'ai.error.invalidPath';
-    case 'DIAGNOSIS_DUPLICATE':
-      return 'ai.error.duplicate';
-    case 'NETWORK_ERROR':
-      return 'error.network';
-    default:
-      return 'error.generic';
-  }
-}
+export { aiErrorKey, isRetryableAiError } from './aiErrors';
