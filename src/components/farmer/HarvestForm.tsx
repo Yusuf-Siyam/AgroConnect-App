@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { View } from 'react-native';
@@ -21,10 +20,12 @@ import {
 import { createHarvestRecord, updateHarvestRecord } from '@/features/farmer/harvestService';
 import { HARVEST_STATUSES, type HarvestRecord } from '@/features/farmer/harvestTypes';
 import { PRODUCT_UNITS } from '@/features/farmer/types';
+import { useBackNavigation } from '@/features/navigation/useBackNavigation';
 import { useTranslation, type TranslationKey } from '@/i18n';
 
 export function HarvestForm({ record }: { record?: HarvestRecord }) {
   const { t } = useTranslation();
+  const { goBack } = useBackNavigation({ fallbackHref: '/farmer/harvest' });
   const queryClient = useQueryClient();
   const [saveError, setSaveError] = useState<TranslationKey | null>(null);
 
@@ -40,7 +41,7 @@ export function HarvestForm({ record }: { record?: HarvestRecord }) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['farmer', 'harvest-records'] });
-      router.back();
+      goBack();
     },
   });
 

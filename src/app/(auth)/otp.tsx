@@ -1,9 +1,9 @@
-import { Link } from 'expo-router';
 import { View } from 'react-native';
 
 import { AppText } from '@/components/common/AppText';
 import { Card } from '@/components/common/Card';
 import { Screen } from '@/components/common/Screen';
+import { NavigationBackLink } from '@/components/navigation/NavigationBackButton';
 import { useTranslation } from '@/i18n';
 
 export default function OtpScreen() {
@@ -23,9 +23,7 @@ export default function OtpScreen() {
           <AppText>{t('auth.otpUnavailableDetail')}</AppText>
         </Card>
 
-        <Link href="/login">
-          <AppText className="text-center font-semibold text-primary">{t('auth.backToLogin')}</AppText>
-        </Link>
+        <NavigationBackLink labelKey="auth.backToLogin" />
       </View>
     </Screen>
   );

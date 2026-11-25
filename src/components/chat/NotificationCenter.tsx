@@ -7,6 +7,7 @@ import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { Screen } from '@/components/common/Screen';
 import { StateView } from '@/components/common/StateView';
+import { NavigationBackButton } from '@/components/navigation/NavigationBackButton';
 import { notificationHref } from '@/features/chat/notificationRouting';
 import { renderNotification } from '@/features/chat/notificationText';
 import type { NotificationRecord } from '@/features/chat/types';
@@ -60,6 +61,7 @@ export function NotificationCenter() {
   return (
     <Screen scroll>
       <View className="gap-4 px-5 py-6">
+        <NavigationBackButton compact />
         <View className="gap-1">
           <AppText variant="title">{t('chat.notifications.title')}</AppText>
           <AppText variant="caption">

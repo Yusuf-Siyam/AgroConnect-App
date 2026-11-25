@@ -8,6 +8,7 @@ import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { Screen } from '@/components/common/Screen';
 import { StateView } from '@/components/common/StateView';
+import { NavigationBackButton } from '@/components/navigation/NavigationBackButton';
 import { chatErrorKey, createChat } from '@/features/chat/chatService';
 import { otherParticipant } from '@/features/chat/chatIds';
 import { useChats } from '@/features/chat/useChat';
@@ -42,6 +43,7 @@ export default function ChatListScreen() {
   return (
     <Screen scroll>
       <View className="gap-5 px-5 py-6">
+        <NavigationBackButton compact />
         <View className="gap-1">
           <AppText variant="title">{t('chat.title')}</AppText>
           <AppText variant="caption">{t('chat.subtitle')}</AppText>

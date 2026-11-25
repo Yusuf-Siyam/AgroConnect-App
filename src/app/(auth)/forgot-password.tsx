@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { View } from 'react-native';
 
@@ -9,6 +8,7 @@ import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { Screen } from '@/components/common/Screen';
 import { TextField } from '@/components/common/TextField';
+import { NavigationBackLink } from '@/components/navigation/NavigationBackButton';
 import { AUTH_EMULATOR_RESET_URL } from '@/features/authentication/emulatorLinks';
 import { authErrorKey, validationKey } from '@/features/authentication/errorMessages';
 import { forgotPasswordSchema, type ForgotPasswordValues } from '@/features/authentication/schemas';
@@ -85,9 +85,7 @@ export default function ForgotPasswordScreen() {
           </Card>
         )}
 
-        <Link href="/login">
-          <AppText className="text-center font-semibold text-primary">{t('auth.backToLogin')}</AppText>
-        </Link>
+        <NavigationBackLink labelKey="auth.backToLogin" />
       </View>
     </Screen>
   );

@@ -8,6 +8,8 @@ import { useNotifications } from '@/features/chat/useChat';
 import { useTranslation } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
 
+import { NavigationBackButton } from './NavigationBackButton';
+
 /** Symbol only; all visible wording and accessibility labels come from locales. */
 const BELL_GLYPH = '\u{1F514}';
 
@@ -23,6 +25,7 @@ export function DashboardHeader() {
   return (
     <View className="border-b border-line bg-surface px-5 pb-3 pt-2">
       <View className="flex-row items-center justify-between gap-3">
+        <NavigationBackButton compact />
         <View className="flex-1 gap-0.5">
           <AppText variant="caption">{t('dashboard.welcome')}</AppText>
           <AppText className="font-semibold" numberOfLines={1}>

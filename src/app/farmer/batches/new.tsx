@@ -13,6 +13,7 @@ import { TextField } from '@/components/common/TextField';
 import { FarmerPage } from '@/components/farmer/FarmerPage';
 import { farmerApiErrorKey, validationKey } from '@/features/farmer/errorMessages';
 import { listHarvestRecords } from '@/features/farmer/harvestService';
+import { useBackNavigation } from '@/features/navigation/useBackNavigation';
 import {
   emptyProductBatchForm,
   productBatchFormSchema,
@@ -26,6 +27,7 @@ import { useTranslation, type TranslationKey } from '@/i18n';
 
 export default function NewBatchScreen() {
   const { t } = useTranslation();
+  const { goBack } = useBackNavigation({ fallbackHref: '/farmer/batches' });
   const queryClient = useQueryClient();
   const products = useQuery({ queryKey: ['farmer', 'products', 'for-batch'], queryFn: () => listProducts({ limit: 100, offset: 0 }) });
   const harvests = useQuery({ queryKey: ['farmer', 'harvest-records', 'for-batch'], queryFn: () => listHarvestRecords({ limit: 100, offset: 0 }) });
@@ -68,7 +70,7 @@ export default function NewBatchScreen() {
         <TextField label={t('farmer.batches.expiresAtLabel')} value={values.expiresAt} onChangeText={(v: string) => setValue('expiresAt', v, { shouldValidate: true })} placeholder="YYYY-MM-DD" error={err('expiresAt')} />
         {create.isError ? <AppText variant="error">{t(farmerApiErrorKey((create.error as { code?: string }).code))}</AppText> : null}
         <View className="flex-row gap-3">
-          <Button label={t('common.cancel')} variant="outline" className="flex-1" onPress={() => router.back()} />
+          <Button label={t('common.cancel')} variant="outline" className="flex-1" onPress={goBack} />
           <Button label={t('common.save')} className="flex-1" loading={create.isPending} onPress={handleSubmit((v) => create.mutate(toProductBatchPayload(v)))} />
         </View>
       </Card>

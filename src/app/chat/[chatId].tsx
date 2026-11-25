@@ -7,6 +7,7 @@ import { Button } from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
 import { StateView } from '@/components/common/StateView';
 import { TextField } from '@/components/common/TextField';
+import { NavigationBackButton } from '@/components/navigation/NavigationBackButton';
 import { chatErrorKey, markChatRead, sendChatMessage } from '@/features/chat/chatService';
 import { otherParticipant } from '@/features/chat/chatIds';
 import { useChat, useMessages } from '@/features/chat/useChat';
@@ -60,7 +61,8 @@ export default function ChatThreadScreen() {
   return (
     <Screen>
       <View className="flex-1">
-        <View className="border-b border-line px-5 py-3">
+        <View className="flex-row items-center gap-2 border-b border-line px-5 py-3">
+          <NavigationBackButton compact />
           <AppText variant="subtitle">{title}</AppText>
         </View>
 

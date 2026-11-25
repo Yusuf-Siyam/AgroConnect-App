@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Image, Pressable, View } from 'react-native';
@@ -24,6 +23,7 @@ import {
 } from '@/features/farmer/schemas';
 import { createProduct, updateProduct } from '@/features/farmer/productService';
 import { PRODUCT_STATUSES, PRODUCT_UNITS, type Product } from '@/features/farmer/types';
+import { useBackNavigation } from '@/features/navigation/useBackNavigation';
 import { useTranslation, type TranslationKey } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
 import { getUploadConfig } from '@/services/cloudinaryUpload';
@@ -50,6 +50,7 @@ const emptyValues: ProductFormValues = {
 export function ProductForm({ product }: { product?: Product }) {
   const { t } = useTranslation();
   const { profile } = useAuth();
+  const { goBack } = useBackNavigation({ fallbackHref: '/farmer/products' });
   const queryClient = useQueryClient();
   const [productId] = useState(() => product?.id ?? createUuid());
   const [images, setImages] = useState<string[]>(product?.images ?? []);
@@ -73,7 +74,7 @@ export function ProductForm({ product }: { product?: Product }) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['farmer', 'products'] });
       await queryClient.invalidateQueries({ queryKey: ['farmer', 'product-stats'] });
-      router.back();
+      goBack();
     },
   });
 

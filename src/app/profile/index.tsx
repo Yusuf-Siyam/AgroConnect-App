@@ -9,6 +9,7 @@ import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { Screen } from '@/components/common/Screen';
+import { NavigationBackButton } from '@/components/navigation/NavigationBackButton';
 import { StateView } from '@/components/common/StateView';
 import { TextField } from '@/components/common/TextField';
 import { validationKey } from '@/features/authentication/errorMessages';
@@ -54,6 +55,7 @@ export default function ProfileScreen() {
   return (
     <Screen scroll>
       <View className="gap-6 px-6 py-8">
+        <NavigationBackButton compact />
         <View className="gap-2">
           <AppText variant="title" className="text-primary">
             {t('profile.title')}
