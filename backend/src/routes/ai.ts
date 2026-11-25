@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
+
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 
-import { assertPhotoAdviceConfigured } from '../config/photoAdvice';
+import { assertPhotoAdviceConfigured, photoAdviceStatus } from '../config/photoAdvice';
 import { authenticate, requireRole } from '../middleware/auth';
 import { HttpError } from '../middleware/error';
 import { createRateLimiter } from '../middleware/rateLimit';
@@ -22,7 +24,14 @@ import {
   listDiagnoses,
 } from '../services/diagnosis';
 import { validationMessage } from '../validators/validation';
-import type { AiTextProvider, CropDiseaseClassifier, PlantPhotoAdvisor } from '../types/ai';
+import type {
+  AiTextProvider,
+  CropDiseaseClassifier,
+  Diagnosis,
+  DiagnosisImageAsset,
+  PlantPhotoAdvisor,
+} from '../types/ai';
+import { InFlightMap } from '../utils/inFlight';
 import {
   chatSchema,
   conversationIdParamSchema,
@@ -37,6 +46,14 @@ function parseOrThrow<T>(schema: { safeParse: (data: unknown) => { success: true
     throw new HttpError(400, 'VALIDATION_ERROR', validationMessage(result.error));
   }
   return result.data;
+}
+
+function diagnosisRequestKey(userId: string, image: DiagnosisImageAsset): string {
+  const fingerprint =
+    image.provider === 'inline'
+      ? `${image.mimeType}:${image.data}`
+      : `${image.publicId}:${image.resourceType}:${image.deliveryType}`;
+  return `${userId}:${createHash('sha256').update(fingerprint).digest('hex')}`;
 }
 
 function asyncRoute(
@@ -60,9 +77,19 @@ export function createAiRouter(
   photoAdvisor: PlantPhotoAdvisor = createPhotoAdvisor(classifier),
 ): Router {
   const router = Router();
+  // A repeated tap while a diagnosis is running reuses the first request.
+  const diagnosisRequests = new InFlightMap<Diagnosis>();
   router.use(createRateLimiter({ windowMs: 60_000, max: 60 }));
   router.use(authenticate);
   router.use(requireRole('farmer'));
+
+  // Secret-free snapshot of the config the running server actually loaded.
+  router.get(
+    '/status',
+    asyncRoute(async (_req, res) => {
+      res.json(photoAdviceStatus());
+    }),
+  );
 
   router.post(
     '/chat',
@@ -102,7 +129,11 @@ export function createAiRouter(
     asyncRoute(async (req, res) => {
       assertPhotoAdviceConfigured();
       const input = parseOrThrow(diagnoseSchema, req.body);
-      res.status(201).json(await createDiagnosis(req.auth!.uid, input, photoAdvisor, provider));
+      const uid = req.auth!.uid;
+      const diagnosis = await diagnosisRequests.run(diagnosisRequestKey(uid, input.image), () =>
+        createDiagnosis(uid, input, photoAdvisor, provider),
+      );
+      res.status(201).json(diagnosis);
     }),
   );
 

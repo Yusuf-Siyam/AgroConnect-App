@@ -73,7 +73,8 @@ export interface PlantPhotoAdvisor {
   suggest(input: PlantPhotoAdviceInput): Promise<PlantPhotoAdvice>;
 }
 
-export type DiagnosisImageAsset = {
+/** Legacy Cloudinary asset, still readable for existing diagnosis history. */
+export type CloudinaryDiagnosisImage = {
   provider: 'cloudinary';
   publicId: string;
   resourceType: 'image';
@@ -81,6 +82,16 @@ export type DiagnosisImageAsset = {
   version?: number;
   format?: string;
 };
+
+/** New diagnosis images are sent once, processed in memory, and never stored. */
+export type InlineDiagnosisImage = {
+  provider: 'inline';
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+  /** Raw base64 bytes on the request only. Diagnosis records omit this field. */
+  data?: string;
+};
+
+export type DiagnosisImageAsset = CloudinaryDiagnosisImage | InlineDiagnosisImage;
 
 export type CropDiseaseInput = {
   image: DiagnosisImageAsset;

@@ -9,14 +9,14 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/app.test.ts src/config/deliveryPricing.test.ts src/config/firebase.test.ts src/middleware/auth.test.ts src/services/userProfile.test.ts src/services/notificationTemplates.test.ts src/services/reputation.test.ts src/utils/dates.test.ts src/services/product.test.ts src/services/cloudinary.test.ts src/services/cloudinary.url.test.ts src/providers/geminiVision.test.ts",
+    "test": "tsx --test src/app.test.ts src/config/deliveryPricing.test.ts src/config/photoAdvice.test.ts src/config/firebase.test.ts src/middleware/auth.test.ts src/services/userProfile.test.ts src/services/notificationTemplates.test.ts src/services/reputation.test.ts src/utils/dates.test.ts src/utils/inFlight.test.ts src/services/product.test.ts src/services/cloudinary.test.ts src/services/cloudinary.url.test.ts src/services/diagnosis.test.ts src/providers/gemini.test.ts src/providers/geminiVision.test.ts",
     "ai:check-vision": "tsx src/scripts/checkVision.ts",
+    "ai:check-text": "tsx src/scripts/checkGeminiText.ts",
     "admin:provision": "tsx src/scripts/provision-admin.ts",
     "market:import": "tsx src/scripts/import-market-prices.ts",
     "seed:dev-paid-order": "tsx src/scripts/seedDevPaidOrder.ts"
   },
   "dependencies": {
-    "cloudinary": "^2.9.0",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.10",

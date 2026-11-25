@@ -1,5 +1,15 @@
 import { createApp } from './app';
 import { env } from './config/env';
+import { photoAdviceStatus } from './config/photoAdvice';
+
+// Log safe flags so a stale process or wrong .env is obvious at startup.
+const aiStatus = photoAdviceStatus();
+console.log('[agroconnect-backend] AI config', {
+  diseaseProvider: aiStatus.provider,
+  photoAdviceConfigured: aiStatus.photoAdviceConfigured,
+  geminiKeyPresent: aiStatus.geminiApiKeyPresent,
+  geminiVisionModelPresent: aiStatus.geminiVisionModelPresent,
+});
 
 const app = createApp();
 

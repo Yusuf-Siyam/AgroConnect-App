@@ -10,9 +10,35 @@ export const CHEMICAL_SAFETY_NOTICE =
 
 const PROVIDERS = new Set<DiseaseProvider>(['none', 'gemini', 'external']);
 
-/** Read at call time so tests and local config changes do not need a rebuild. */
-export function resolveDiseaseProvider(): DiseaseProvider {
-  const raw = (process.env.DISEASE_PROVIDER ?? '').trim() || 'none';
+/**
+ * One parsed snapshot, loaded from backend/.env by config/env.ts. The API
+ * server and ai:check-vision both use it, so they cannot disagree about config.
+ * Tests pass an explicit snapshot instead of mutating global process.env.
+ */
+export type PhotoAdviceConfig = {
+  diseaseProvider: string;
+  geminiApiKey: string;
+  geminiVisionModel: string;
+  diseaseModelEndpoint: string;
+  diseaseModelApiKey: string;
+};
+
+export function photoAdviceConfig(): PhotoAdviceConfig {
+  return {
+    diseaseProvider: env.diseaseProvider,
+    geminiApiKey: env.geminiApiKey,
+    geminiVisionModel: env.geminiVisionModel,
+    diseaseModelEndpoint: env.diseaseModelEndpoint,
+    diseaseModelApiKey: env.diseaseModelApiKey,
+  };
+}
+
+function present(value: string): boolean {
+  return Boolean(value.trim());
+}
+
+export function resolveDiseaseProvider(config: PhotoAdviceConfig = photoAdviceConfig()): DiseaseProvider {
+  const raw = config.diseaseProvider.trim() || 'none';
   if (PROVIDERS.has(raw as DiseaseProvider)) return raw as DiseaseProvider;
   throw new AiNotConfiguredError(
     'AI photo suggestion',
@@ -20,8 +46,8 @@ export function resolveDiseaseProvider(): DiseaseProvider {
   );
 }
 
-export function assertPhotoAdviceConfigured(): void {
-  const provider = resolveDiseaseProvider();
+export function assertPhotoAdviceConfigured(config: PhotoAdviceConfig = photoAdviceConfig()): void {
+  const provider = resolveDiseaseProvider(config);
   if (provider === 'none') {
     throw new AiNotConfiguredError(
       'AI photo suggestion',
@@ -29,7 +55,7 @@ export function assertPhotoAdviceConfigured(): void {
     );
   }
   if (provider === 'gemini') {
-    if (!process.env.GEMINI_API_KEY?.trim() || !process.env.GEMINI_VISION_MODEL?.trim()) {
+    if (!present(config.geminiApiKey) || !present(config.geminiVisionModel)) {
       throw new AiNotConfiguredError(
         'Gemini photo advisor',
         'Set GEMINI_API_KEY and GEMINI_VISION_MODEL on the backend.',
@@ -37,12 +63,38 @@ export function assertPhotoAdviceConfigured(): void {
     }
     return;
   }
-  if (!process.env.DISEASE_MODEL_ENDPOINT?.trim() || !process.env.DISEASE_MODEL_API_KEY?.trim()) {
+  if (!present(config.diseaseModelEndpoint) || !present(config.diseaseModelApiKey)) {
     throw new AiNotConfiguredError(
       'External photo advisor',
       'Set DISEASE_MODEL_ENDPOINT and DISEASE_MODEL_API_KEY on the backend.',
     );
   }
+}
+
+/** Safe, secret-free snapshot for health checks and the farmer AI screen. */
+export function photoAdviceStatus(config: PhotoAdviceConfig = photoAdviceConfig()): {
+  provider: DiseaseProvider | 'invalid';
+  photoAdviceConfigured: boolean;
+  geminiApiKeyPresent: boolean;
+  geminiVisionModelPresent: boolean;
+  externalConfigured: boolean;
+} {
+  let provider: DiseaseProvider | 'invalid' = 'invalid';
+  let configured = false;
+  try {
+    provider = resolveDiseaseProvider(config);
+    assertPhotoAdviceConfigured(config);
+    configured = true;
+  } catch {
+    configured = false;
+  }
+  return {
+    provider,
+    photoAdviceConfigured: configured,
+    geminiApiKeyPresent: present(config.geminiApiKey),
+    geminiVisionModelPresent: present(config.geminiVisionModel),
+    externalConfigured: present(config.diseaseModelEndpoint) && present(config.diseaseModelApiKey),
+  };
 }
 
 /** Numeric values are internal compatibility metadata and are never shown to farmers. */

@@ -36,6 +36,17 @@ const envSchema = z.object({
   GEMINI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(15_000),
   GEMINI_RETRIES: z.coerce.number().int().min(0).max(1).default(1),
   GEMINI_VISION_MODEL: z.string().default(''),
+  // Image requests take substantially longer than text generation on the
+  // Interactions endpoint; keep this independent so the chat timeout is unchanged.
+  GEMINI_VISION_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(90_000),
+  // Bounded retries for temporary image-provider failures (429/500/502/503/504).
+  // This is a retry count, so the hard cap is three retries / four provider requests.
+  GEMINI_VISION_RETRIES: z.coerce.number().int().min(0).max(3).default(2),
+  // Wall-clock budget shared by all attempts and backoff waits. Must cover the
+  // per-attempt timeout and stay below the mobile client's 120s request timeout.
+  GEMINI_VISION_TOTAL_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(110_000),
+  // Optional local image for `npm run ai:check-vision`; never sent by the API.
+  AI_CHECK_IMAGE_PATH: z.string().default(''),
   DISEASE_PROVIDER: z.enum(['none', 'gemini', 'external']).default('none'),
   AI_DAILY_MESSAGE_LIMIT: z.coerce.number().int().positive().max(10_000).default(50),
   AI_MESSAGES_PER_MINUTE: z.coerce.number().int().positive().max(100).default(10),
@@ -52,10 +63,15 @@ const envSchema = z.object({
   CHAT_MESSAGES_PER_MINUTE: z.coerce.number().int().positive().max(1_000).default(30),
   CHAT_CONVERSATIONS_PER_DAY: z.coerce.number().int().positive().max(1_000).default(20),
   CHAT_SUPPORT_MESSAGES_PER_HOUR: z.coerce.number().int().positive().max(1_000).default(10),
-}).refine((data) => data.DISEASE_POSSIBLE_MAX >= data.DISEASE_UNCERTAIN_MAX, {
-  message: 'DISEASE_POSSIBLE_MAX must be greater than or equal to DISEASE_UNCERTAIN_MAX',
-  path: ['DISEASE_POSSIBLE_MAX'],
-});
+})
+  .refine((data) => data.DISEASE_POSSIBLE_MAX >= data.DISEASE_UNCERTAIN_MAX, {
+    message: 'DISEASE_POSSIBLE_MAX must be greater than or equal to DISEASE_UNCERTAIN_MAX',
+    path: ['DISEASE_POSSIBLE_MAX'],
+  })
+  .refine((data) => data.GEMINI_VISION_TOTAL_TIMEOUT_MS >= data.GEMINI_VISION_TIMEOUT_MS, {
+    message: 'GEMINI_VISION_TOTAL_TIMEOUT_MS must be greater than or equal to GEMINI_VISION_TIMEOUT_MS',
+    path: ['GEMINI_VISION_TOTAL_TIMEOUT_MS'],
+  });
 
 // Empty values in a copied .env.example should fall back to the schema defaults.
 const candidates = Object.fromEntries(
@@ -88,6 +104,10 @@ export const env = {
   geminiRequestTimeoutMs: parsed.data.GEMINI_REQUEST_TIMEOUT_MS,
   geminiRetries: parsed.data.GEMINI_RETRIES,
   geminiVisionModel: parsed.data.GEMINI_VISION_MODEL,
+  geminiVisionTimeoutMs: parsed.data.GEMINI_VISION_TIMEOUT_MS,
+  geminiVisionRetries: parsed.data.GEMINI_VISION_RETRIES,
+  geminiVisionTotalTimeoutMs: parsed.data.GEMINI_VISION_TOTAL_TIMEOUT_MS,
+  aiCheckImagePath: parsed.data.AI_CHECK_IMAGE_PATH,
   diseaseProvider: parsed.data.DISEASE_PROVIDER,
   aiDailyMessageLimit: parsed.data.AI_DAILY_MESSAGE_LIMIT,
   aiMessagesPerMinute: parsed.data.AI_MESSAGES_PER_MINUTE,

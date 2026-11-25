@@ -44,9 +44,19 @@ export function createApp(options: AppOptions = {}) {
 
   const app = express();
 
+  const isJsonRequest = (req: { headers: Record<string, unknown> }): boolean =>
+    String(req.headers['content-type'] ?? '').toLowerCase().includes('application/json');
+
   app.disable('x-powered-by');
   app.use(cors({ origin: env.corsOrigins.length > 0 ? env.corsOrigins : false }));
-  app.use(express.json({ limit: '1mb' }));
+  // Diagnosis images travel once as base64 JSON; other JSON bodies stay at 1 MB.
+  app.use(
+    express.json({
+      limit: '1mb',
+      type: (req) => isJsonRequest(req as { headers: Record<string, unknown> }) && !(req.url ?? '').startsWith('/api/ai/diagnose'),
+    }),
+  );
+  app.use('/api/ai/diagnose', express.json({ limit: '7mb', type: (req) => isJsonRequest(req as { headers: Record<string, unknown> }) }));
 
   app.use('/api/health', healthRouter);
   app.use('/api/auth', createAuthRouter());

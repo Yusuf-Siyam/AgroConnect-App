@@ -4,6 +4,7 @@ export class AiProviderError extends Error {
     message: string,
     public readonly code: string = 'AI_PROVIDER_ERROR',
     public readonly retryable = false,
+    public readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = 'AiProviderError';
@@ -24,14 +25,36 @@ export class AiProviderTimeoutError extends AiProviderError {
   }
 }
 
+/** Client-side image validation failures are never provider failures. */
+export class AiInvalidImageError extends AiProviderError {
+  constructor(message: string, code = 'INVALID_IMAGE_ASSET') {
+    super(message, code, false);
+    this.name = 'AiInvalidImageError';
+  }
+}
+
 export function toAiHttpError(error: unknown): {
   statusCode: number;
   code: string;
   message: string;
 } {
   if (error instanceof AiProviderError) {
-    const statusCode =
-      error.code === 'AI_NOT_CONFIGURED' ? 503 : error.code === 'AI_RATE_LIMITED' ? 429 : 502;
+    const statusCode = error.code === 'INVALID_IMAGE_DATA' ||
+      error.code === 'INVALID_IMAGE_TYPE' ||
+      error.code === 'INVALID_IMAGE_FORMAT' ||
+      error.code === 'INVALID_IMAGE_ASSET' ||
+      error.code === 'IMAGE_TOO_LARGE'
+      ? 400
+      : error.code === 'AI_RATE_LIMITED'
+        ? 429
+        : error.code === 'AI_PROVIDER_TIMEOUT'
+          ? 504
+          : error.code === 'AI_NOT_CONFIGURED' ||
+              error.code === 'AI_PROVIDER_AUTH' ||
+              error.code === 'AI_MODEL_UNAVAILABLE' ||
+              error.code === 'AI_PROVIDER_UNAVAILABLE'
+            ? 503
+            : 502;
     return { statusCode, code: error.code, message: error.message };
   }
 
