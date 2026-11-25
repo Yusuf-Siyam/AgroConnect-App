@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { NotificationBridge } from '@/components/chat/NotificationBridge';
 import { SplashScreen } from '@/components/common/SplashScreen';
+import { AndroidBackHandler } from '@/components/navigation/AndroidBackHandler';
 import { AppLocaleProvider } from '@/providers/AppLocaleProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { LanguagePreferenceSync } from '@/providers/LanguagePreferenceSync';
@@ -52,6 +53,7 @@ function RootContent() {
       <LanguagePreferenceSync />
       <NotificationBridge />
       <AppNavigator />
+      <AndroidBackHandler />
     </>
   );
 }

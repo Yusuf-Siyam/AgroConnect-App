@@ -3,7 +3,12 @@ import { useCallback } from 'react';
 
 import { useAuth } from '@/providers/AuthProvider';
 
-import { resolveBackAction, type BackAction, type BackRole } from './backNavigation';
+import {
+  resolveBackAction,
+  shouldHandleHardwareBack,
+  type BackAction,
+  type BackRole,
+} from './backNavigation';
 
 type Options = {
   fallbackHref?: Href | null;
@@ -31,11 +36,25 @@ export function useBackNavigation(options: Options = {}) {
 
   const action = getAction(canGoBack);
 
-  const goBack = useCallback(() => {
-    const resolved = getAction(router.canGoBack());
-    if (resolved.kind === 'back') router.back();
-    else if (resolved.kind === 'replace') router.replace(resolved.href as Href);
-  }, [getAction, router]);
+  const perform = useCallback(
+    (resolved: BackAction) => {
+      if (resolved.kind === 'back') router.back();
+      else if (resolved.kind === 'replace') router.replace(resolved.href as Href);
+    },
+    [router],
+  );
 
-  return { action, getAction, goBack };
+  const goBack = useCallback(() => {
+    perform(getAction(router.canGoBack()));
+  }, [getAction, perform, router]);
+
+  /** Returns true when the app consumed the hardware event instead of exiting. */
+  const handleHardwareBack = useCallback(() => {
+    const resolved = getAction(router.canGoBack());
+    if (!shouldHandleHardwareBack(resolved)) return false;
+    perform(resolved);
+    return true;
+  }, [getAction, perform, router]);
+
+  return { action, getAction, goBack, handleHardwareBack };
 }
