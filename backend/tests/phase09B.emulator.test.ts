@@ -144,6 +144,14 @@ function resetEnv(): void {
   process.env.CLOUDINARY_API_SECRET = 'test-secret';
   (env as any).aiDiagnosisDailyLimit = 3;
   (env as any).aiDiagnosesPerMinute = 100;
+  // The app reads one parsed env snapshot, not process.env at request time.
+  // Override the snapshot so owner .env values cannot make tests call real providers.
+  (env as any).diseaseProvider = 'external';
+  (env as any).geminiApiKey = '';
+  (env as any).geminiModel = '';
+  (env as any).geminiVisionModel = '';
+  (env as any).diseaseModelEndpoint = 'https://classifier.example.test/diagnose';
+  (env as any).diseaseModelApiKey = 'test-classifier-key';
 }
 
 before(async () => {
@@ -288,8 +296,8 @@ describe('Phase 09B disease detection emulator verification', () => {
     assert.equal(withoutGemini.guidance, undefined);
     assert.equal(guidanceCalls.length, 0);
 
-    process.env.GEMINI_API_KEY = 'test-gemini-key';
-    process.env.GEMINI_MODEL = 'test-model';
+    (env as any).geminiApiKey = 'test-gemini-key';
+    (env as any).geminiModel = 'test-model';
     try {
       const withGemini = await (
         await diagnose(user, diagnosisImage(user), { cropName: 'Potato', language: 'en' })
@@ -300,17 +308,17 @@ describe('Phase 09B disease detection emulator verification', () => {
       assert.match(guidanceCalls[0]!.systemInstruction, /never claim a confirmed diagnosis/i);
       assert.match(guidanceCalls[0]!.systemInstruction, /read the label/i);
     } finally {
-      process.env.GEMINI_API_KEY = '';
-      process.env.GEMINI_MODEL = '';
+      (env as any).geminiApiKey = '';
+      (env as any).geminiModel = '';
     }
   });
 
   it('returns a clear not-configured error without a classifier', async () => {
     const user = await registerUser('p9b-not-configured');
-    const endpoint = process.env.DISEASE_MODEL_ENDPOINT;
-    const key = process.env.DISEASE_MODEL_API_KEY;
-    process.env.DISEASE_MODEL_ENDPOINT = '';
-    process.env.DISEASE_MODEL_API_KEY = '';
+    const endpoint = (env as any).diseaseModelEndpoint;
+    const key = (env as any).diseaseModelApiKey;
+    (env as any).diseaseModelEndpoint = '';
+    (env as any).diseaseModelApiKey = '';
     try {
       const response = await diagnose(user, diagnosisImage(user));
       assert.equal(response.status, 503, await response.clone().text());
@@ -318,8 +326,8 @@ describe('Phase 09B disease detection emulator verification', () => {
       assert.equal(body.error.code, 'AI_NOT_CONFIGURED');
       assert.match(String(body.error.message), /not configured/i);
     } finally {
-      process.env.DISEASE_MODEL_ENDPOINT = endpoint;
-      process.env.DISEASE_MODEL_API_KEY = key;
+      (env as any).diseaseModelEndpoint = endpoint;
+      (env as any).diseaseModelApiKey = key;
     }
   });
 
@@ -332,7 +340,7 @@ describe('Phase 09B disease detection emulator verification', () => {
       },
     };
     const timeout = await diagnose(user, diagnosisImage(user));
-    assert.equal(timeout.status, 502);
+    assert.equal(timeout.status, 504);
     assert.equal(await errorCode(timeout), 'AI_PROVIDER_TIMEOUT');
 
     activeClassifier = {

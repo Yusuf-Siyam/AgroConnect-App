@@ -230,7 +230,7 @@ describe('Phase 09A farming assistant emulator verification', () => {
       },
     };
     const timeout = await chat(user, { message: 'Water schedule?', language: 'en' });
-    assert.equal(timeout.status, 502);
+    assert.equal(timeout.status, 504);
     assert.equal(await errorCode(timeout), 'AI_PROVIDER_TIMEOUT');
 
     activeProvider = {

@@ -125,6 +125,14 @@ before(async () => {
   process.env.CLOUDINARY_API_SECRET = 'test-secret';
   (env as any).aiDiagnosisDailyLimit = 20;
   (env as any).aiDiagnosesPerMinute = 100;
+  // The app reads one parsed env snapshot, not process.env at request time.
+  // Override the snapshot so owner .env values cannot make tests call real providers.
+  (env as any).diseaseProvider = 'gemini';
+  (env as any).geminiApiKey = 'test-gemini-key';
+  (env as any).geminiModel = '';
+  (env as any).geminiVisionModel = 'test-vision-model';
+  (env as any).diseaseModelEndpoint = 'https://classifier.example.test/diagnose';
+  (env as any).diseaseModelApiKey = 'test-classifier-key';
   setCloudinaryService(createCloudinaryTestService(cloudinaryState));
 
   const { createApp } = await import('../src/app.js');
@@ -228,14 +236,14 @@ describe('Unverified AI photo suggestion emulator verification', () => {
     const user = await registerUser('photo-disabled');
     activeAdvisor = { async suggest() { return advice(); } };
     advisorCalls.length = 0;
-    process.env.DISEASE_PROVIDER = 'none';
+    (env as any).diseaseProvider = 'none';
     try {
       const response = await diagnose(user, diagnosisImage(user));
       assert.equal(response.status, 503);
       assert.equal(await errorCode(response), 'AI_NOT_CONFIGURED');
       assert.equal(advisorCalls.length, 0);
     } finally {
-      process.env.DISEASE_PROVIDER = 'gemini';
+      (env as any).diseaseProvider = 'gemini';
     }
   });
 
