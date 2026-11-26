@@ -23,10 +23,6 @@ export function BuyerTabs() {
       <Tabs.Screen name="orders" options={{ title: t('buyer.tab.orders') }} />
       <Tabs.Screen name="trace" options={{ title: t('buyer.tab.trace') }} />
       <Tabs.Screen name="profile" options={{ title: t('buyer.tab.profile') }} />
-      {/* Pushed/detail routes stay in their own stacks and never appear as tabs. */}
-      <Tabs.Screen name="checkout" options={{ href: null }} />
-      <Tabs.Screen name="product" options={{ href: null }} />
-      <Tabs.Screen name="farmer" options={{ href: null }} />
     </Tabs>
   );
 }

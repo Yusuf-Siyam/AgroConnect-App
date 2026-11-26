@@ -364,6 +364,14 @@ export const en = {
   'error.locationRequired': 'Allow location access or enter a district.',
   'error.invalidResponse': 'The server returned an unexpected response.',
 
+  'route.profileErrorTitle': 'We could not load your profile',
+  'route.profileErrorDetail': 'Check your connection and try again. You can also sign out and sign back in.',
+  'route.suspendedTitle': 'This account is inactive',
+  'route.suspendedDetail': 'Access is paused for this account. Sign out and contact support if this is unexpected.',
+  'route.notFoundTitle': 'Page not found',
+  'route.notFoundDetail': 'This page is not available. Return to your home screen.',
+  'route.goHome': 'Go to my home',
+
   'common.filters': 'Filters',
   'common.apply': 'Apply',
   'common.clear': 'Clear',

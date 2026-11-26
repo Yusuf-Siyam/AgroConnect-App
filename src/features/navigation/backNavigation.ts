@@ -40,7 +40,11 @@ const NO_FALLBACK_PATHS = new Set([
 ]);
 const FARMER_MORE_PATHS = new Set([
   '/farmer/analytics',
+  '/farmer/batches',
   '/farmer/emergency',
+  '/farmer/groups',
+  '/farmer/harvest',
+  '/farmer/inventory',
   '/farmer/market',
   '/farmer/weather',
 ]);

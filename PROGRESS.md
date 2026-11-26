@@ -1162,3 +1162,32 @@ Typing `/farmer/groups` resolves to a real file, but `FarmerTabs.tsx:26` declare
 - Admin: `src/app/admin/_layout.tsx:1-10` uses `RoleGuard role="admin"` and `RoleNavigator` (`src/components/navigation/RoleNavigator.tsx:1-16`), a `Stack` with a shared header. There is no tab layout or hidden tab. Admin has only `src/app/admin/index.tsx`.
 - `RoleGuard`, root `Stack.Protected`, the role-home mapper and the missing return-path/profile-error behavior apply equally to all four role areas. The specific dashboard bounce found here is limited to hidden tabs: seven farmer paths and three buyer paths.
 
+## Routing and guards - STEP 1 implementation
+
+### Changes
+
+1. **Hidden-route fix (all roles with the problem)**. Farmer and buyer visible tab screens were moved into `(tabs)` route groups while every public URL stayed identical. `src/app/farmer/(tabs)/_layout.tsx` and `src/app/buyer/(tabs)/_layout.tsx` own `FarmerTabs`/`BuyerTabs`; tool and detail stacks remain sibling routes under the role layout. `href: null` was removed from `FarmerTabs.tsx` and `BuyerTabs.tsx`, so SDK 58 no longer hides and replaces a focused route with the dashboard. Transporter has no hidden tabs and admin has no tab navigator, so neither needed a route move.
+2. **Single pure guard decision**. `src/features/navigation/routeAccess.ts` exports `resolveRouteAccess()` with one decision union: `loading`, `allow`, `redirectLogin` (with sanitized `returnTo`), `profileError`, `suspended`, `redirectHome` (with `homePathForRole`) and `notFound`. `src/features/navigation/routeManifest.ts` holds the canonical role paths and path matcher used for the exact-route and unknown-route cases.
+3. **Guard UI and state**. `src/components/common/RoleGuard.tsx` now applies the resolver for farmer, buyer, transporter and admin; it shows `SplashScreen` while loading/redirecting, `RouteAccessScreen` for profile error (Retry + Sign out), suspension (message + Sign out) and unknown path (Go to my home). `src/app/index.tsx` uses the same recovery screen when a signed-in user has no profile yet. Explicit Sign out clears any stored return path so it cannot send the next login back to a guarded page.
+4. **Auth state without silent sign-out**. `AuthProvider` now exposes `profileError`, `profileLoading` and `isSuspended`. A failed Firestore/Auth profile load keeps the Firebase session, marks the error and lets the guard offer retry/sign-out instead of bouncing to `/login`. `isActive === false` or `accountStatus === 'suspended'` in `users/{uid}` drives the suspended state; absent values mean active. `refreshProfile()` clears the error on success.
+5. **Return-path login**. `src/features/navigation/returnPath.ts` stores only safe single-slash app paths in `sessionStorage` with an in-memory fallback. `RoleGuard` remembers a signed-out deep link; `(auth)/login.tsx` and `(auth)/register.tsx` navigate to that path after success and then consume it. Root `Stack.Protected` still guards `(auth)`, `chat` and `profile`; role areas are guarded in their layouts so the intended path is available before redirecting.
+6. **Back navigation and hrefs**. Every More tools page now falls back to `/farmer/more` when it has no history; nested detail screens still fall back to their own lists. All More tools hrefs were verified against real route files by tests. No feature form, API contract or screen behavior was changed.
+
+### Verification
+
+Run after the code change:
+
+- `npx tsc --noEmit` — passed, no diagnostics.
+- `npm run lint` — passed, no warnings or errors.
+- `npm run test:mobile` — passed, 135/135 tests in 25 suites, 0 failures.
+- `cd backend && npm test` — passed, 67/67 tests in 16 suites, 0 failures.
+- `npm run check:i18n` — passed, 114 TSX files with no literal user-facing strings.
+- Full `npm run test:emulators` — passed with Java 21 outside the repository: 19 emulator suites / 131 tests / 0 failures. No emulator suite was skipped.
+
+### Assumptions and owner tasks
+
+- Suspension is opt-in via `users/{uid}.isActive === false` or `accountStatus === 'suspended'`. Existing profiles without those fields remain active, so this change cannot lock out a valid user.
+- A profile-fetch failure is now recoverable in-app. Real Firebase project owners still need to verify that `EXPO_PUBLIC_FIREBASE_PROJECT_ID`/`EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` match backend `FIREBASE_PROJECT_ID`, that the service account and device clocks are valid, and that required `users/{uid}` profiles exist. No secret value was opened or printed.
+- The earlier `1 mon = 40 kg` unit question remains with the product owner; routing work did not change pricing or units.
+- No files were pushed and no `.env` value, credential, key, secret or user image was opened, printed or committed.
+

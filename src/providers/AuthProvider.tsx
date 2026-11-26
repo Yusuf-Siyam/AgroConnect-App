@@ -36,6 +36,9 @@ type AuthContextValue = {
   role: Role | null;
   errorCode: AuthErrorCode | null;
   isConfigured: boolean;
+  profileError: boolean;
+  profileLoading: boolean;
+  isSuspended: boolean;
   signIn: (values: LoginValues) => Promise<UserProfile>;
   signUp: (values: RegisterValues) => Promise<UserProfile>;
   resetPassword: (values: ForgotPasswordValues) => Promise<void>;
@@ -83,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null);
+  const [profileError, setProfileError] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(env.isFirebaseConfigured);
   const userRef = useRef<User | null>(null);
   const authActionInProgressRef = useRef(false);
 
@@ -128,6 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             : (user.displayName ?? user.email?.split('@')[0] ?? ''),
         role: resolvedRole,
         isVerified: data.isVerified === true || resolvedRole === 'admin',
+        ...(typeof data.isActive === 'boolean' ? { isActive: data.isActive } : {}),
+        ...(data.accountStatus === 'active' || data.accountStatus === 'suspended'
+          ? { accountStatus: data.accountStatus }
+          : {}),
         ...(typeof data.phoneNumber === 'string' && data.phoneNumber ? { phoneNumber: data.phoneNumber } : {}),
         ...(typeof data.district === 'string' && data.district ? { district: data.district } : {}),
         ...(data.preferredLanguage === 'bn' || data.preferredLanguage === 'en'
@@ -188,6 +197,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return created;
   }, []);
 
+  /** Keeps loading/error state explicit so route guards never guess from a null profile. */
+  const loadProfileWithState = useCallback(
+    async (user: User): Promise<UserProfile> => {
+      setProfileLoading(true);
+      setProfileError(false);
+      try {
+        const resolved = await loadProfile(user);
+        return resolved;
+      } catch (error) {
+        setProfileError(true);
+        throw error;
+      } finally {
+        setProfileLoading(false);
+      }
+    },
+    [loadProfile],
+  );
+
   const failAuthentication = useCallback(async () => {
     try {
       await signOutUser();
@@ -197,6 +224,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     userRef.current = null;
     setFirebaseUser(null);
     setProfile(null);
+    setProfileError(false);
+    setProfileLoading(false);
     setStatus('unauthenticated');
   }, []);
 
@@ -217,14 +246,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!user) {
         setProfile(null);
+        setProfileError(false);
+        setProfileLoading(false);
         setStatus('unauthenticated');
         return;
       }
 
-      void loadProfile(user)
+      void loadProfileWithState(user)
         .then((resolved) => {
           if (!active) return;
           setProfile(resolved);
+          setProfileError(false);
           setStatus('authenticated');
         })
         .catch((error) => {
@@ -234,9 +266,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               uid: user.uid,
               code: (error as { code?: string })?.code,
             });
-          // Never leave an authenticated user without a role: the route guards
-          // would bounce between the dashboard and /login.
-          void failAuthentication();
+          // Keep the signed-in Firebase session so the route guard can show a
+          // retry/error screen instead of silently signing the user out.
+          setProfile(null);
+          setProfileLoading(false);
+          setStatus('authenticated');
         });
     });
 
@@ -244,7 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       unsubscribe();
     };
-  }, [failAuthentication, loadProfile]);
+  }, [loadProfileWithState]);
 
   // Token provider is registered synchronously during render so React Query
   // hooks that mount on the same auth transition already have a token source.
@@ -274,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userRef.current = user;
         setFirebaseUser(user);
         try {
-          const resolved = await loadProfile(user);
+          const resolved = await loadProfileWithState(user);
           setProfile(resolved);
           setStatus('authenticated');
           return resolved;
@@ -289,7 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
     },
-    [failAuthentication, loadProfile, runAuthAction],
+    [failAuthentication, loadProfileWithState, runAuthAction],
   );
 
   const signUp = useCallback(
@@ -299,7 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userRef.current = user;
         setFirebaseUser(user);
         try {
-          const resolved = await loadProfile(user);
+          const resolved = await loadProfileWithState(user);
           setProfile(resolved);
           setStatus('authenticated');
           return resolved;
@@ -314,7 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
     },
-    [failAuthentication, loadProfile, runAuthAction],
+    [failAuthentication, loadProfileWithState, runAuthAction],
   );
 
   const resetPassword = useCallback(
@@ -328,6 +362,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userRef.current = null;
       setFirebaseUser(null);
       setProfile(null);
+      setProfileError(false);
+      setProfileLoading(false);
       setStatus('unauthenticated');
     });
   }, [runAuthAction]);
@@ -335,10 +371,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     const user = userRef.current;
     if (!user) return null;
-    const resolved = await loadProfile(user);
+    const resolved = await loadProfileWithState(user);
     setProfile(resolved);
     return resolved;
-  }, [loadProfile]);
+  }, [loadProfileWithState]);
 
   const updateProfile = useCallback(
     async (values: ProfileUpdate) => {
@@ -357,12 +393,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...values,
           updatedAt: serverTimestamp(),
         });
-        const refreshed = await loadProfile(user);
+        const refreshed = await loadProfileWithState(user);
         setProfile(refreshed);
         return refreshed;
       });
     },
-    [loadProfile, wrap],
+    [loadProfileWithState, wrap],
   );
 
   const syncPreferredLanguage = useCallback(async (locale: Locale) => {
@@ -378,6 +414,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const isSuspended = Boolean(
+    profile && (profile.isActive === false || profile.accountStatus === 'suspended'),
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -386,6 +426,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: profile?.role ?? null,
       errorCode,
       isConfigured: env.isFirebaseConfigured,
+      profileError,
+      profileLoading,
+      isSuspended,
       signIn,
       signUp,
       resetPassword,
@@ -400,6 +443,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       firebaseUser,
       profile,
       errorCode,
+      profileError,
+      profileLoading,
+      isSuspended,
       signIn,
       signUp,
       resetPassword,

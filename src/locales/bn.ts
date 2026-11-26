@@ -366,6 +366,14 @@ export const bn: Record<TranslationKey, string> = {
   'error.locationRequired': 'অবস্থান অনুমতি দিন বা একটি জেলা লিখুন।',
   'error.invalidResponse': 'সার্ভার অপ্রত্যাশিত উত্তর দিয়েছে।',
 
+  'route.profileErrorTitle': 'আপনার প্রোফাইল লোড করা যায়নি',
+  'route.profileErrorDetail': 'সংযোগ পরীক্ষা করে আবার চেষ্টা করুন। অথবা সাইন আউট করে আবার সাইন ইন করুন।',
+  'route.suspendedTitle': 'এই অ্যাকাউন্টটি নিষ্ক্রিয়',
+  'route.suspendedDetail': 'এই অ্যাকাউন্টের ব্যবহার সাময়িকভাবে বন্ধ। অপ্রত্যাশিত হলে সাইন আউট করে সহায়তার সাথে যোগাযোগ করুন।',
+  'route.notFoundTitle': 'পৃষ্ঠা পাওয়া যায়নি',
+  'route.notFoundDetail': 'এই পৃষ্ঠাটি উপলব্ধ নেই। আপনার হোম স্ক্রিনে ফিরে যান।',
+  'route.goHome': 'আমার হোমে যান',
+
   'common.filters': 'ফিল্টার',
   'common.apply': 'প্রয়োগ',
   'common.clear': 'মুছে ফেলুন',

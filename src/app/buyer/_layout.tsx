@@ -1,10 +1,12 @@
-import { RoleGuard } from '@/components/common/RoleGuard';
-import { BuyerTabs } from '@/components/navigation/BuyerTabs';
+import { Stack } from 'expo-router';
 
+import { RoleGuard } from '@/components/common/RoleGuard';
+
+/** Buyer guard plus a host stack for tab and detail routes. */
 export default function BuyerLayout() {
   return (
     <RoleGuard role="buyer">
-      <BuyerTabs />
+      <Stack screenOptions={{ headerShown: false }} />
     </RoleGuard>
   );
 }

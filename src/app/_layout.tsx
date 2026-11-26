@@ -29,11 +29,13 @@ function AppNavigator() {
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
 
+      {/* Role areas own their guards so a deep link can remember its return path. */}
+      <Stack.Screen name="farmer" />
+      <Stack.Screen name="buyer" />
+      <Stack.Screen name="transporter" />
+      <Stack.Screen name="admin" />
+
       <Stack.Protected guard={status === 'authenticated'} redirectTo="/login">
-        <Stack.Screen name="farmer" />
-        <Stack.Screen name="buyer" />
-        <Stack.Screen name="transporter" />
-        <Stack.Screen name="admin" />
         <Stack.Screen name="chat" />
         <Stack.Screen name="profile" />
       </Stack.Protected>

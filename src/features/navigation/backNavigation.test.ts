@@ -95,6 +95,33 @@ describe('custom back button decisions', () => {
   });
 });
 
+describe('More tools back navigation', () => {
+  for (const pathname of [
+    '/farmer/analytics',
+    '/farmer/batches',
+    '/farmer/emergency',
+    '/farmer/groups',
+    '/farmer/harvest',
+    '/farmer/inventory',
+    '/farmer/market',
+    '/farmer/weather',
+  ]) {
+    it(`returns ${pathname} to More tools without history`, () => {
+      assert.deepEqual(
+        resolveBackAction({ pathname, canGoBack: false, role: 'farmer' }),
+        { kind: 'replace', href: '/farmer/more' },
+      );
+    });
+  }
+
+  it('keeps nested detail screens attached to their own list', () => {
+    assert.deepEqual(
+      resolveBackAction({ pathname: '/farmer/harvest/new', canGoBack: false, role: 'farmer' }),
+      { kind: 'replace', href: '/farmer/harvest' },
+    );
+  });
+});
+
 describe('no-history fallback', () => {
   it('uses role-aware parents for shared screens', () => {
     assert.deepEqual(fallbackHrefForPath('/chat/support_user-1', 'buyer'), '/chat');

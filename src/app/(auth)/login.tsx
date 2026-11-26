@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, router } from 'expo-router';
+import { Link, router, type Href } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { View } from 'react-native';
 
@@ -10,6 +10,7 @@ import { Screen } from '@/components/common/Screen';
 import { TextField } from '@/components/common/TextField';
 import { authErrorKey, validationKey } from '@/features/authentication/errorMessages';
 import { loginSchema, type LoginValues } from '@/features/authentication/schemas';
+import { consumeReturnPath, readReturnPath } from '@/features/navigation/returnPath';
 import { useTranslation } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
 import { homePathForRole } from '@/types/user';
@@ -26,7 +27,9 @@ export default function LoginScreen() {
     clearError();
     try {
       const profile = await signIn(values);
-      router.replace(homePathForRole(profile.role));
+      const destination = readReturnPath() ?? homePathForRole(profile.role);
+      consumeReturnPath();
+      router.replace(destination as Href);
     } catch {
       // Error state is exposed through the auth context.
     }

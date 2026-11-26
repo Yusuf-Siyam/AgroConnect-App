@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, router } from 'expo-router';
+import { Link, router, type Href } from 'expo-router';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { View } from 'react-native';
 
@@ -11,6 +11,7 @@ import { Screen } from '@/components/common/Screen';
 import { TextField } from '@/components/common/TextField';
 import { authErrorKey, validationKey } from '@/features/authentication/errorMessages';
 import { registerFormSchema, type RegisterFormValues } from '@/features/authentication/schemas';
+import { consumeReturnPath, readReturnPath } from '@/features/navigation/returnPath';
 import { useTranslation } from '@/i18n';
 import { useAuth } from '@/providers/AuthProvider';
 import { homePathForRole } from '@/types/user';
@@ -39,7 +40,9 @@ export default function RegisterScreen() {
     clearError();
     try {
       const profile = await signUp({ ...values, role: values.role });
-      router.replace(homePathForRole(profile.role));
+      const destination = readReturnPath() ?? homePathForRole(profile.role);
+      consumeReturnPath();
+      router.replace(destination as Href);
     } catch {
       // Error state is exposed through the auth context.
     }

@@ -12,6 +12,8 @@ const profileSchema = z.object({
   district: z.string().optional(),
   role: roleSchema,
   isVerified: z.boolean().default(false),
+  isActive: z.boolean().optional(),
+  accountStatus: z.enum(['active', 'suspended']).optional(),
   preferredLanguage: z.enum(['bn', 'en']).optional(),
   vehicle: z
     .object({

@@ -16,6 +16,9 @@ export type UserProfile = {
   district?: string;
   role: Role;
   isVerified: boolean;
+  /** Optional account state used by route guards; absent means active. */
+  isActive?: boolean;
+  accountStatus?: 'active' | 'suspended';
   preferredLanguage?: 'bn' | 'en';
   vehicle?: {
     type: string;
