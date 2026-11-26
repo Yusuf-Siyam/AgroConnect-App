@@ -1071,3 +1071,94 @@ All gates were run from the repository root unless noted, after the final code a
 
 `git diff --check` is clean. No `.env` value, credential, key or user image was opened, printed or committed. The only new dependency is the SDK-matched official `expo-clipboard` module installed with `npx expo install`; no third-party package was added. STEP 1 is committed as a single code-and-test change; nothing was pushed.
 
+## Routing and guards - STEP 0 read-only audit
+
+This section is documentation only. No feature code, route file, test, locale or configuration was changed while producing it. The app uses `expo-router ~58.0.32` (`package.json:21`). SDK 58 docs were checked at `https://docs.expo.dev/router/migrate/sdk-57-to-58.md`, `https://docs.expo.dev/router/advanced/protected.md`, `https://docs.expo.dev/router/advanced/nesting-navigators.md` and `https://docs.expo.dev/router/advanced/tabs.md`.
+
+### 1. Route files and wrapping layouts
+
+| Requested URL | Real route file | Nested layout | Wrapping layouts |
+|---|---|---|---|
+| `/farmer/analytics` | `src/app/farmer/analytics/index.tsx` | none | `src/app/farmer/_layout.tsx` → `src/app/_layout.tsx` |
+| `/farmer/weather` | `src/app/farmer/weather/index.tsx` | none | `src/app/farmer/_layout.tsx` → `src/app/_layout.tsx` |
+| `/farmer/market` | `src/app/farmer/market/index.tsx` | none | `src/app/farmer/_layout.tsx` → `src/app/_layout.tsx` |
+| `/farmer/harvest` | `src/app/farmer/harvest/index.tsx` | `src/app/farmer/harvest/_layout.tsx` (`Stack`, `anchor: 'index'`, lines 1-10) | `src/app/farmer/_layout.tsx` → `src/app/_layout.tsx` |
+| `/farmer/batches` | `src/app/farmer/batches/index.tsx` | `src/app/farmer/batches/_layout.tsx` (`Stack`, `anchor: 'index'`, lines 1-10) | `src/app/farmer/_layout.tsx` → `src/app/_layout.tsx` |
+| `/farmer/emergency` | `src/app/farmer/emergency/index.tsx` | none | `src/app/farmer/_layout.tsx` → `src/app/_layout.tsx` |
+| `/farmer/groups` | `src/app/farmer/groups/index.tsx` | `src/app/farmer/groups/_layout.tsx` (`Stack`, `anchor: 'index'`, lines 1-10) | `src/app/farmer/_layout.tsx` → `src/app/_layout.tsx` |
+
+Root layout: `src/app/_layout.tsx:22-43` declares a `Stack`; `Stack.Protected` at lines 28-30 protects `(auth)` while unauthenticated and redirects to `/`; `Stack.Protected` at lines 32-39 protects `farmer`, `buyer`, `transporter`, `admin`, `chat` and `profile` while authenticated and redirects to `/login`; `index` is declared at line 41. `RootContent` at lines 46-59 shows `SplashScreen` while `status === 'loading'` (line 49).
+
+Farmer layout: `src/app/farmer/_layout.tsx:1-10` wraps `FarmerTabs` in `RoleGuard role="farmer"`. Tab layout: `src/components/navigation/FarmerTabs.tsx:18-30`; the five visible tabs are `index`, `products`, `orders`, `ai`, `more`, while all eight detail/tool directories are declared with `href: null` at lines 23-30. There is no route group under `src/app/farmer`; `farmer/_layout.tsx` itself is the tab navigator. The nested `Stack` layouts listed in the table are the only group layouts under those seven paths. `src/app/farmer/more.tsx` is the More tools hub.
+
+### 2. Every redirect / role-home source found
+
+| File and line | Exact condition / destination | Assessment |
+|---|---|---|
+| `src/app/_layout.tsx:28-30` | `guard={status === 'unauthenticated'}`; when false, `Stack.Protected` redirects the `(auth)` group to `/` | Intended auth-shell redirect; `/` then applies the role-home rule below. |
+| `src/app/_layout.tsx:32-39` | `guard={status === 'authenticated'}`; when false, role/chat/profile screens redirect to `/login` | Intended login gate, but it has no return-path memory. |
+| `src/app/index.tsx:9-10` | `status === 'authenticated'` → `<Redirect href={homePathForRole(role)} />`; `status === 'unauthenticated'` → `/login` | Root role-home dispatcher, not a per-page dashboard bug. |
+| `src/components/common/RoleGuard.tsx:12-14` | `status === 'loading'` → `SplashScreen`; otherwise `status !== 'authenticated' || profile?.role !== role` → `<Redirect href={homePathForRole(profile?.role)} />` | Used by farmer, buyer, transporter and admin layouts. A failed profile load currently becomes unauthenticated and therefore lands on `/login`; a wrong role lands on that role's own home. |
+| `src/types/user.ts:35-47` | `homePathForRole()` maps `farmer → /farmer`, `buyer → /buyer`, `transporter → /transporter`, `admin → /admin`, default → `/login` | Central role-home mapping. |
+| `src/app/(auth)/login.tsx:25-29` | successful `signIn()` → `router.replace(homePathForRole(profile.role))` | Always role home; ignores any intended path. |
+| `src/app/(auth)/register.tsx:37-42` | successful `signUp()` → `router.replace(homePathForRole(profile.role))` | Expected after registration. |
+| `src/app/profile/index.tsx:152-158` | sign-out button → `logout()` then `router.replace('/login')` | Explicit user action. |
+| `src/app/buyer/product/index.tsx:1-5` | every visit to `/buyer/product` → `<Redirect href="/buyer" />` | Anchor route redirect; not one of the seven farmer URLs. |
+| `src/app/buyer/farmer/index.tsx:1-5` | every visit to `/buyer/farmer` → `<Redirect href="/buyer" />` | Anchor route redirect; not one of the seven farmer URLs. |
+| `src/features/navigation/backNavigation.ts:59-63,75-119` | `roleHomeOrNull()` uses `homePathForRole()`; unknown/deep paths fall back to role home at line 106 | Only used on explicit back/hardware-back actions; not automatic on page open. |
+| `src/features/navigation/useBackNavigation.ts:39-49` | `router.back()` or `router.replace(resolved.href)` | Called only by back buttons/hardware back. |
+| `src/components/navigation/AndroidBackHandler.tsx:7-15` | Android-only hardware-back subscription | Not web and not automatic on page open. |
+| `src/components/navigation/DashboardHeader.tsx:28,38,46,58` | header back button and explicit chat/notifications/profile pushes | `FarmerPage` renders this header; no automatic redirect. |
+| `src/app/farmer/index.tsx:30,81` | dashboard cards push `/farmer/products` and `/farmer/harvest` | Correct destination hrefs. |
+| `src/components/chat/NotificationBridge.tsx:29-43` and `src/features/chat/notificationRouting.ts:55-65` | native notification tap only; validated role-specific href via `router.push` | No dashboard redirect; native platforms only. |
+
+SDK 58 hidden-tab redirect (the automatic dashboard bounce):
+
+- `src/components/navigation/FarmerTabs.tsx:23-30` passes `href: null` for all seven requested tool paths (and `inventory`).
+- `node_modules/expo-router/build/layouts/TabsClient.js:85-99` converts `href: null` into `options.hidden = true`.
+- `node_modules/expo-router/build/standard-navigation/useVisibleTabsWithRedirect.js:39-43` filters hidden routes out of `visibleRoutes`; line 56 selects the navigator's valid initial route (`index` here); lines 71-91 replace a focused route that is not visible with that redirect route. The farmer tab's `index` is the dashboard (`FarmerTabs.tsx:18`), so every focused hidden tool route is replaced with the dashboard.
+- The same effect is the reason a direct web URL or refresh cannot stay on the requested tool page: Expo Router builds navigation state from the URL, the focused route is hidden, and the effect replaces it with `index`.
+
+### 3. Per-page diagnosis
+
+All seven routes exist at the exact requested path (`section 1`). Their More tools hrefs match those paths (`src/app/farmer/more.tsx:15-43`), and the farmer `RoleGuard` allows them when `profile.role === 'farmer'` (`RoleGuard.tsx:12-17`). Therefore the common cause is category **(e), something else**, specifically the SDK 58 hidden-tab redirect above. They are not missing files (b), not wrong hub hrefs (d), and they are declared in the tab layout, but only as `href: null` hidden routes.
+
+| Page | Category | Proof |
+|---|---|---|
+| `/farmer/analytics` | (e) | `FarmerTabs.tsx:23`; `TabsClient.js:91-98`; `useVisibleTabsWithRedirect.js:71-91` → `index`. |
+| `/farmer/weather` | (e) | `FarmerTabs.tsx:30`; same SDK 58 hidden-route redirect. |
+| `/farmer/market` | (e) | `FarmerTabs.tsx:29`; same SDK 58 hidden-route redirect. |
+| `/farmer/harvest` | (e) | `FarmerTabs.tsx:27`; nested `Stack` at `farmer/harvest/_layout.tsx:1-10` does not change the parent hidden-tab decision. |
+| `/farmer/batches` | (e) | `FarmerTabs.tsx:24`; nested `Stack` at `farmer/batches/_layout.tsx:1-10` does not change the parent hidden-tab decision. |
+| `/farmer/emergency` | (e) | `FarmerTabs.tsx:25`; same SDK 58 hidden-route redirect. |
+| `/farmer/groups` | (e) | `FarmerTabs.tsx:26`; nested `Stack` at `farmer/groups/_layout.tsx:1-10` does not change the parent hidden-tab decision. |
+
+The role guard can also send a non-farmer to `/buyer`, `/transporter` or `/admin`, and a signed-out user to `/login`, but those are not the reported farmer-role failure.
+
+### 4. Auth loading sequence and failure behavior
+
+1. `src/config/env.ts:4-24` reads only public `EXPO_PUBLIC_*` values; `isFirebaseConfigured` requires all five Firebase public config values.
+2. `src/services/firebase.ts:44-97` lazily initializes Firebase Auth with `browserLocalPersistence` on web (lines 63-70) and Firestore. Emulator wiring is conditional on `EXPO_PUBLIC_USE_EMULATOR === 'true'` (lines 80-88); the reported environment is real Firebase, so no emulator connection is used there.
+3. `src/providers/AuthProvider.tsx:81-87` starts `status: 'loading'` when configured; `RootContent` shows `SplashScreen` while loading (`src/app/_layout.tsx:46-50`).
+4. `onAuthStateChanged` at `AuthProvider.tsx:203-247` stores the Firebase user. When no user, it clears profile and sets `unauthenticated` (lines 218-222). When a user exists, it calls `loadProfile()` (lines 224-229).
+5. `loadProfile()` at `AuthProvider.tsx:89-189` refreshes the ID token with `getIdTokenResult(true)` (line 92), reads the role claim (line 93), reads `users/{uid}` from Firestore (lines 94-95), parses it, resolves the claim role over the stored role (lines 106-115), and sets authenticated only after success (lines 224-229).
+6. There is **no HTTP profile request in the app**. `fetchMyProfile()` exists at `src/services/api.ts:86-90` but has no caller. Consequently 401/403/404/500 HTTP statuses do not occur during profile load. Firestore/Auth failures carry Firebase error codes instead. The API interceptor at `src/services/api.ts:20-40` attaches the current Firebase ID token; the backend verifies it at `backend/src/middleware/auth.ts:26-79` and returns 401 for a missing token (line 30) or invalid/expired/wrong-project token (line 78), and 403 for a missing/disallowed role (lines 38-40, 89-91).
+7. On any `loadProfile()` rejection, `AuthProvider.tsx:230-240` calls `failAuthentication()` (lines 191-201), which signs out, clears user/profile and sets `unauthenticated`. There is no profile-error state, no Retry UI and no Sign out choice; the root protected group then sends the user to `/login` (`src/app/_layout.tsx:32-39`). It does not directly redirect to the farmer dashboard, but it does lose the intended path.
+8. If the profile document does not exist, `AuthProvider.tsx:154-188` creates a fallback profile from the Auth user and the claim role (default `farmer`) with a client-side `setDoc`. If Firestore rules deny that client write, the promise rejects and the previous failure path signs the user out. If the document exists but is malformed, lines 119-139 construct a best-effort profile without overwriting protected fields. There is no `suspended`/`inactive` field in `src/types/user.ts:10-26` or `src/features/authentication/profile.ts:7-24`, so the guard cannot currently detect suspension.
+9. A dashboard API 401 (for example analytics/products) is a separate API request, not profile loading. The app currently has no 401 interceptor/recovery (`src/services/api.ts:20-40` has only the request interceptor). With a real project this points at configuration (backend service-account/project, frontend `EXPO_PUBLIC_FIREBASE_*` project, clock skew, expired token, missing Firestore profile), not at the hidden-tab routing bug.
+
+### 5. Direct deep link and refresh on web
+
+Typing `/farmer/groups` resolves to a real file, but `FarmerTabs.tsx:26` declares `groups` with `href: null`; `TabsClient.js:91-98` marks it hidden; `useVisibleTabsWithRedirect.js:71-91` replaces the focused hidden route with the initial visible tab. The initial tab is `index` (`FarmerTabs.tsx:18`), i.e. the farmer dashboard. A refresh follows the same URL-to-state-to-effect path. This is a code-derived conclusion from installed SDK 58 source; no runtime web session was started during this read-only audit.
+
+### 6. More tools navigation
+
+`src/app/farmer/more.tsx` uses `Link` exclusively. Hrefs are `inventory` line 15, `analytics` line 18, `weather` line 21, `market` line 24, `harvest` line 27, `batches` line 30, `emergency` line 33, `groups` line 36, `ai` line 39 and `/profile` line 43. Every one matches an existing route file or, for `/profile`, `src/app/profile/index.tsx`. No wrong href was found. The links fail only because the destination is a hidden tab under SDK 58.
+
+### 7. Other role areas
+
+- Buyer: `src/components/navigation/BuyerTabs.tsx:27-29` declares `checkout`, `product` and `farmer` with `href: null`, so those buyer detail routes have the same SDK 58 hidden-tab redirect to `/buyer`. Buyer visible tabs at lines 18-25 are otherwise correct. `buyer/product/index.tsx:5` and `buyer/farmer/index.tsx:5` also explicitly redirect their anchor routes to `/buyer`.
+- Transporter: `src/components/navigation/TransporterTabs.tsx:18-21` declares only real visible tabs (`index`, `jobs`, `deliveries`, `profile`). No hidden-tab problem was found; `deliveries/_layout.tsx` is a nested stack like the farmer tool stacks.
+- Admin: `src/app/admin/_layout.tsx:1-10` uses `RoleGuard role="admin"` and `RoleNavigator` (`src/components/navigation/RoleNavigator.tsx:1-16`), a `Stack` with a shared header. There is no tab layout or hidden tab. Admin has only `src/app/admin/index.tsx`.
+- `RoleGuard`, root `Stack.Protected`, the role-home mapper and the missing return-path/profile-error behavior apply equally to all four role areas. The specific dashboard bounce found here is limited to hidden tabs: seven farmer paths and three buyer paths.
+
