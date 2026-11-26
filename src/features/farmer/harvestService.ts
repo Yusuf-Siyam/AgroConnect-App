@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { api, assertApiConfigured, toApiError } from '@/services/api';
 
-import type { HarvestPayload } from './harvestSchemas';
+import type { HarvestPayload, HarvestUpdatePayload } from './harvestSchemas';
 import { PRODUCT_UNITS } from './types';
 import type { HarvestRecord, HarvestRecordList, HarvestStatusUpdate } from './harvestTypes';
 
@@ -77,7 +77,7 @@ export async function createHarvestRecord(payload: HarvestPayload): Promise<Harv
 
 export async function updateHarvestRecord(
   recordId: string,
-  payload: HarvestPayload,
+  payload: HarvestUpdatePayload,
 ): Promise<HarvestRecord> {
   assertApiConfigured();
   try {

@@ -116,6 +116,61 @@ describe('Phase 11 group purchase emulator verification', () => {
     assert.equal(bad.status, 400);
   });
 
+  it('scopes the farmer group list to the creator and paginates', async () => {
+    const farmer = await registerUser('gp-list-farmer', 'farmer');
+    const otherFarmer = await registerUser('gp-list-other-farmer', 'farmer');
+    const firstProduct = await createProduct(farmer, { id: randomUUID() });
+    const secondProduct = await createProduct(farmer, { id: randomUUID() });
+    const foreignProduct = await createProduct(otherFarmer, { id: randomUUID() });
+
+    const createGroup = async (owner: TestUser, productId: string) => {
+      const response = await fetchAs('/api/group-purchases', owner.token, {
+        method: 'POST',
+        body: JSON.stringify({ productId, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 5, deadlineInDays: 3 }),
+      });
+      assert.equal(response.status, 201, await response.clone().text());
+    };
+    await createGroup(farmer, firstProduct.id);
+    await createGroup(farmer, secondProduct.id);
+    await createGroup(otherFarmer, foreignProduct.id);
+
+    const response = await fetchAs('/api/group-purchases/mine?limit=1&offset=1', farmer.token);
+    assert.equal(response.status, 200, await response.clone().text());
+    const body = await response.json() as {
+      items: { farmerId: string }[];
+      total: number;
+      limit: number;
+      offset: number;
+    };
+    assert.equal(body.total, 2);
+    assert.equal(body.items.length, 1);
+    assert.equal(body.items.every((item) => item.farmerId === farmer.uid), true);
+    assert.equal(body.limit, 1);
+    assert.equal(body.offset, 1);
+  });
+
+  it('paginates the buyer group list', async () => {
+    const farmer = await registerUser('gp-page-farmer', 'farmer');
+    const buyer = await registerUser('gp-page-buyer', 'buyer');
+    const firstProduct = await createProduct(farmer, { id: randomUUID() });
+    const secondProduct = await createProduct(farmer, { id: randomUUID() });
+    for (const product of [firstProduct, secondProduct]) {
+      const response = await fetchAs('/api/group-purchases', farmer.token, {
+        method: 'POST',
+        body: JSON.stringify({ productId: product.id, targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 5, deadlineInDays: 3 }),
+      });
+      assert.equal(response.status, 201, await response.clone().text());
+    }
+
+    const response = await fetchAs('/api/group-purchases?limit=1&offset=1', buyer.token);
+    assert.equal(response.status, 200, await response.clone().text());
+    const body = await response.json() as { items: unknown[]; total: number; limit: number; offset: number };
+    assert.equal(body.items.length, 1);
+    assert.ok(body.total >= 2);
+    assert.equal(body.limit, 1);
+    assert.equal(body.offset, 1);
+  });
+
   it('join creates no order and does not change stock', async () => {
     const farmer = await registerUser('gp-farmer2', 'farmer');
     const buyer = await registerUser('gp-buyer2', 'buyer');

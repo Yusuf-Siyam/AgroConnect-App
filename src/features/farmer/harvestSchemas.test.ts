@@ -6,8 +6,10 @@ import {
   harvestFormDateProblem,
   harvestFormSchema,
   harvestMonthKey,
+  planHarvestEdit,
   toHarvestFormValues,
   toHarvestPayload,
+  toHarvestUpdatePayload,
 } from './harvestSchemas';
 import type { HarvestRecord } from './harvestTypes';
 
@@ -89,5 +91,48 @@ describe('harvest form helpers', () => {
       notes: '',
     });
     assert.equal(harvestMonthKey(record.expectedHarvestDate), '2026-05');
+  });
+
+  it('builds a PATCH payload without status and sends null for cleared optional fields', () => {
+    const payload = toHarvestUpdatePayload({
+      ...emptyHarvestForm,
+      crop: 'Rice',
+      sowingDate: '2026-01-01',
+      expectedHarvestDate: '2026-05-01',
+      status: 'growing',
+    });
+
+    assert.equal('status' in payload, false);
+    assert.equal(payload.productId, null);
+    assert.equal(payload.plot, null);
+    assert.equal(payload.actualHarvestDate, null);
+    assert.equal(payload.notes, null);
+  });
+
+  it('places the status transition before PATCH when leaving harvested', () => {
+    const record: HarvestRecord = {
+      id: 'record-1',
+      farmerId: 'farmer-1',
+      crop: 'Rice',
+      sowingDate: '2026-01-01',
+      expectedHarvestDate: '2026-05-20',
+      actualHarvestDate: '2026-05-20',
+      expectedQuantity: 100,
+      unit: 'kg',
+      status: 'harvested',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-05-20T00:00:00.000Z',
+    };
+    const plan = planHarvestEdit(record, {
+      ...emptyHarvestForm,
+      crop: 'Rice',
+      sowingDate: '2026-01-01',
+      expectedHarvestDate: '2026-05-20',
+      status: 'growing',
+    });
+
+    assert.equal(plan.statusFirst, true);
+    assert.deepEqual(plan.status, { status: 'growing' });
+    assert.equal(plan.update.actualHarvestDate, null);
   });
 });

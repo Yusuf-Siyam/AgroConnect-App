@@ -67,6 +67,10 @@ export default function BuyerTraceScreen() {
       setScanning(false);
       setScanned(false);
     },
+    onError: () => {
+      // Allow the camera to scan again after a failed lookup instead of staying locked.
+      setScanned(false);
+    },
   });
 
   const submit = (value: string) => {

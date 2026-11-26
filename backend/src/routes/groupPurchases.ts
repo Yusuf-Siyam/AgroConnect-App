@@ -25,6 +25,19 @@ export function createGroupPurchasesRouter(): Router {
   router.use(createRateLimiter({ windowMs: 60_000, max: 120 }));
   router.use(authenticate);
 
+  router.get('/mine', requireRole('farmer'), async (req, res, next) => {
+    const parsed = groupPurchaseQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      next(new HttpError(400, 'VALIDATION_ERROR', validationMessage(parsed.error)));
+      return;
+    }
+    try {
+      res.json(await listGroupPurchases(parsed.data, { creatorId: req.auth!.uid }));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get('/', async (req, res, next) => {
     const parsed = groupPurchaseQuerySchema.safeParse(req.query);
     if (!parsed.success) {

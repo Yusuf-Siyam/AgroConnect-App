@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
 import { PRODUCT_UNITS } from './types';
-import { HARVEST_STATUSES, type HarvestRecord, type HarvestStatus } from './harvestTypes';
+import {
+  HARVEST_STATUSES,
+  type HarvestRecord,
+  type HarvestStatus,
+  type HarvestStatusUpdate,
+} from './harvestTypes';
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -86,6 +91,25 @@ export type HarvestPayload = {
   notes?: string;
 };
 
+/** PATCH payload: status changes use the dedicated status endpoint. `null` clears an optional field. */
+export type HarvestUpdatePayload = {
+  crop: string;
+  productId?: string | null;
+  plot?: string | null;
+  sowingDate: string;
+  expectedHarvestDate: string;
+  actualHarvestDate?: string | null;
+  expectedQuantity: number;
+  unit: (typeof PRODUCT_UNITS)[number];
+  notes?: string | null;
+};
+
+export type HarvestEditPlan = {
+  update: HarvestUpdatePayload;
+  status?: HarvestStatusUpdate;
+  statusFirst: boolean;
+};
+
 export const emptyHarvestForm: HarvestFormValues = {
   crop: '',
   productId: '',
@@ -111,6 +135,40 @@ export function toHarvestPayload(values: HarvestFormValues): HarvestPayload {
     unit: values.unit,
     status: values.status,
     ...(values.notes ? { notes: values.notes.trim() } : {}),
+  };
+}
+
+export function toHarvestUpdatePayload(values: HarvestFormValues): HarvestUpdatePayload {
+  return {
+    crop: values.crop.trim(),
+    productId: values.productId.trim() || null,
+    plot: values.plot.trim() || null,
+    sowingDate: values.sowingDate.trim(),
+    expectedHarvestDate: values.expectedHarvestDate.trim(),
+    actualHarvestDate: values.actualHarvestDate.trim() || null,
+    expectedQuantity: Number(values.expectedQuantity),
+    unit: values.unit,
+    notes: values.notes.trim() || null,
+  };
+}
+
+/** Keeps status transitions on the canonical status endpoint while allowing optional fields to be cleared. */
+export function planHarvestEdit(
+  record: HarvestRecord,
+  values: HarvestFormValues,
+): HarvestEditPlan {
+  const statusChanged = values.status !== record.status;
+  return {
+    update: toHarvestUpdatePayload(values),
+    status: statusChanged
+      ? {
+          status: values.status,
+          ...(values.actualHarvestDate.trim()
+            ? { actualHarvestDate: values.actualHarvestDate.trim() }
+            : {}),
+        }
+      : undefined,
+    statusFirst: statusChanged && record.status === 'harvested' && values.status !== 'harvested',
   };
 }
 

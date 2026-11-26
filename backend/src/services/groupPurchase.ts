@@ -235,8 +235,14 @@ export async function getGroupPurchase(groupId: string): Promise<GroupPurchase> 
   return group;
 }
 
-export async function listGroupPurchases(query: GroupPurchaseQuery): Promise<GroupPurchaseListResponse> {
-  const snap = await groups().orderBy('createdAt', 'desc').get();
+export async function listGroupPurchases(
+  query: GroupPurchaseQuery,
+  scope: { creatorId?: string } = {},
+): Promise<GroupPurchaseListResponse> {
+  const baseQuery = scope.creatorId
+    ? groups().where('creatorId', '==', scope.creatorId).orderBy('createdAt', 'desc')
+    : groups().orderBy('createdAt', 'desc');
+  const snap = await baseQuery.get();
   const evaluated = await Promise.all(
     snap.docs.map(async (d) => {
       const g = parseGroup(d.data());

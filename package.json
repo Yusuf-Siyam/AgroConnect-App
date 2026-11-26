@@ -9,6 +9,7 @@
     "axios": "^1.21.1",
     "expo": "~58.0.26",
     "expo-camera": "~58.0.14",
+    "expo-clipboard": "~58.0.4",
     "expo-constants": "~58.0.16",
     "expo-crypto": "~58.0.8",
     "expo-image-manipulator": "~58.0.16",
@@ -58,7 +59,7 @@
     "emulators": "firebase emulators:start --only auth,firestore --project demo-agroconnect",
     "emulators:persist": "firebase emulators:start --only auth,firestore --project demo-agroconnect --import ./emulator-data --export-on-exit ./emulator-data",
     "test:emulators": "firebase emulators:exec --only auth,firestore --project demo-agroconnect \"node scripts/run-emulator-tests.mjs\"",
-    "test:mobile": "tsx --test src/features/chat/chatIds.test.ts src/features/chat/validation.test.ts src/features/chat/notificationText.test.ts src/features/chat/notificationRouting.test.ts src/features/authentication/authErrors.test.ts src/features/buyer/reputation.test.ts src/features/farmer/harvestSchemas.test.ts src/features/ai/photoSuggestionConsent.test.ts src/features/ai/aiErrors.test.ts src/features/ai/diagnosisImage.test.ts src/features/ai/diagnosisRequest.test.ts src/features/navigation/backNavigation.test.ts src/locales/keyParity.test.ts",
+    "test:mobile": "tsx --test src/features/chat/chatIds.test.ts src/features/chat/validation.test.ts src/features/chat/notificationText.test.ts src/features/chat/notificationRouting.test.ts src/features/authentication/authErrors.test.ts src/features/buyer/reputation.test.ts src/features/farmer/harvestSchemas.test.ts src/features/farmer/groupService.test.ts src/features/farmer/batchShare.test.ts src/features/ai/photoSuggestionConsent.test.ts src/features/ai/aiErrors.test.ts src/features/ai/diagnosisImage.test.ts src/features/ai/diagnosisRequest.test.ts src/features/navigation/backNavigation.test.ts src/i18n/translate.test.ts src/locales/keyParity.test.ts",
     "seed:dev-paid-order": "cd backend && npm run seed:dev-paid-order --"
   },
   "private": true

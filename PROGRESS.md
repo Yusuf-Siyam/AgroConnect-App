@@ -1030,3 +1030,44 @@ All gates below were run from the repository root unless noted, after the approv
 
 `git diff --check` is clean. The Java 21 home and the extracted TypeScript platform binary are outside tracked files; no `.env` value, credential, key or user image was opened, printed or committed. STEP 0 is committed as a docs-only change (the approved baseline test repair is a separate, earlier test-only commit); nothing was pushed.
 
+## More tools hardening - STEP 1 implementation (in progress)
+
+Scope: repair broken contracts, write paths and the translation placeholders used by those paths only. Phase 07B, Phase 11 STEP 6, offline mode, voice, price prediction, the dashboard harvest card, Asia/Dhaka date math and the UI-shell/component work remain deferred to their planned steps.
+
+### Contracts and writes repaired
+
+- Farmer and buyer group services now parse `response.data` on every list, detail, create, join, leave and cancel call. Both list services accept `status`, `limit` and `offset` and return the full list envelope instead of a bare array, so the backend total is reachable from the screens.
+- Added farmer-only `GET /api/group-purchases/mine` before the detail route. It reuses the strict group query validator, scopes Firestore by `creatorId == uid` plus `createdAt desc` (covered by the existing composite index), and preserves status evaluation, total and pagination. The public list keeps its existing behavior and now receives mobile `limit`/`offset`.
+- Farmer and buyer group screens now load 20 rows per page, append on Load more, reset on refresh/create/cancel, show localized list errors with retry, and show empty/loading states. Farmer group cancel now asks for confirmation, disables all cancel buttons while one is pending, and surfaces cancel errors.
+- Harvest create still uses `POST` with status. Harvest edit now uses a PATCH payload with no `status`; status changes go through the existing `POST /:id/status` endpoint. Empty optional fields are sent as `null`, accepted by the strict Zod PATCH schema and written as `FieldValue.delete()` so `merge:true` no longer retains stale values. When leaving `harvested`, the status transition runs before the PATCH so clearing the actual date cannot fail harvested-date validation. Status remains rejected in PATCH.
+- Emergency cancel now asks for confirmation, disables the pending action and surfaces localized errors.
+- Group placeholder strings in both locales now use the double braces expected by `translate()`, so progress, deadline, discount, participant counts and per-participant quantities render actual values instead of literal `{name}` text.
+- Buyer trace scanning resets `scanned` on a failed lookup, so the camera can scan again instead of staying locked.
+- Batch detail has Copy code and Share code actions. Copy uses the newly installed official `expo-clipboard` module; share uses React Native core `Share`. No third-party package was added. The share message is the trimmed trace code only.
+
+### Dependency note
+
+`npx expo install expo-clipboard` was run because the project uses npm (`package-lock.json`, no `bun.lock`). The SDK 58 docs confirm `expo-clipboard` is included in Expo Go and compatible with this SDK. `expo-sharing` was evaluated and intentionally not installed because `Share` from React Native core already covers the required text action without another native module.
+
+### New coverage
+
+- Mobile: seven group response/query scenarios, two harvest-edit planning scenarios, one batch share payload scenario, one translation-interpolation scenario covering both locales.
+- Backend unit: harvest PATCH accepts `null` optional fields and rejects `status`.
+- Emulator: farmer-only scoped/paginated group list, buyer list pagination, optional harvest field clearing and PATCH status rejection.
+
+### STEP 1 verification record
+
+All gates were run from the repository root unless noted, after the final code and locale changes:
+
+| Gate | Command | Result |
+|---|---|---|
+| Root typecheck | `npx tsc --noEmit` | PASS (no output). |
+| Backend typecheck | `cd backend && npm run typecheck` | PASS (no output). |
+| Lint | `npm run lint` | PASS (`expo lint` clean; only env variable names are printed, never values). |
+| Mobile tests | `npm run test:mobile` | PASS - 72 tests / 21 suites, 0 failures. |
+| Backend unit tests | `cd backend && npm test` | PASS - 67 tests / 16 suites, 0 failures. |
+| i18n check | `npm run check:i18n` | PASS - 111 TSX files have no literal user-facing strings. |
+| Full emulator suite | `JAVA_HOME=/tmp/opencode/jdk21/jdk-21.0.13.1+2 PATH=/tmp/opencode/jdk21/jdk-21.0.13.1+2/bin:$PATH npm run test:emulators` | PASS - 19 suites / 131 tests, 0 failures, ending in `[emulator-tests] All emulator test suites passed`. |
+
+`git diff --check` is clean. No `.env` value, credential, key or user image was opened, printed or committed. The only new dependency is the SDK-matched official `expo-clipboard` module installed with `npx expo install`; no third-party package was added. STEP 1 is committed as a single code-and-test change; nothing was pushed.
+

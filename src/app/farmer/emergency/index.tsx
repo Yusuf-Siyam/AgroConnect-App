@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
@@ -15,7 +15,7 @@ import {
 } from '@/features/farmer/emergencyService';
 import { farmerApiErrorKey } from '@/features/farmer/errorMessages';
 import { listProducts } from '@/features/farmer/productService';
-import { useTranslation } from '@/i18n';
+import { useTranslation, type TranslationKey } from '@/i18n';
 
 export default function EmergencyListingsScreen() {
   const { t, locale } = useTranslation();
@@ -25,6 +25,7 @@ export default function EmergencyListingsScreen() {
   const [availableQty, setAvailableQty] = useState('');
   const [expiresInHours, setExpiresInHours] = useState('24');
   const [formError, setFormError] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<TranslationKey | null>(null);
 
   const products = useQuery({
     queryKey: ['farmer', 'products', 'all-for-emergency'],
@@ -54,10 +55,30 @@ export default function EmergencyListingsScreen() {
   const cancel = useMutation({
     mutationFn: cancelEmergencyListing,
     onSuccess: async () => {
+      setCancelError(null);
       await qc.invalidateQueries({ queryKey: ['farmer', 'emergency-listings'] });
       await qc.invalidateQueries({ queryKey: ['farmer', 'products'] });
     },
+    onError: (error) => setCancelError(farmerApiErrorKey((error as { code?: string }).code)),
   });
+
+  const confirmCancel = (listingId: string) => {
+    Alert.alert(
+      t('farmer.emergency.cancelConfirmTitle'),
+      t('farmer.emergency.cancelConfirmMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('farmer.emergency.cancelAction'),
+          style: 'destructive',
+          onPress: () => {
+            setCancelError(null);
+            cancel.mutate(listingId);
+          },
+        },
+      ],
+    );
+  };
 
   const submit = () => {
     if (!productId) { setFormError(t('farmer.emergency.productRequired')); return; }
@@ -92,7 +113,13 @@ export default function EmergencyListingsScreen() {
         <TextField label={t('farmer.emergency.qtyLabel')} value={availableQty} onChangeText={setAvailableQty} keyboardType="number-pad" />
         <TextField label={t('farmer.emergency.hoursLabel')} value={expiresInHours} onChangeText={setExpiresInHours} keyboardType="number-pad" />
         {formError ? <AppText variant="error">{formError}</AppText> : null}
-        <Button label={t('farmer.emergency.createAction')} onPress={submit} loading={create.isPending} />
+        {cancelError ? <AppText variant="error">{t(cancelError)}</AppText> : null}
+        <Button
+          label={t('farmer.emergency.createAction')}
+          onPress={submit}
+          loading={create.isPending}
+          disabled={create.isPending}
+        />
       </Card>
 
       <View className="gap-3">
@@ -110,7 +137,13 @@ export default function EmergencyListingsScreen() {
             <AppText variant="caption">{t('farmer.emergency.statusValue', { status: listing.status })}</AppText>
             <AppText variant="caption">{t('farmer.emergency.expiresAt', { date: new Date(listing.expiresAt).toLocaleString() })}</AppText>
             {listing.status === 'active' ? (
-              <Button label={t('farmer.emergency.cancelAction')} variant="outline" onPress={() => cancel.mutate(listing.id)} loading={cancel.isPending} />
+              <Button
+                label={t('farmer.emergency.cancelAction')}
+                variant="outline"
+                onPress={() => confirmCancel(listing.id)}
+                loading={cancel.isPending}
+                disabled={cancel.isPending}
+              />
             ) : null}
           </Card>
         ))}

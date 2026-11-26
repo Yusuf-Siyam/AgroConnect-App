@@ -13,11 +13,16 @@ import { farmerApiErrorKey, validationKey } from '@/features/farmer/errorMessage
 import {
   emptyHarvestForm,
   harvestFormSchema,
+  planHarvestEdit,
   toHarvestFormValues,
   toHarvestPayload,
   type HarvestFormValues,
 } from '@/features/farmer/harvestSchemas';
-import { createHarvestRecord, updateHarvestRecord } from '@/features/farmer/harvestService';
+import {
+  createHarvestRecord,
+  setHarvestRecordStatus,
+  updateHarvestRecord,
+} from '@/features/farmer/harvestService';
 import { HARVEST_STATUSES, type HarvestRecord } from '@/features/farmer/harvestTypes';
 import { PRODUCT_UNITS } from '@/features/farmer/types';
 import { useBackNavigation } from '@/features/navigation/useBackNavigation';
@@ -36,8 +41,16 @@ export function HarvestForm({ record }: { record?: HarvestRecord }) {
 
   const save = useMutation({
     mutationFn: async (values: HarvestFormValues) => {
-      const payload = toHarvestPayload(values);
-      return record ? updateHarvestRecord(record.id, payload) : createHarvestRecord(payload);
+      if (!record) return createHarvestRecord(toHarvestPayload(values));
+
+      const plan = planHarvestEdit(record, values);
+      if (plan.statusFirst && plan.status) {
+        await setHarvestRecordStatus(record.id, plan.status);
+        return updateHarvestRecord(record.id, plan.update);
+      }
+      const updated = await updateHarvestRecord(record.id, plan.update);
+      if (plan.status) return setHarvestRecordStatus(record.id, plan.status);
+      return updated;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['farmer', 'harvest-records'] });

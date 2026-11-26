@@ -23,10 +23,26 @@ const groupSchema = z.object({
 const listSchema = z.object({ items: z.array(groupSchema), total: z.number(), limit: z.number(), offset: z.number() });
 
 export type FarmerGroupPurchase = z.infer<typeof groupSchema>;
+export type FarmerGroupPurchaseList = z.infer<typeof listSchema>;
+export type FarmerGroupPurchaseQuery = {
+  status?: FarmerGroupPurchase['status'];
+  limit?: number;
+  offset?: number;
+};
 
-export async function listMyGroupPurchases(): Promise<FarmerGroupPurchase[]> {
-  const res = await api.get<unknown>('/api/group-purchases');
-  return listSchema.parse(res).items;
+function queryParams(query: FarmerGroupPurchaseQuery) {
+  return {
+    ...(query.status ? { status: query.status } : {}),
+    limit: query.limit ?? 20,
+    offset: query.offset ?? 0,
+  };
+}
+
+export async function listMyGroupPurchases(
+  query: FarmerGroupPurchaseQuery = {},
+): Promise<FarmerGroupPurchaseList> {
+  const res = await api.get<unknown>('/api/group-purchases/mine', { params: queryParams(query) });
+  return listSchema.parse(res.data);
 }
 
 export async function createGroupPurchase(input: {
@@ -37,9 +53,11 @@ export async function createGroupPurchase(input: {
   maxParticipants: number;
   deadlineInDays: number;
 }): Promise<FarmerGroupPurchase> {
-  return groupSchema.parse(await api.post<unknown>('/api/group-purchases', input));
+  const res = await api.post<unknown>('/api/group-purchases', input);
+  return groupSchema.parse(res.data);
 }
 
 export async function cancelGroupPurchase(groupId: string): Promise<FarmerGroupPurchase> {
-  return groupSchema.parse(await api.post<unknown>(`/api/group-purchases/${groupId}/cancel`, {}));
+  const res = await api.post<unknown>(`/api/group-purchases/${groupId}/cancel`, {});
+  return groupSchema.parse(res.data);
 }

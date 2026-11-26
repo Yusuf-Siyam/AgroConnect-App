@@ -7,12 +7,22 @@ import { z } from 'zod';
 import { AppText } from '@/components/common/AppText';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
+import { StateView } from '@/components/common/StateView';
 import { TextField } from '@/components/common/TextField';
 import { Screen } from '@/components/common/Screen';
-import { cancelGroupPurchase, createGroupPurchase, listMyGroupPurchases, type FarmerGroupPurchase } from '@/features/farmer/groupService';
+import {
+  cancelGroupPurchase,
+  createGroupPurchase,
+  listMyGroupPurchases,
+  type FarmerGroupPurchase,
+  type FarmerGroupPurchaseList,
+} from '@/features/farmer/groupService';
+import { farmerApiErrorKey } from '@/features/farmer/errorMessages';
 import { listProducts } from '@/features/farmer/productService';
 import type { Product } from '@/features/farmer/types';
-import { useTranslation } from '@/i18n';
+import { useTranslation, type TranslationKey } from '@/i18n';
+
+const PAGE_SIZE = 20;
 
 const schema = z.object({
   productId: z.string().min(1),
@@ -29,50 +39,81 @@ export default function FarmerGroupsScreen() {
   const { t, locale } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [groups, setGroups] = useState<FarmerGroupPurchase[]>([]);
+  const [list, setList] = useState<FarmerGroupPurchaseList | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [listError, setListError] = useState<TranslationKey | null>(null);
+  const [cancelError, setCancelError] = useState<TranslationKey | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const { control, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { productId: '', targetQuantity: 20, quantityPerParticipant: 10, discountPercent: 10, maxParticipants: 5, deadlineInDays: 3 },
   });
   const selectedProductId = useWatch({ control, name: 'productId' });
 
-  const load = useCallback(async () => {
-    const [p, g] = await Promise.all([listProducts({ limit: 100, offset: 0, status: 'active' }), listMyGroupPurchases()]);
-    setProducts(p.items.filter((x) => !x.deleted));
-    setGroups(g);
+  const load = useCallback(async (nextOffset: number, options: { refresh?: boolean } = {}) => {
+    const reset = options.refresh === true || nextOffset === 0;
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
+    try {
+      const [p, g] = await Promise.all([
+        listProducts({ limit: 100, offset: 0, status: 'active' }),
+        listMyGroupPurchases({ limit: PAGE_SIZE, offset: nextOffset }),
+      ]);
+      setProducts(p.items.filter((item) => !item.deleted));
+      setGroups((current) => (reset ? g.items : [...current, ...g.items]));
+      setList(g);
+      setOffset(nextOffset + g.items.length);
+      setListError(null);
+    } catch (error) {
+      setListError(farmerApiErrorKey((error as { code?: string }).code));
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
   }, []);
 
   useEffect(() => {
     let active = true;
-    (async () => {
-      try {
-        const [p, g] = await Promise.all([listProducts({ limit: 100, offset: 0, status: 'active' }), listMyGroupPurchases()]);
-        if (!active) return;
-        setProducts(p.items.filter((x) => !x.deleted));
-        setGroups(g);
-      } catch {
-        // keep screen usable
-      }
-    })();
+    void Promise.resolve().then(() => {
+      if (active) void load(0);
+    });
     return () => { active = false; };
-  }, []);
+  }, [load]);
 
   const onSubmit = handleSubmit(async (values) => {
     try {
       await createGroupPurchase(schema.parse(values));
       Alert.alert(t('common.success'), t('farmer.groups.created'));
-      await load();
+      await load(0, { refresh: true });
     } catch {
       Alert.alert(t('common.error'), t('farmer.groups.createError'));
     }
   });
 
-  const onCancel = async (id: string) => {
+  const cancel = useCallback(async (id: string) => {
+    setCancelError(null);
+    setCancellingId(id);
     try {
       await cancelGroupPurchase(id);
-      await load();
-    } catch {
-      Alert.alert(t('common.error'), t('farmer.groups.cancelError'));
+      await load(0, { refresh: true });
+    } catch (error) {
+      setCancelError(farmerApiErrorKey((error as { code?: string }).code));
+    } finally {
+      setCancellingId(null);
     }
+  }, [load]);
+
+  const confirmCancel = (id: string) => {
+    Alert.alert(t('farmer.groups.cancelConfirmTitle'), t('farmer.groups.cancelConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('farmer.groups.cancelAction'),
+        style: 'destructive',
+        onPress: () => void cancel(id),
+      },
+    ]);
   };
 
   return (
@@ -84,8 +125,14 @@ export default function FarmerGroupsScreen() {
         <AppText className="font-semibold mb-2">{t('farmer.groups.create')}</AppText>
         <AppText className="text-xs text-gray-500 mb-2">{t('farmer.groups.selectProduct')}</AppText>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
-          {products.map((p) => (
-            <Button key={p.id} variant={selectedProductId === p.id ? 'primary' : 'outline'} className="mr-2" label={p.name.en || p.name.bn} onPress={() => setValue('productId', p.id, { shouldValidate: true })} />
+          {products.map((item) => (
+            <Button
+              key={item.id}
+              variant={selectedProductId === item.id ? 'primary' : 'outline'}
+              className="mr-2"
+              label={locale === 'bn' ? item.name.bn : item.name.en}
+              onPress={() => setValue('productId', item.id, { shouldValidate: true })}
+            />
           ))}
         </ScrollView>
         {errors.productId ? <AppText className="text-xs text-red-600 mb-2">{t('farmer.groups.productRequired')}</AppText> : null}
@@ -99,15 +146,40 @@ export default function FarmerGroupsScreen() {
       </Card>
 
       <AppText className="font-semibold mt-6 mb-2">{t('farmer.groups.list')}</AppText>
-      {groups.length === 0 ? <AppText className="text-sm text-gray-500">{t('farmer.groups.empty')}</AppText> : null}
-      {groups.map((g) => (
-        <Card key={g.id} className="mb-3">
-          <AppText className="font-semibold">{g.status}</AppText>
-          <AppText className="text-xs text-gray-600 mt-1">{t('buyer.groups.progress', { committed: g.committedQuantity, target: g.targetQuantity, unit: g.unit })}</AppText>
-          <AppText className="text-xs text-gray-500 mt-1">{t('buyer.groups.deadline', { date: new Date(g.deadline).toLocaleDateString(locale === 'bn' ? 'bn-BD' : 'en-GB') })}</AppText>
-          {g.status === 'open' ? <Button variant="outline" className="mt-3" label={t('common.cancel')} onPress={() => void onCancel(g.id)} /> : null}
+      {listError ? (
+        <StateView state="error" message={t(listError)} onRetry={() => void load(0, { refresh: true })} />
+      ) : null}
+      {cancelError ? <AppText variant="error">{t(cancelError)}</AppText> : null}
+      {loading ? <StateView state="loading" /> : null}
+      {!loading && !listError && groups.length === 0 ? (
+        <StateView state="empty" title={t('farmer.groups.empty')} />
+      ) : null}
+      {groups.map((item) => (
+        <Card key={item.id} className="mb-3">
+          <AppText className="font-semibold">{item.status}</AppText>
+          <AppText className="text-xs text-gray-600 mt-1">{t('buyer.groups.progress', { committed: item.committedQuantity, target: item.targetQuantity, unit: item.unit })}</AppText>
+          <AppText className="text-xs text-gray-500 mt-1">{t('buyer.groups.deadline', { date: new Date(item.deadline).toLocaleDateString(locale === 'bn' ? 'bn-BD' : 'en-GB') })}</AppText>
+          {item.status === 'open' ? (
+            <Button
+              variant="outline"
+              className="mt-3"
+              label={t('farmer.groups.cancelAction')}
+              onPress={() => confirmCancel(item.id)}
+              loading={cancellingId === item.id}
+              disabled={cancellingId !== null}
+            />
+          ) : null}
         </Card>
       ))}
+      {list && groups.length < list.total ? (
+        <Button
+          variant="outline"
+          label={t('common.loadMore')}
+          onPress={() => void load(offset)}
+          loading={loadingMore}
+          disabled={loadingMore}
+        />
+      ) : null}
       <View className="h-6" />
     </Screen>
   );

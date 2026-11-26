@@ -256,6 +256,34 @@ describe('Phase 11 harvest records emulator verification', () => {
     assert.equal(missing.status, 404);
   });
 
+  it('clears optional harvest fields through PATCH', async () => {
+    const record = await createRecord(farmer, {
+      productId: product.id,
+      plot: 'North field',
+      actualHarvestDate: '2026-04-10',
+      notes: 'Keep this note',
+    });
+    const response = await fetchAs(`/api/harvest-records/${record.id}`, farmer.token, {
+      method: 'PATCH',
+      body: JSON.stringify({ productId: null, plot: null, actualHarvestDate: null, notes: null }),
+    });
+    assert.equal(response.status, 200, await response.clone().text());
+    const patched = (await response.json()) as HarvestRecord;
+    assert.equal('productId' in patched, false);
+    assert.equal('plot' in patched, false);
+    assert.equal('actualHarvestDate' in patched, false);
+    assert.equal('notes' in patched, false);
+  });
+
+  it('rejects a status change through PATCH', async () => {
+    const record = await createRecord(farmer);
+    const response = await fetchAs(`/api/harvest-records/${record.id}`, farmer.token, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'harvested' }),
+    });
+    assert.equal(response.status, 400);
+  });
+
   it('rejects impossible dates and harvested status without an actual date', async () => {
     const badOrder = await fetchAs('/api/harvest-records', farmer.token, {
       method: 'POST',

@@ -31,6 +31,13 @@ export const createHarvestRecordSchema = z
 export const updateHarvestRecordSchema = createHarvestRecordSchema
   .omit({ status: true })
   .partial()
+  .extend({
+    productId: productIdSchema.nullable().optional(),
+    plot: z.string().trim().min(1).max(120).nullable().optional(),
+    actualHarvestDate: dateSchema.nullable().optional(),
+    notes: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict()
   .refine((value) => Object.keys(value).length > 0, 'At least one field is required');
 
 export const harvestStatusSchema = z

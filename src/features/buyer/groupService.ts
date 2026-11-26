@@ -49,22 +49,41 @@ const listSchema = z.object({
 });
 
 export type GroupPurchase = z.infer<typeof groupSchema>;
+export type GroupPurchaseList = z.infer<typeof listSchema>;
 export type GroupJoinResponse = z.infer<typeof joinResponseSchema>;
+export type GroupPurchaseQuery = {
+  status?: GroupPurchase['status'];
+  limit?: number;
+  offset?: number;
+};
 
-export async function listGroupPurchases(params?: { status?: string }): Promise<GroupPurchase[]> {
-  const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
-  const res = await api.get<unknown>(`/api/group-purchases${query}`);
-  return listSchema.parse(res).items;
+function queryParams(query: GroupPurchaseQuery) {
+  return {
+    ...(query.status ? { status: query.status } : {}),
+    limit: query.limit ?? 20,
+    offset: query.offset ?? 0,
+  };
+}
+
+export async function listGroupPurchases(query: GroupPurchaseQuery = {}): Promise<GroupPurchaseList> {
+  const res = await api.get<unknown>('/api/group-purchases', { params: queryParams(query) });
+  return listSchema.parse(res.data);
 }
 
 export async function getGroupPurchase(groupId: string): Promise<GroupPurchase> {
-  return groupSchema.parse(await api.get<unknown>(`/api/group-purchases/${groupId}`));
+  const res = await api.get<unknown>(`/api/group-purchases/${groupId}`);
+  return groupSchema.parse(res.data);
 }
 
 export async function joinGroupPurchase(groupId: string, quantity?: number): Promise<GroupJoinResponse> {
-  return joinResponseSchema.parse(await api.post<unknown>(`/api/group-purchases/${groupId}/join`, quantity ? { quantity } : {}));
+  const res = await api.post<unknown>(
+    `/api/group-purchases/${groupId}/join`,
+    quantity ? { quantity } : {},
+  );
+  return joinResponseSchema.parse(res.data);
 }
 
 export async function leaveGroupPurchase(groupId: string): Promise<GroupPurchase> {
-  return groupSchema.parse(await api.post<unknown>(`/api/group-purchases/${groupId}/leave`, {}));
+  const res = await api.post<unknown>(`/api/group-purchases/${groupId}/leave`, {});
+  return groupSchema.parse(res.data);
 }

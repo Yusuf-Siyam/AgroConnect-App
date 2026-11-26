@@ -146,13 +146,24 @@ export async function updateHarvestRecord(
   input: UpdateHarvestRecordInput,
 ): Promise<HarvestRecord> {
   const current = await requireOwnedHarvestRecord(farmerId, recordId);
-  const next = { ...current, ...input };
-  assertValidDates(next);
-  await assertOwnedProduct(farmerId, next.productId);
+  const patch: Record<string, unknown> = { ...input };
+  const clearedFields: string[] = [];
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) {
+      clearedFields.push(key);
+      delete patch[key];
+    }
+  }
 
-  await collection()
-    .doc(recordId)
-    .set({ ...input, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  const next = { ...current, ...patch };
+  for (const key of clearedFields) delete (next as Record<string, unknown>)[key];
+  assertValidDates(next);
+  await assertOwnedProduct(farmerId, typeof patch.productId === 'string' ? patch.productId : undefined);
+
+  const update: Record<string, unknown> = { ...patch };
+  for (const key of clearedFields) update[key] = FieldValue.delete();
+  update.updatedAt = FieldValue.serverTimestamp();
+  await collection().doc(recordId).set(update, { merge: true });
 
   return requireOwnedHarvestRecord(farmerId, recordId);
 }
